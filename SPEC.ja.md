@@ -167,8 +167,6 @@ struct IRProtocolSpec {
   bool lsb_first = true;             // ビット順序（true: LSB first）
 
   uint16_t bit_length = 0;           // 既定のビット長
-  uint16_t bit_length_variants[8] = {}; // 可変長許容値のリスト
-  uint8_t  bit_length_variant_count = 0; // variants の件数
 
   bool has_repeat = false;           // REPEAT シーケンスがあるか
   IRPulseUs repeat_header;           // REPEAT 用ヘッダ
@@ -209,6 +207,9 @@ constexpr esp32irpk::IRProtocolSpec MyProto = {
 ### 4.2 参照方法
 ```cpp
 esp32irpk::specs::NEC
+esp32irpk::specs::SONY12
+esp32irpk::specs::SONY15
+esp32irpk::specs::SONY20
 esp32irpk::specs::SAMSUNG32
 esp32irpk::specs::SAMSUNG36
 ```
@@ -217,7 +218,6 @@ esp32irpk::specs::SAMSUNG36
 本ライブラリにおける `protocol_id` は、単に波形の符号化方式（timing）が同一であることを示すものではなく、`IRDecodedBits.bits` の論理的な意味（Frame の pack/unpack 解釈）が互換であることを表す識別子として扱う。
 
 - 波形的（scheme/family/timing）に類似していても、BITS のレイアウトや意味付けが異なり、同一の Frame（pack/unpack）で扱えない場合は別 `protocol_id` とする。
-- 逆に、`bit_length` が異なっても、BITS が同一レイアウトの拡張（上位互換）として解釈できる場合は、同一 `protocol_id` の `bit_length` variant として扱ってよい。
 
 例：Samsung 32bit と 36bit は波形符号化方式が類似しているが、BITS の意味付けと pack/unpack 処理が互換ではないため、`SAMSUNG32` / `SAMSUNG36` のように別 `protocol_id` として提供する。
 
