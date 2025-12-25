@@ -5,10 +5,9 @@
 実装の詳細（内部アルゴリズム、最適化、各プロトコルの厳密仕様）は本仕様書の対象外とする。
 
 ### 0.2 対象環境
-- ESP32 Arduino ライブラリ（Arduino Core 3.0 以降をサポート）
-- ESP-IDF 5 系以降で使用可能な **最新RMTドライバ**を利用
-- ビルド設定は C++20 指定初期化（designated initializers）を前提とする（例：`-std=gnu++20`）
-- Arduino Core 3.0 以降では内部IDFが 5.1.4、デフォルトコンパイラ設定は C++23 になるが、C++20 指定初期化が有効であることを前提とする点は同じ
+- ESP32 Arduino ライブラリ（Arduino Core 3.0 以降を想定。内部IDFは 5.1.4 ベース）
+- ESP-IDF 5 系以降の **新RMTドライバ**（Arduinoでも同ドライバを使用）
+- ビルド環境は C++23（Arduino Core 3.0 ではデフォルトが C++23）
 
 ### 0.3 ライブラリ名・ネームスペース規約
 - ライブラリ名：**ESP32IRPulseKit**
@@ -188,7 +187,7 @@ struct IRProtocolSpec {
 } // namespace
 ```
 
-### 3.4 C++20 指定初期化の例（参考）
+### 3.4 指定初期化の例（参考）
 ```cpp
 constexpr esp32irpk::IRProtocolSpec MyProto = {
   .protocol_id = esp32irpk::IRProtocolID::USER1,           // 一意なID
