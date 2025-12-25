@@ -295,7 +295,7 @@ struct IRReceiveResult {
 ```cpp
 namespace esp32irpk {
 
-template <size_t MaxCandidates = 4>
+template <size_t MaxCandidates = 8>
 class IRReceiver {
 public:
   explicit IRReceiver(int gpio);
