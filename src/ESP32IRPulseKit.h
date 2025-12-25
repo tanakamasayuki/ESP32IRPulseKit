@@ -218,16 +218,9 @@ namespace esp32irpk
     bool begun_ = false;
   };
 
-  namespace specs
-  {
-    extern const IRProtocolSpec NEC;
-    extern const IRProtocolSpec SONY12;
-    extern const IRProtocolSpec SONY15;
-    extern const IRProtocolSpec SONY20;
-    extern const IRProtocolSpec SAMSUNG32;
-    extern const IRProtocolSpec SAMSUNG36;
-  } // namespace specs
-
 } // namespace esp32irpk
 
 #include "codec/Receiver.inl"
+#include "protocols/NEC.h"
+#include "protocols/Sony.h"
+#include "protocols/Samsung.h"
