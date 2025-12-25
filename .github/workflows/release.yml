@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_level:
+        description: "Version component to bump when forcing a release (major, minor, patch)"
+        required: false
+        default: "patch"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_BRANCH: release
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Bump version
+        id: version
+        run: |
+          LEVEL="${{ github.event.inputs.version_level || 'patch' }}"
+          OUT=$(python tools/bump_version.py --level "$LEVEL")
+          VERSION=$(printf '%s\n' "$OUT" | sed -n '1p')
+          HEADER=$(printf '%s\n' "$OUT" | sed -n '2p')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_header=$HEADER" >> "$GITHUB_OUTPUT"
+
+      - name: Stage files
+        run: |
+          git add library.properties
+          if [ -f CHANGELOG.md ]; then
+            git add CHANGELOG.md
+          fi
+          # Leave sketch.yaml updates unstaged on the default branch; they will be committed on the release branch.
+          # If bump_version.py created a version header, include it in the commit
+          if [ -n "${{ steps.version.outputs.version_header }}" ] && [ -f "${{ steps.version.outputs.version_header }}" ]; then
+            git add "${{ steps.version.outputs.version_header }}"
+          fi
+
+      - name: Commit changes
+        run: |
+          git commit -m "Release ${{ steps.version.outputs.version }}" || echo "No changes to commit."
+
+      - name: Push default branch
+        run: git push origin HEAD:"$DEFAULT_BRANCH"
+
+      - name: Prepare release branch with release-only files
+        id: release_branch
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git checkout -B "$RELEASE_BRANCH"
+          git ls-files 'examples/sketch.yaml' 'examples/**/sketch.yaml' | sort -u | xargs -r git add
+          if git diff --cached --quiet; then
+            echo "No release-only changes to commit."
+          else
+            git commit -m "Release assets v${VERSION}"
+          fi
+          echo "branch=$RELEASE_BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Build release archive
+        id: archive
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCHIVE="${{ github.event.repository.name }}-${VERSION}.zip"
+          PREFIX="${{ github.event.repository.name }}"
+          WORKDIR="$(pwd)"
+          TEMP_DIR="$(mktemp -d)"
+
+          # Copy tracked files from the release branch working tree.
+          rsync -a --files-from=<(git ls-files) ./ "$TEMP_DIR/$PREFIX/"
+          (cd "$TEMP_DIR" && zip -r "$WORKDIR/$ARCHIVE" "$PREFIX")
+          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: create_tag_and_push
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          git checkout "$RELEASE_BRANCH"
+          # create tag only if it doesn't exist locally
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists locally; skipping tag creation."
+          else
+            git tag "$TAG"
+          fi
+          git push origin "$RELEASE_BRANCH" --force-with-lease
+          # push the tag; if remote already has same tag, this will be a no-op
+          git push origin "$TAG"
+
+      - name: Publish release
+        if: steps.create_tag_and_push.outcome == 'success'
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body: |
+            Release.
+
+            - Library version bumped to v${{ steps.version.outputs.version }}.
+          files: |
+            ${{ steps.archive.outputs.archive }}
