@@ -12,6 +12,7 @@
 ### 0.3 ライブラリ名・ネームスペース規約
 - ライブラリ名：**ESP32IRPulseKit**
 - ネームスペース：**`esp32irpk`**
+- プロジェクトURL：<https://github.com/tanakamasayuki/ESP32IRPulseKit>
 - 本仕様書のサンプルコードは `using namespace` を使用せず、すべてフル修飾名で記述する。
 
 ### 0.4 非対象範囲
