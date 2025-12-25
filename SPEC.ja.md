@@ -87,6 +87,7 @@
 - mark/spaceが交互に並ぶことを前提とする
 
 ### 2.3 `esp32irpk::IRPulseUs`
+mark/space をマイクロ秒単位で保持する単純なペア。
 ```cpp
 namespace esp32irpk {
 struct IRPulseUs {
@@ -97,6 +98,7 @@ struct IRPulseUs {
 ```
 
 ### 2.4 `esp32irpk::IRRawTickView`
+受信RAWを tick 単位配列として参照するためのビュー（内部バッファ参照）。
 ```cpp
 namespace esp32irpk {
 struct IRRawTickView {
@@ -107,6 +109,7 @@ struct IRRawTickView {
 ```
 
 ### 2.5 `esp32irpk::IRDecodedBits`
+プロトコル判定後の正規化 BITS（ビット列）表現を保持する。
 ```cpp
 namespace esp32irpk {
 
@@ -144,6 +147,7 @@ struct IRDecodedBits {
 - `family`：共通処理・共通判定ロジックの再利用単位（NEC_LIKE等）
 
 ### 3.3 IRProtocolSpec 定義
+1つのプロトコルに必要な時間パラメータやビット長、リピート定義などをまとめた設定構造体。
 ```cpp
 namespace esp32irpk {
 
@@ -246,6 +250,7 @@ esp32irpk::specs::SAMSUNG36
 ## 6. 受信API：`esp32irpk::IRReceiver`
 
 ### 6.1 IRResultFlags / IRRxStats
+受信結果の状態フラグと、ドロップ／オーバーフローなどの統計値。
 ```cpp
 namespace esp32irpk {
 
@@ -266,6 +271,7 @@ struct IRRxStats {
 ```
 
 ### 6.2 IRReceiveResult
+RAWビューとデコード候補一覧をまとめて返却する受信結果コンテナ。
 ```cpp
 namespace esp32irpk {
 
