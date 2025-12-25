@@ -356,8 +356,8 @@ public:
   bool begin();
   void end();
 
-  bool send(const esp32irpk::IRRawTickView& raw);
-  bool send(const IRDecodedBits& decoded);
+  bool send(const esp32irpk::IRRawTickView& raw, uint8_t repeat_count=0);
+  bool send(const IRDecodedBits& decoded, uint8_t repeat_count=0);
 
   bool encode(const IRDecodedBits& decoded,
                       /*out*/ IRRawTickBuffer& out_raw); // optional
