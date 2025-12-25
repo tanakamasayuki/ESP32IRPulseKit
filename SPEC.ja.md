@@ -299,7 +299,7 @@ struct IRReceiveResult {
   IRRawTickView raw;                     // 最新RAWビュー
   IRResultFlags flags = IRResultFlags::NONE; // フレームに付随する状態フラグ
 
-  uint8_t count = 0;                     // candidates の件数
+  uint8_t count = 0;                     // candidates の件数（型は uint8_t 固定）
   IRDecodeCandidate candidates[MaxCandidates]; // スコア順の候補
 
   const esp32irpk::IRDecodeCandidate* candidate() const;
@@ -308,7 +308,7 @@ struct IRReceiveResult {
 
 }
 ```
-- `candidate()` / `bits()` は `count == 0` の場合に `nullptr` を返す。
+- `candidate()` / `bits()` は `count == 0` の場合に `nullptr` を返す。`count` は `uint8_t` のため最大 255 件に制限される（`kDefaultMaxDecodeCandidates` の実用範囲では影響なし）。
 
 ### 6.3 クラス定義（概要）
 ```cpp
@@ -395,8 +395,8 @@ public:
 }
 ```
 - `IRRawTickBuffer` は呼び出し側がバッファと capacity を用意し、`encode()`/`send()` が `len` を設定する（`len <= capacity` になるよう実装する）。
-- `send(const IRRawTickView*)` は `raw == nullptr` の場合は送信せず `false` を返す。
-- `send(const IRDecodedBits*)` は `decoded == nullptr` の場合は送信せず `false` を返す（呼び出し側が判定できるようにする）。
+- `send(const IRRawTickView*)` は `raw == nullptr` の場合は送信せず `false` を返す（参照版と同様、送信失敗時も `false` を返す）。
+- `send(const IRDecodedBits*)` は `decoded == nullptr` の場合は送信せず `false` を返す（参照版と同様、送信失敗時も `false` を返す）。
 
 ---
 
