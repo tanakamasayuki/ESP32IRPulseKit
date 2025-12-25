@@ -26,10 +26,10 @@
 | tick | 内部時間単位。1 tick = 10us。RAW tick 配列はこの単位で公開する。 |
 | mark | IR LED が ON（搬送波が出る）区間の長さ。 |
 | space | IR LED が OFF 区間の長さ。 |
-| RAW | mark/space の連続列（エンコード前の信号表現）。 |
+| RAW | mark/space の連続列（エンコード前の信号表現）。本仕様では RAW と表記。 |
 | IRRawTickView | RAW を tick 配列として参照する view。次回 `read()` まで有効。 |
-| IRDecodedBits | プロトコル判定後の「正規化されたビット列」表現。`protocol_id` / `bit_length` / `bits` を持つ。 |
-| Frame（プロトコル別定義） | IRDecodedBits をプロトコル固有フィールドにマッピングした表現。Appendix A 参照。 |
+| IRDecodedBits | プロトコル判定後の正規化ビット表現。本仕様では BITS（ビット列）と呼び、`protocol_id` / `bit_length` / `bits` を持つ。 |
+| Frame（プロトコル別定義） | BITS（IRDecodedBits）をプロトコル固有フィールドにマッピングした表現。Appendix A 参照。 |
 | Spec（IRProtocolSpec） | プロトコル定義（header、one/zero、gap、tolerance、bit order 等）。受信/送信で共通。 |
 | scheme | ビット表現方式の大分類（SPACE_ENC 等）。共通処理分岐に使用。 |
 | family | プロトコルの系統分類（NEC_LIKE 等）。共通ロジックの適用範囲に使用。 |
@@ -52,13 +52,13 @@
 - ESP32 の RMT ハードウェアを用いた IR送受信
 - 高精度（ソフトタイマ実装ではなくRMT利用）
 - RAW受信 → RAW送信
-- RAW受信 → decode（bits化） → send（学習リモコン用途）
-- RAW受信 → decode（bits化） → Frame（プロトコル別型）まで復元 → アプリ側で利用
-- Frame（プロトコル別型） → encodeToBits → send（プロトコル正規化から送信までを一貫提供）
+- RAW受信 → decode（RAW→BITS） → send（学習リモコン用途）
+- RAW受信 → decode（RAW→BITS） → Frame（プロトコル別型）まで復元 → アプリ側で利用
+- Frame（プロトコル別型） → encodeToBits（Frame→BITS） → send（プロトコル正規化から送信までを一貫提供）
 
 ### 1.2 特徴
 - 受信はバックエンドで継続し、デコード処理中も受信を停止しない
-- デコード結果は **bit列（`esp32irpk::IRDecodedBits`）**を返す（address/command 等の論理値は共通返却しない。論理値はプロトコル別 Frame 型へ `decodeFromBits()` で変換して得る想定）
+- デコード結果は **BITS（`esp32irpk::IRDecodedBits`）**を返す（address/command 等の論理値は共通返却せず、必要なら `decodeFromBits()` でプロトコル別 Frame 型へ変換して得る）
 - decode候補はスコア順で返却（上位N件）
 
 ### 1.3 設計方針（分離）
