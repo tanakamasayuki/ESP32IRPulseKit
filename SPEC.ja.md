@@ -119,6 +119,8 @@ struct IRDecodedBits {
   IRFrameType frame_type = IRFrameType::NORMAL;
   uint16_t bit_length = 0; // 0..64
   uint64_t bits = 0;
+
+  bool isRepeat() const { return frame_type == IRFrameType::REPEAT; }
 };
 
 }
