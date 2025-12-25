@@ -36,7 +36,8 @@
 | family | プロトコルの系統分類（NEC_LIKE 等）。共通ロジックの適用範囲に使用。 |
 | decode（RAW→BITS） | RAW をプロトコル判定し IRDecodedBits に正規化する処理。 |
 | encode（BITS→RAW） | IRDecodedBits から送信用 RAW を生成する処理。 |
-| decodeFromBits / encodeToBits | Frame と IRDecodedBits 間の変換。プロトコル別実装を想定。 |
+| unpack（BITS→Frame） | BITS をプロトコル別 Frame 型に展開する処理。関数名 `fromBits()` を推奨。 |
+| pack（Frame→BITS） | Frame を BITS に正規化する処理。関数名 `toBits()` を推奨。 |
 | idle threshold | RMT が「無信号期間」としてフレームを切る閾値。 |
 | frame_end_gap_us | Spec が定義するフレーム終端 gap（最小）。idle threshold 算出に使う。 |
 | 候補（candidate） | decode が成立したプロトコル判定結果。score 付きで返る。 |
@@ -54,12 +55,12 @@
 - 高精度（ソフトタイマ実装ではなくRMT利用）
 - RAW受信 → RAW送信
 - RAW受信 → decode（RAW→BITS） → send（学習リモコン用途）
-- RAW受信 → decode（RAW→BITS） → Frame（プロトコル別型）まで復元 → アプリ側で利用
-- Frame（プロトコル別型） → encodeToBits（Frame→BITS） → send（プロトコル正規化から送信までを一貫提供）
+- RAW受信 → decode（RAW→BITS） → Frame（プロトコル別型）まで `fromBits()` で unpack → アプリ側で利用
+- Frame（プロトコル別型） → `toBits()` で pack（Frame→BITS） → send（プロトコル正規化から送信までを一貫提供）
 
 ### 1.2 特徴
 - 受信はバックエンドで継続し、デコード処理中も受信を停止しない
-- デコード結果は **BITS（`esp32irpk::IRDecodedBits`）**を返す（address/command 等の論理値は共通返却せず、必要なら `decodeFromBits()` でプロトコル別 Frame 型へ変換して得る）
+- デコード結果は **BITS（`esp32irpk::IRDecodedBits`）**を返す（address/command 等の論理値は共通返却せず、必要なら `fromBits()` でプロトコル別 Frame 型へ unpack して得る）
 - decode候補はスコア順で返却（上位N件）
 
 ### 1.3 設計方針（分離）
@@ -127,8 +128,8 @@ struct IRDecodedBits {
 ```
 
 ### 2.6 データフローと変換用語
-- 受信経路：RAW（`IRRawTickView`） → **decode（RAW→BITS）** → `IRDecodedBits` → 必要に応じて `decodeFromBits()` で各プロトコルの Frame 型へ。
-- 送信経路：Frame 型 → `encodeToBits()` で `IRDecodedBits` → **encode（BITS→RAW）**（`IRSender::encodeFromBits()`）で RAW → RMT 送信。
+- 受信経路：RAW（`IRRawTickView`） → **decode（RAW→BITS）** → `IRDecodedBits` → 必要に応じて `fromBits()` で各プロトコルの Frame 型へ unpack。
+- 送信経路：Frame 型 → `toBits()` で pack（Frame→BITS） → **encode（BITS→RAW）**（`IRSender::encodeFromBits()`）で RAW → RMT 送信。
 - RAW / BITS / Frame と変換呼称は上記で統一する。
 
 ---
@@ -396,7 +397,7 @@ RMT受信ハードウェア／ドライバオーバーフロー等が発生し�
 ---
 
 ## Appendix A. プロトコル別Frame型（参考）
-- `decodeFromBits()` / `encodeToBits()` を推奨
+- `fromBits()`（unpack） / `toBits()`（pack） を推奨
 - 具体例は参考情報として記載可能（NECなど）
 
 ---
