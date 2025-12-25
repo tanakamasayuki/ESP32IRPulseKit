@@ -130,7 +130,15 @@ struct IRDecodedBits {
 }
 ```
 
-### 2.6 データフローと変換用語
+### 2.6 受信候補数のデフォルト
+デコード候補を保持する最大件数のデフォルト値をライブラリ共通で定義する。
+```cpp
+namespace esp32irpk {
+  inline constexpr size_t kDefaultMaxDecodeCandidates = 4;
+}
+```
+
+### 2.7 データフローと変換用語
 - 受信経路：RAW（`IRRawTickView`） → **decode（RAW→BITS）** → `IRDecodedBits` → 必要に応じて `fromBits()` で各プロトコルの Frame 型へ unpack。
 - 送信経路：Frame 型 → `toBits()` で pack（Frame→BITS） → **encode（BITS→RAW）**（`IRSender::encodeFromBits()`）で RAW → RMT 送信。
 - RAW / BITS / Frame と変換呼称は上記で統一する。
@@ -273,13 +281,20 @@ struct IRRxStats {
 
 }
 ```
+- `DECODE_SKIPPED`：decodeCandidates==0 などの設定によりデコード処理を実行しなかった結果として候補が 0 件のときに付与される（内部エラーを示すものではない）。
 
 ### 6.2 IRReceiveResult
 RAWビューとデコード候補一覧をまとめて返却する受信結果コンテナ。
 ```cpp
 namespace esp32irpk {
 
-template <size_t MaxCandidates>
+struct IRDecodeCandidate {
+  IRProtocolID protocol_id;   // 判定されたプロトコル
+  int16_t score = 0;          // 減点後のスコア（大きいほど良い）
+  IRDecodedBits decoded;      // 正規化された BITS
+};
+
+template <size_t MaxCandidates = esp32irpk::kDefaultMaxDecodeCandidates>
 struct IRReceiveResult {
   IRRawTickView raw;                     // 最新RAWビュー
   IRResultFlags flags = IRResultFlags::NONE; // フレームに付随する状態フラグ
@@ -287,18 +302,19 @@ struct IRReceiveResult {
   uint8_t count = 0;                     // candidates の件数
   IRDecodeCandidate candidates[MaxCandidates]; // スコア順の候補
 
-  const esp32irpk::IRDecodeCandidate* bestCandidate() const;
-  const esp32irpk::IRDecodedBits* bestBits() const;
+  const esp32irpk::IRDecodeCandidate* candidate() const;
+  const esp32irpk::IRDecodedBits* bits() const;
 };
 
 }
 ```
+- `candidate()` / `bits()` は `count == 0` の場合に `nullptr` を返す。
 
 ### 6.3 クラス定義（概要）
 ```cpp
 namespace esp32irpk {
 
-template <size_t MaxCandidates = 4>
+template <size_t MaxCandidates = esp32irpk::kDefaultMaxDecodeCandidates>
 class IRReceiver {
 public:
   explicit IRReceiver(int gpio);
@@ -345,6 +361,12 @@ public:
 ```cpp
 namespace esp32irpk {
 
+struct IRRawTickBuffer {
+  uint16_t* ticks = nullptr; // 出力先の tick バッファ（1 tick = 10us）
+  size_t capacity = 0;       // ticks の最大要素数（呼び出し側が確保）
+  size_t len = 0;            // エンコード結果の有効長（要素数）
+};
+
 class IRSender {
 public:
   explicit IRSender(int gpio);
@@ -370,6 +392,7 @@ public:
 
 }
 ```
+- `IRRawTickBuffer` は呼び出し側がバッファと capacity を用意し、`encode()`/`send()` が `len` を設定する（`len <= capacity` になるよう実装する）。
 
 ---
 
@@ -455,7 +478,7 @@ struct NECFrame {
   uint8_t command = 0;
 
   // ---- Repeat marker ----
-  // v1.0 方針：repeatフレームは bit_length=0 とし、bitsはオール1など特殊値にする。
+  // 必須: frame_type==REPEAT。推奨: bit_length==0 かつ bits==all-ones を併用する。
   bool is_repeat = false;
 
   // ---- Construction / conversion ----
@@ -466,9 +489,6 @@ private:
   // Internal helpers
   void unpackBits(uint64_t bits, uint16_t bit_length);
   uint64_t packBits() const;
-
-  static bool isRepeatBits(const esp32irpk::IRDecodedBits& in);
-  static uint8_t inv8(uint8_t v) { return static_cast<uint8_t>(~v); }
 };
 
 } // namespace esp32irpk::frames
@@ -499,21 +519,14 @@ namespace esp32irpk {
 
 namespace esp32irpk::frames {
 
-// 受信repeatの識別ルール（v1.0推奨）
-// - bit_length==0 を repeat とする
-// - bits は特殊値（例：全ビット1）にする
-bool NECFrame::isRepeatBits(const esp32irpk::IRDecodedBits& in) {
-  if (in.bit_length != 0) return false;
-  return in.bits == 0xFFFFFFFFFFFFFFFFULL; // special marker
-}
-
 esp32irpk::frames::NECFrame NECFrame::fromBits(const esp32irpk::IRDecodedBits& in) {
   esp32irpk::frames::NECFrame f{};
 
   // protocol_id チェックは利用側方針により省略/実装
   // if (in.protocol_id != esp32irpk::IRProtocolID::NEC) { ... }
 
-  if (isRepeatBits(in) || in.frame_type == esp32irpk::IRFrameType::REPEAT) {
+  // 必須: frame_type==REPEAT。推奨: bit_length==0 かつ bits==all-ones を併用。
+  if (in.frame_type == esp32irpk::IRFrameType::REPEAT) {
     f.is_repeat = true;
     return f;
   }
@@ -535,7 +548,7 @@ void NECFrame::unpackBits(uint64_t bits, uint16_t bit_length) {
   uint8_t inv   = static_cast<uint8_t>((bits >> 24) & 0xFFULL);
 
   // 簡易整合チェック（実装では decodeスコアに反映してもよい）
-  // if (inv != inv8(cmd)) { ... }
+  // if (inv != static_cast<uint8_t>(~cmd)) { ... }
 
   this->address = addr;
   this->command = cmd;
@@ -550,7 +563,7 @@ uint64_t NECFrame::packBits() const {
   uint64_t bits = 0;
   bits |= static_cast<uint64_t>(this->address);
   bits |= (static_cast<uint64_t>(this->command) << 16);
-  bits |= (static_cast<uint64_t>(inv8(this->command)) << 24);
+  bits |= (static_cast<uint64_t>(~this->command) << 24);
   return bits;
 }
 
@@ -608,7 +621,7 @@ tx.send(b, /*repeat_count=*/2); // 合計3回送信（実装がNEC repeat frame�
 ### A.3 設計上の注意
 
 - `NECFrame` の bit配置は実装の `IRProtocolSpec`（LSB/MSB順、フィールド割当）と一致させること
-- repeat表現（bit_length==0, bits==all-ones）は **v1.0の推奨**であり、将来拡張時に変更される可能性がある
+- repeat表現は **frame_type==REPEAT が必須**。可読性のため `bit_length==0` かつ `bits==all-ones` を併用することを推奨する（将来拡張で変更される可能性がある）
 - `fromBits()` / `toBits()` は decode/encode の本体ではなく、論理値と `IRDecodedBits` の相互変換に徹する
 
 
@@ -660,9 +673,12 @@ void setup() {
 
 void loop() {
   esp32irpk::IRReceiveResult r;
-  if (rx.read(r) && r.count > 0) {
-    // best候補のBITSを送信（repeat_count=0）
-    tx.send(r.bits());
+  if (rx.read(r)) {
+    const esp32irpk::IRDecodedBits* b = r.bits();
+    if (b != nullptr) {
+      // best候補のBITSを送信（repeat_count=0）
+      tx.send(*b);
+    }
   }
 }
 ```
