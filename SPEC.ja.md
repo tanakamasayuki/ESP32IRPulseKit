@@ -236,8 +236,8 @@ esp32irpk::specs::SAMSUNG36
 - `setIdleThresholdUs()`
 
 ### 5.2 Specの所有権
-`addProtocol()` は Spec を内部でコピー保持する。  
-ユーザーは Spec を `constexpr/static` として保持する必要はない。
+`addProtocol()` に渡された `IRProtocolSpec` は、ユーザーの Spec 寿命に依存しないよう内部でコピー保持される。  
+なお、内蔵 Spec（`esp32irpk::specs::*`）は静的領域に存在するため、実装は内部参照保持による最適化を行ってもよい（外部仕様上はコピー保持と同等に扱う）。
 
 ### 5.3 begin時のデフォルト登録
 - RX：decodeCandidates > 0 かつ登録が空の場合 → `esp32irpk::specs` を全登録
