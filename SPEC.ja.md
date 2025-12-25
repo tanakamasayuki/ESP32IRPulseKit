@@ -382,7 +382,9 @@ public:
   void end();
 
   bool send(const esp32irpk::IRRawTickView& raw, uint8_t repeat_count = 0);
+  bool send(const esp32irpk::IRRawTickView* raw, uint8_t repeat_count = 0); // raw==nullptr は送信せず false
   bool send(const IRDecodedBits& decoded, uint8_t repeat_count = 0);
+  bool send(const IRDecodedBits* decoded, uint8_t repeat_count = 0); // decoded==nullptr は送信せず false
 
   bool encode(const IRDecodedBits& decoded,
               /*out*/ IRRawTickBuffer& out_raw); // optional
@@ -393,6 +395,8 @@ public:
 }
 ```
 - `IRRawTickBuffer` は呼び出し側がバッファと capacity を用意し、`encode()`/`send()` が `len` を設定する（`len <= capacity` になるよう実装する）。
+- `send(const IRRawTickView*)` は `raw == nullptr` の場合は送信せず `false` を返す。
+- `send(const IRDecodedBits*)` は `decoded == nullptr` の場合は送信せず `false` を返す（呼び出し側が判定できるようにする）。
 
 ---
 
@@ -658,7 +662,7 @@ void loop() {
 
 ---
 
-### B.2 RAW受信 → BITS → 送信（best候補を送る）
+### B.2 RAW受信 → BITS → 送信（best候補のBITSを送る）
 
 ```cpp
 #include <ESP32IRPulseKit.h>
@@ -674,11 +678,8 @@ void setup() {
 void loop() {
   esp32irpk::IRReceiveResult r;
   if (rx.read(r)) {
-    const esp32irpk::IRDecodedBits* b = r.bits();
-    if (b != nullptr) {
-      // best候補のBITSを送信（repeat_count=0）
-      tx.send(*b);
-    }
+    // best候補のBITSを送信（候補なし/nullptrなら送信しない）
+    tx.send(r.bits());
   }
 }
 ```
