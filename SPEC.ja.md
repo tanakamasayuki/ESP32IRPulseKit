@@ -443,10 +443,10 @@ RMT受信ハードウェア／ドライバオーバーフロー等が発生し�
 ---
 
 ## 12. ディレクトリ/ファイル構成（実装指針）
-- `src/ESP32IRPulseKit.h/.cpp/.inl`：公開APIとエントリーポイント。内部実装はここから各モジュールを呼び出す。
+- `src/ESP32IRPulseKit.h/.cpp`：公開APIとエントリーポイント。内部実装はここから各モジュールを呼び出す。
 - `src/hal/`：RMTドライバを扱うHAL層（RX/TXチャネル管理、バッファ確保、idle threshold設定など）。
-- `src/codec/`：decode/encodeロジックとスコアリング。`IRProtocolSpec` を入力に RAW⇄BITS を扱う共通処理。
-- `src/protocols/`：組み込み `IRProtocolSpec` 定義と、必要に応じて対応する Frame 型（fromBits/toBits）の実装も同居させる（NEC/Sony/Samsung などプロトコル別ファイル）。
+- `src/codec/`：decode/encodeロジックとスコアリング。`IRProtocolSpec` を入力に RAW⇄BITS を扱う共通処理（テンプレートのインライン実装含む）。
+- `src/protocols/`：プロトコル別ヘッダに `IRProtocolSpec`（inline constexpr）と対応する Frame 型を同居させる（NEC/Sony/Samsung など）。インクルードだけで利用可能。
 - `src/util/`（任意）：共通ユーティリティ（時間単位変換、配列ヘルパー等）をまとめる。
 
 ---
