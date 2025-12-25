@@ -413,8 +413,201 @@ RMT受信ハードウェア／ドライバオーバーフロー等が発生し�
 ---
 
 ## Appendix A. プロトコル別Frame型（参考）
-- `fromBits()`（unpack） / `toBits()`（pack） を推奨
-- 具体例は参考情報として記載可能（NECなど）
+本章は参考情報として、`esp32irpk::IRDecodedBits` をプロトコル固有の論理値（address/command等）へ変換する **Frame型** の例を示す。  
+Frame型は以下の責務を持つ：
+
+- `esp32irpk::IRDecodedBits` ⇄ プロトコル固有論理値 の相互変換
+- 変換の公開APIは短い対称名 `fromBits()` / `toBits()` を推奨
+- 内部処理として `unpackBits()` / `packBits()` を持ち、対応関係を明確化してよい
+
+> 注意：本章は NEC を例にした参考であり、他プロトコル（SONY等）の詳細仕様は本仕様書では規定しない。
+
+---
+
+### A.1 NECFrame の例
+
+以下は **NEC（32bit）** の代表的な論理解釈例である。  
+本例は「典型的な NEC 互換（address 16bit + command 8bit + command_inv 8bit）」を想定する。
+
+> `protocol_id` や bit配置は `esp32irpk::specs::NEC` の定義に合わせること。  
+> （実装ではLSB/MSB順やビット配置はSpecに従う）
+
+#### A.1.1 型定義（例）
+
+```cpp
+#pragma once
+#include <stdint.h>
+
+namespace esp32irpk {
+  struct IRDecodedBits;     // forward decl
+  enum class IRProtocolID : uint16_t;
+  enum class IRFrameType : uint8_t;
+}
+
+namespace esp32irpk::frames {
+
+struct NECFrame {
+  // ---- Logical fields ----
+  uint16_t address = 0;
+  uint8_t command = 0;
+
+  // ---- Repeat marker ----
+  // v1.0 方針：repeatフレームは bit_length=0 とし、bitsはオール1など特殊値にする。
+  bool is_repeat = false;
+
+  // ---- Construction / conversion ----
+  static esp32irpk::frames::NECFrame fromBits(const esp32irpk::IRDecodedBits& in);
+  esp32irpk::IRDecodedBits toBits() const;
+
+private:
+  // Internal helpers
+  void unpackBits(uint64_t bits, uint16_t bit_length);
+  uint64_t packBits() const;
+
+  static bool isRepeatBits(const esp32irpk::IRDecodedBits& in);
+  static uint8_t inv8(uint8_t v) { return static_cast<uint8_t>(~v); }
+};
+
+} // namespace esp32irpk::frames
+```
+
+#### A.1.2 実装例（参考）
+
+```cpp
+#include <stdint.h>
+
+namespace esp32irpk {
+  struct IRDecodedBits {
+    esp32irpk::IRProtocolID protocol_id;
+    esp32irpk::IRFrameType frame_type;
+    uint16_t bit_length;
+    uint64_t bits;
+  };
+
+  enum class IRProtocolID : uint16_t {
+    NEC = 1,
+  };
+
+  enum class IRFrameType : uint8_t {
+    NORMAL = 0,
+    REPEAT = 1,
+  };
+}
+
+namespace esp32irpk::frames {
+
+// 受信repeatの識別ルール（v1.0推奨）
+// - bit_length==0 を repeat とする
+// - bits は特殊値（例：全ビット1）にする
+bool NECFrame::isRepeatBits(const esp32irpk::IRDecodedBits& in) {
+  if (in.bit_length != 0) return false;
+  return in.bits == 0xFFFFFFFFFFFFFFFFULL; // special marker
+}
+
+esp32irpk::frames::NECFrame NECFrame::fromBits(const esp32irpk::IRDecodedBits& in) {
+  esp32irpk::frames::NECFrame f{};
+
+  // protocol_id チェックは利用側方針により省略/実装
+  // if (in.protocol_id != esp32irpk::IRProtocolID::NEC) { ... }
+
+  if (isRepeatBits(in) || in.frame_type == esp32irpk::IRFrameType::REPEAT) {
+    f.is_repeat = true;
+    return f;
+  }
+
+  f.unpackBits(in.bits, in.bit_length);
+  return f;
+}
+
+void NECFrame::unpackBits(uint64_t bits, uint16_t bit_length) {
+  // 代表例：NEC 32bit（LSB-firstを想定）
+  // bits[0..15] : address
+  // bits[16..23]: command
+  // bits[24..31]: command_inv
+
+  (void)bit_length; // 実装では bit_length==32 を確認してよい
+
+  uint16_t addr = static_cast<uint16_t>(bits & 0xFFFFULL);
+  uint8_t cmd   = static_cast<uint8_t>((bits >> 16) & 0xFFULL);
+  uint8_t inv   = static_cast<uint8_t>((bits >> 24) & 0xFFULL);
+
+  // 簡易整合チェック（実装では decodeスコアに反映してもよい）
+  // if (inv != inv8(cmd)) { ... }
+
+  this->address = addr;
+  this->command = cmd;
+}
+
+uint64_t NECFrame::packBits() const {
+  // repeat の場合は特殊値（all-ones）を返す方針（v1.0推奨）
+  if (this->is_repeat) {
+    return 0xFFFFFFFFFFFFFFFFULL;
+  }
+
+  uint64_t bits = 0;
+  bits |= static_cast<uint64_t>(this->address);
+  bits |= (static_cast<uint64_t>(this->command) << 16);
+  bits |= (static_cast<uint64_t>(inv8(this->command)) << 24);
+  return bits;
+}
+
+esp32irpk::IRDecodedBits NECFrame::toBits() const {
+  esp32irpk::IRDecodedBits out{};
+  out.protocol_id = esp32irpk::IRProtocolID::NEC;
+
+  if (this->is_repeat) {
+    out.frame_type  = esp32irpk::IRFrameType::REPEAT;
+    out.bit_length  = 0;
+    out.bits        = 0xFFFFFFFFFFFFFFFFULL;
+    return out;
+  }
+
+  out.frame_type  = esp32irpk::IRFrameType::NORMAL;
+  out.bit_length  = 32;
+  out.bits        = this->packBits();
+  return out;
+}
+
+} // namespace esp32irpk::frames
+```
+
+---
+
+### A.2 利用例（bits ⇄ NECFrame ⇄ send）
+
+#### A.2.1 受信結果（IRDecodedBits）から論理値へ
+
+```cpp
+esp32irpk::IRReceiveResult<4> r;
+if (rx.read(r) && r.count > 0) {
+  const esp32irpk::IRDecodedBits& b = r.candidates[0].decoded;
+
+  esp32irpk::frames::NECFrame f = esp32irpk::frames::NECFrame::fromBits(b);
+  if (!f.is_repeat) {
+    // f.address / f.command を利用できる
+  }
+}
+```
+
+#### A.2.2 論理値から bits を生成して送信
+
+```cpp
+esp32irpk::frames::NECFrame f{};
+f.address = 0x00FF;
+f.command = 0x12;
+
+esp32irpk::IRDecodedBits b = f.toBits();
+tx.send(b, /*repeat_count=*/2); // 合計3回送信（実装がNEC repeat frameを使ってもよい）
+```
+
+---
+
+### A.3 設計上の注意
+
+- `NECFrame` の bit配置は実装の `IRProtocolSpec`（LSB/MSB順、フィールド割当）と一致させること
+- repeat表現（bit_length==0, bits==all-ones）は **v1.0の推奨**であり、将来拡張時に変更される可能性がある
+- `fromBits()` / `toBits()` は decode/encode の本体ではなく、論理値と `IRDecodedBits` の相互変換に徹する
+
 
 ---
 
