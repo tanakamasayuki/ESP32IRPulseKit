@@ -19,6 +19,27 @@
 - デコード判定の順序・最適化などの内部実装手法
 - 低レベルのRMTドライバの設定詳細
 
+### 0.5 用語集（Glossary）
+| 用語 | 意味 |
+| --- | --- |
+| us | マイクロ秒。外部APIで使う時間単位。Spec もこの単位で保持する。 |
+| tick | 内部時間単位。1 tick = 10us。RAW tick 配列はこの単位で公開する。 |
+| mark | IR LED が ON（搬送波が出る）区間の長さ。 |
+| space | IR LED が OFF 区間の長さ。 |
+| RAW | mark/space の連続列（エンコード前の信号表現）。 |
+| IRRawTickView | RAW を tick 配列として参照する view。次回 `read()` まで有効。 |
+| IRDecodedBits | プロトコル判定後の「正規化されたビット列」表現。`protocol_id` / `bit_length` / `bits` を持つ。 |
+| Spec（IRProtocolSpec） | プロトコル定義（header、one/zero、gap、tolerance、bit order 等）。受信/送信で共通。 |
+| scheme | ビット表現方式の大分類（SPACE_ENC 等）。共通処理分岐に使用。 |
+| family | プロトコルの系統分類（NEC_LIKE 等）。共通ロジックの適用範囲に使用。 |
+| idle threshold | RMT が「無信号期間」としてフレームを切る閾値。 |
+| frame_end_gap_us | Spec が定義するフレーム終端 gap（最小）。idle threshold 算出に使う。 |
+| 候補（candidate） | decode が成立したプロトコル判定結果。score 付きで返る。 |
+| score | 候補の信頼度。高いほど良い。減点方式で算出。 |
+| RAW_TRUNCATED | 返却 RAW が最大長超過により切り詰められたことを示すフラグ。 |
+| RMT_OVERFLOW | RMT 受信側でオーバーフローや取りこぼしが発生した可能性を示すフラグ。 |
+| queue_overflow_count | 内部受信キュー溢れで drop oldest が発生した累積回数。 |
+
 ---
 
 ## 1. ライブラリ概要
@@ -342,7 +363,7 @@ public:
 
 ### 10.1 IRRawTickView の寿命
 `IRRawTickView.ticks` は内部バッファを参照する。  
-次回 `read(true)` または `end()` 呼び出しまで有効とする。
+次回 `read()` （成功・失敗を問わず）または `end()` 呼び出しまで有効とする。
 
 ### 10.2 RAW長上限・truncate
 RAWが上限を超えた場合、切り詰め（truncate）または破棄する。  
