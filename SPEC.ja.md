@@ -209,7 +209,6 @@ constexpr esp32irpk::IRProtocolSpec MyProto = {
 ### 4.2 参照方法
 ```cpp
 esp32irpk::specs::NEC
-esp32irpk::specs::SONY
 esp32irpk::specs::SAMSUNG32
 esp32irpk::specs::SAMSUNG36
 ```
