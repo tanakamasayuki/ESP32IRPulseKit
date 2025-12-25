@@ -91,8 +91,8 @@ mark/space をマイクロ秒単位で保持する単純なペア。
 ```cpp
 namespace esp32irpk {
 struct IRPulseUs {
-  uint32_t mark_us = 0;
-  uint32_t space_us = 0;
+  uint32_t mark_us = 0;  // mark の長さ（us）
+  uint32_t space_us = 0; // space の長さ（us）
 };
 }
 ```
@@ -102,8 +102,8 @@ struct IRPulseUs {
 ```cpp
 namespace esp32irpk {
 struct IRRawTickView {
-  const uint16_t* ticks = nullptr; // 1 tick = 10us
-  size_t len = 0;
+  const uint16_t* ticks = nullptr; // 1 tick = 10us, 内部バッファを指す
+  size_t len = 0;                  // ticks 配列の要素数
 };
 }
 ```
@@ -119,10 +119,10 @@ enum class IRFrameType : uint8_t {
 };
 
 struct IRDecodedBits {
-  IRProtocolID protocol_id;
-  IRFrameType frame_type = IRFrameType::NORMAL;
-  uint16_t bit_length = 0; // 0..64
-  uint64_t bits = 0;
+  IRProtocolID protocol_id;                  // 判定されたプロトコルID
+  IRFrameType frame_type = IRFrameType::NORMAL; // NORMAL/REPEAT 等のフレーム種別
+  uint16_t bit_length = 0;                   // BITS の長さ（0..64）
+  uint64_t bits = 0;                         // LSB-first/ MSB-first は Spec に従う
 
   bool isRepeat() const { return frame_type == IRFrameType::REPEAT; }
 };
@@ -152,30 +152,30 @@ struct IRDecodedBits {
 namespace esp32irpk {
 
 struct IRProtocolSpec {
-  IRProtocolID protocol_id;
+  IRProtocolID protocol_id;          // 一意なプロトコルID
 
-  IRProtocolScheme scheme;
-  IRProtocolFamily family;
+  IRProtocolScheme scheme;           // ビット表現方式（例：SPACE_ENC）
+  IRProtocolFamily family;           // プロトコル系統（例：NEC_LIKE）
 
-  IRPulseUs header;
-  IRPulseUs one;
-  IRPulseUs zero;
-  IRPulseUs trailer;
+  IRPulseUs header;                  // ヘッダ mark/space
+  IRPulseUs one;                     // ビット1の mark/space
+  IRPulseUs zero;                    // ビット0の mark/space
+  IRPulseUs trailer;                 // トレーラ（終端） mark/space
 
-  uint32_t frame_end_gap_us = 0;
+  uint32_t frame_end_gap_us = 0;     // フレーム終端 gap（us）
 
-  bool lsb_first = true;
+  bool lsb_first = true;             // ビット順序（true: LSB first）
 
-  uint16_t bit_length = 0;
-  uint16_t bit_length_variants[8] = {};
-  uint8_t  bit_length_variant_count = 0;
+  uint16_t bit_length = 0;           // 既定のビット長
+  uint16_t bit_length_variants[8] = {}; // 可変長許容値のリスト
+  uint8_t  bit_length_variant_count = 0; // variants の件数
 
-  bool has_repeat = false;
-  IRPulseUs repeat_header;
-  uint32_t repeat_gap_us = 0;
+  bool has_repeat = false;           // REPEAT シーケンスがあるか
+  IRPulseUs repeat_header;           // REPEAT 用ヘッダ
+  uint32_t repeat_gap_us = 0;        // REPEAT 間の gap（us）
 
-  uint16_t bit_tol_pct = 25;
-  uint16_t endgap_tol_pct = 30;
+  uint16_t bit_tol_pct = 25;         // パルス許容誤差（%）
+  uint16_t endgap_tol_pct = 30;      // 終端 gap の許容誤差（%）
 };
 
 } // namespace
@@ -184,18 +184,18 @@ struct IRProtocolSpec {
 ### 3.4 C++20 指定初期化の例（参考）
 ```cpp
 constexpr esp32irpk::IRProtocolSpec MyProto = {
-  .protocol_id = esp32irpk::IRProtocolID::USER1,
-  .scheme      = esp32irpk::IRProtocolScheme::SPACE_ENC,
-  .family      = esp32irpk::IRProtocolFamily::NEC_LIKE,
+  .protocol_id = esp32irpk::IRProtocolID::USER1,           // 一意なID
+  .scheme      = esp32irpk::IRProtocolScheme::SPACE_ENC,   // ビット表現方式
+  .family      = esp32irpk::IRProtocolFamily::NEC_LIKE,    // 系統
 
-  .header      = { .mark_us = 4000, .space_us = 2000 },
-  .one         = { .mark_us = 600,  .space_us = 1600 },
-  .zero        = { .mark_us = 600,  .space_us = 600  },
-  .trailer     = { .mark_us = 600,  .space_us = 0    },
+  .header      = { .mark_us = 4000, .space_us = 2000 },    // ヘッダ
+  .one         = { .mark_us = 600,  .space_us = 1600 },    // 1
+  .zero        = { .mark_us = 600,  .space_us = 600  },    // 0
+  .trailer     = { .mark_us = 600,  .space_us = 0    },    // トレーラ
 
-  .frame_end_gap_us = 30000,
-  .lsb_first        = true,
-  .bit_length       = 24,
+  .frame_end_gap_us = 30000,                               // 終端ギャップ
+  .lsb_first        = true,                                // LSB first
+  .bit_length       = 24,                                  // 既定ビット長
 };
 ```
 
@@ -209,13 +209,18 @@ constexpr esp32irpk::IRProtocolSpec MyProto = {
 ### 4.2 参照方法
 ```cpp
 esp32irpk::specs::NEC
+esp32irpk::specs::SONY
 esp32irpk::specs::SAMSUNG32
 esp32irpk::specs::SAMSUNG36
 ```
 
-### 4.3 bit_lengthバリエーションの protocol_id 分離方針
-互換性が無い場合は別 `protocol_id` として定義する。  
-例：Samsung 32bit と 36bit は互換性が無いため別 `protocol_id` とする。
+### 4.3 bit_length バリエーションと protocol_id 分離方針（論理互換性）
+本ライブラリにおける `protocol_id` は、単に波形の符号化方式（timing）が同一であることを示すものではなく、`IRDecodedBits.bits` の論理的な意味（Frame の pack/unpack 解釈）が互換であることを表す識別子として扱う。
+
+- 波形的（scheme/family/timing）に類似していても、BITS のレイアウトや意味付けが異なり、同一の Frame（pack/unpack）で扱えない場合は別 `protocol_id` とする。
+- 逆に、`bit_length` が異なっても、BITS が同一レイアウトの拡張（上位互換）として解釈できる場合は、同一 `protocol_id` の `bit_length` variant として扱ってよい。
+
+例：Samsung 32bit と 36bit は波形符号化方式が類似しているが、BITS の意味付けと pack/unpack 処理が互換ではないため、`SAMSUNG32` / `SAMSUNG36` のように別 `protocol_id` として提供する。
 
 ---
 
@@ -262,9 +267,9 @@ enum class IRResultFlags : uint8_t {
 };
 
 struct IRRxStats {
-  uint32_t queue_overflow_count = 0;
-  uint32_t rmt_overflow_count   = 0;
-  uint32_t raw_truncated_count  = 0;
+  uint32_t queue_overflow_count = 0; // 受信キュー溢れで drop した回数
+  uint32_t rmt_overflow_count   = 0; // RMT ハード/ドライバの overflow 検知回数
+  uint32_t raw_truncated_count  = 0; // RAW truncate を行った回数
 };
 
 }
@@ -277,11 +282,11 @@ namespace esp32irpk {
 
 template <size_t MaxCandidates>
 struct IRReceiveResult {
-  IRRawTickView raw;
-  IRResultFlags flags = IRResultFlags::NONE;
+  IRRawTickView raw;                     // 最新RAWビュー
+  IRResultFlags flags = IRResultFlags::NONE; // フレームに付随する状態フラグ
 
-  uint8_t count = 0;
-  IRDecodeCandidate candidates[MaxCandidates];
+  uint8_t count = 0;                     // candidates の件数
+  IRDecodeCandidate candidates[MaxCandidates]; // スコア順の候補
 };
 
 }
