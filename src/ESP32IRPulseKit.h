@@ -30,6 +30,13 @@ namespace esp32irpk
     SAMSUNG32 = 5,
     SAMSUNG36 = 6,
     USER1 = 1000,
+    USER2 = 1001,
+    USER3 = 1002,
+    USER4 = 1003,
+    USER5 = 1004,
+    USER6 = 1005,
+    USER7 = 1006,
+    USER8 = 1007,
   };
 
   struct IRPulseUs
