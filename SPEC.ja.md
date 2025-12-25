@@ -58,7 +58,7 @@
 
 ### 1.2 特徴
 - 受信はバックエンドで継続し、デコード処理中も受信を停止しない
-- デコード結果は **bit列（`esp32irpk::IRDecodedBits`）**を返す（address/command等の論理値は共通返却しない）
+- デコード結果は **bit列（`esp32irpk::IRDecodedBits`）**を返す（address/command 等の論理値は共通返却しない。論理値はプロトコル別 Frame 型へ `decodeFromBits()` で変換して得る想定）
 - decode候補はスコア順で返却（上位N件）
 
 ### 1.3 設計方針（分離）
