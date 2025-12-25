@@ -122,7 +122,7 @@ struct IRDecodedBits {
   IRProtocolID protocol_id;                  // 判定されたプロトコルID
   IRFrameType frame_type = IRFrameType::NORMAL; // NORMAL/REPEAT 等のフレーム種別
   uint16_t bit_length = 0;                   // BITS の長さ（0..64）
-  uint64_t bits = 0;                         // LSB-first/ MSB-first は Spec に従う
+  uint64_t bits = 0;                         // LSB-first/MSB-first は Spec に従う
 
   bool isRepeat() const { return frame_type == IRFrameType::REPEAT; }
 };
@@ -356,13 +356,13 @@ public:
   bool begin();
   void end();
 
-  bool send(const esp32irpk::IRRawTickView& raw, uint8_t repeat_count=0);
-  bool send(const IRDecodedBits& decoded, uint8_t repeat_count=0);
+  bool send(const esp32irpk::IRRawTickView& raw, uint8_t repeat_count = 0);
+  bool send(const IRDecodedBits& decoded, uint8_t repeat_count = 0);
 
   bool encode(const IRDecodedBits& decoded,
-                      /*out*/ IRRawTickBuffer& out_raw); // optional
+              /*out*/ IRRawTickBuffer& out_raw); // optional
 
-  bool sendNEC(uint16_t address, uint8_t command, bool repeat=false); // optional
+  bool sendNEC(uint16_t address, uint8_t command, bool repeat = false); // optional
 };
 
 }
