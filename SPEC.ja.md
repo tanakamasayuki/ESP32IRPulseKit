@@ -242,7 +242,7 @@ esp32irpk::specs::SAMSUNG36
 ### 5.3 begin時のデフォルト登録
 - RX：decodeCandidates > 0 かつ登録が空の場合 → `esp32irpk::specs` を全登録
 - RX：decodeCandidates == 0（RAW-only） → 自動登録しない
-- TX：登録が空の場合 → `esp32irpk::specs` を全登録
+- TX：登録が空の場合 → `esp32irpk::specs` を全登録（ユーザーが追加したカスタム Spec はこれに加えて送信可能とする）
 
 ### 5.4 idle threshold 決定
 - base：`setIdleThresholdUs()` 指定値、未指定は 30000us
