@@ -286,6 +286,9 @@ struct IRReceiveResult {
 
   uint8_t count = 0;                     // candidates の件数
   IRDecodeCandidate candidates[MaxCandidates]; // スコア順の候補
+
+  const esp32irpk::IRDecodeCandidate* bestCandidate() const;
+  const esp32irpk::IRDecodedBits* bestBits() const;
 };
 
 }
@@ -295,7 +298,7 @@ struct IRReceiveResult {
 ```cpp
 namespace esp32irpk {
 
-template <size_t MaxCandidates = 8>
+template <size_t MaxCandidates = 4>
 class IRReceiver {
 public:
   explicit IRReceiver(int gpio);
@@ -612,17 +615,130 @@ tx.send(b, /*repeat_count=*/2); // 合計3回送信（実装がNEC repeat frame�
 ---
 
 ## Appendix B. サンプル集（フル修飾）
+本章は簡易サンプルであり、エラーハンドリングや詳細設定は省略する。  
+すべて `using namespace` を使用せず、フル修飾名で記述する。
 
-### B.1 学習リモコン：受信→再送
+---
+
+### B.1 RAW受信 → RAW送信（学習リモコン：波形そのまま再生）
+
 ```cpp
-esp32irpk::IRReceiver<4> rx(4);
+#include <ESP32IRPulseKit.h>
+
+esp32irpk::IRReceiver    rx(4, true);   // RX GPIO=4, 通常は反転入力
+esp32irpk::IRSender      tx(5);         // TX GPIO=5
+
+void setup() {
+  rx.setDecodeCandidates(0); // RAW-only
+  rx.begin();
+  tx.begin();
+}
+
+void loop() {
+  esp32irpk::IRReceiveResult r;
+  if (rx.read(r)) {
+    // RAW tick列をそのまま送信
+    tx.send(r.raw);
+  }
+}
+```
+
+---
+
+### B.2 RAW受信 → BITS → 送信（best候補を送る）
+
+```cpp
+#include <ESP32IRPulseKit.h>
+
+esp32irpk::IRReceiver   rx(4, true); // RX GPIO=4, 通常は反転入力
+esp32irpk::IRSender     tx(5);       // TX GPIO=5
+
+void setup() {
+  rx.begin();
+  tx.begin();
+}
+
+void loop() {
+  esp32irpk::IRReceiveResult r;
+  if (rx.read(r) && r.count > 0) {
+    // best候補のBITSを送信（repeat_count=0）
+    tx.send(r.bits());
+  }
+}
+```
+
+---
+
+### B.3 NEC Frame → BITS送信（論理値から生成して送る）
+
+```cpp
+#include <ESP32IRPulseKit.h>
+
 esp32irpk::IRSender tx(5);
 
-rx.begin();
-tx.begin();
+void setup() {
+  tx.begin();
+}
 
-esp32irpk::IRReceiveResult<4> r;
-if (rx.read(r) && r.count > 0) {
-  tx.send(r.candidates[0].decoded);
+void loop() {
+  // 例：NECアドレス0x00FF / コマンド0x12
+  esp32irpk::frames::NECFrame f{};
+  f.address = 0x00FF;
+  f.command = 0x12;
+
+  // 例：合計3回送信（repeat_count=2）
+  tx.send(f.toBits(), 2);
+
+  delay(1000);
+}
+```
+
+---
+
+### B.4 RAW受信 → 8件BITS → 確認（候補スコアを一覧表示）
+
+```cpp
+#include <ESP32IRPulseKit.h>
+
+esp32irpk::IRReceiver<8> rx(4);   // 最大8候補
+esp32irpk::IRSender      tx(5);
+
+void setup() {
+  Serial.begin(115200);
+  rx.begin();
+  tx.begin();
+}
+
+static void printBits(uint64_t v) {
+  // 16進表示（64bit）
+  char buf[32];
+  snprintf(buf, sizeof(buf), "0x%08lx%08lx", (uint32_t)(v >> 32), (uint32_t)(v & 0xFFFFFFFF));
+  Serial.print(buf);
+}
+
+void loop() {
+  esp32irpk::IRReceiveResult<8> r;
+  if (rx.read(r)) {
+    Serial.println("---- IR received ----");
+    Serial.print("raw.len(ticks)=");
+    Serial.println((unsigned)r.raw.len);
+
+    if (r.count == 0) {
+      Serial.println("no decoded candidates");
+      return;
+    }
+
+    for (uint8_t i = 0; i < r.count; ++i) {
+      const esp32irpk::IRDecodeCandidate& c = r.candidates[i];
+      const esp32irpk::IRDecodedBits& b = c.decoded;
+
+      Serial.print("#"); Serial.print(i);
+      Serial.print(" protocol_id="); Serial.print((unsigned)c.protocol_id);
+      Serial.print(" score="); Serial.print((int)c.score);
+      Serial.print(" bit_length="); Serial.print((unsigned)b.bit_length);
+      Serial.print(" bits="); printBits(b.bits);
+      Serial.println();
+    }
+  }
 }
 ```
