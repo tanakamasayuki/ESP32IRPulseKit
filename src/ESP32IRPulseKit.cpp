@@ -1,4 +1,7 @@
 #include "ESP32IRPulseKit.h"
+#include "hal/RmtHal.h"
+#include "codec/Encoder.h"
+#include "codec/Decoder.h"
 
 namespace esp32irpk
 {
@@ -42,6 +45,7 @@ namespace esp32irpk
   bool IRSender::begin()
   {
     begun_ = true;
+    // TODO: hook up hal::RmtTx
     return true;
   }
 
@@ -115,5 +119,7 @@ namespace esp32irpk
     }
     return send(bits, repeat ? 0 : 0);
   }
+
+  // ---- Receiver template instantiation (inline in codec/Receiver.inl) ----
 
 } // namespace esp32irpk

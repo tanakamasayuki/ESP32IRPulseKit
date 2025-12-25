@@ -223,4 +223,4 @@ namespace esp32irpk
 
 } // namespace esp32irpk
 
-#include "ESP32IRPulseKit.inl"
+#include "codec/Receiver.inl"
