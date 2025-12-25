@@ -315,6 +315,9 @@ public:
 
   bool read(IRReceiveResult<MaxCandidates>& out);
 
+  bool decode(const IRRawTickView& raw,
+              IRReceiveResult<MaxCandidates>& out) const; // optional
+
   IRRxStats stats() const;
   void resetStats(); // optional
 };
@@ -353,9 +356,10 @@ public:
   bool begin();
   void end();
 
+  bool send(const esp32irpk::IRRawTickView& raw);
   bool send(const IRDecodedBits& decoded);
 
-  bool encodeFromBits(const IRDecodedBits& decoded,
+  bool encode(const IRDecodedBits& decoded,
                       /*out*/ IRRawTickBuffer& out_raw); // optional
 
   bool sendNEC(uint16_t address, uint8_t command, bool repeat=false); // optional
