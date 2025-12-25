@@ -29,9 +29,13 @@
 | RAW | mark/space の連続列（エンコード前の信号表現）。 |
 | IRRawTickView | RAW を tick 配列として参照する view。次回 `read()` まで有効。 |
 | IRDecodedBits | プロトコル判定後の「正規化されたビット列」表現。`protocol_id` / `bit_length` / `bits` を持つ。 |
+| Frame（プロトコル別定義） | IRDecodedBits をプロトコル固有フィールドにマッピングした表現。Appendix A 参照。 |
 | Spec（IRProtocolSpec） | プロトコル定義（header、one/zero、gap、tolerance、bit order 等）。受信/送信で共通。 |
 | scheme | ビット表現方式の大分類（SPACE_ENC 等）。共通処理分岐に使用。 |
 | family | プロトコルの系統分類（NEC_LIKE 等）。共通ロジックの適用範囲に使用。 |
+| decode（RAW→BITS） | RAW をプロトコル判定し IRDecodedBits に正規化する処理。 |
+| encode（BITS→RAW） | IRDecodedBits から送信用 RAW を生成する処理。 |
+| decodeFromBits / encodeToBits | Frame と IRDecodedBits 間の変換。プロトコル別実装を想定。 |
 | idle threshold | RMT が「無信号期間」としてフレームを切る閾値。 |
 | frame_end_gap_us | Spec が定義するフレーム終端 gap（最小）。idle threshold 算出に使う。 |
 | 候補（candidate） | decode が成立したプロトコル判定結果。score 付きで返る。 |
@@ -116,6 +120,11 @@ struct IRDecodedBits {
 
 }
 ```
+
+### 2.6 データフローと変換用語
+- 受信経路：RAW（`IRRawTickView`） → **decode（RAW→BITS）** → `IRDecodedBits` → 必要に応じて `decodeFromBits()` で各プロトコルの Frame 型へ。
+- 送信経路：Frame 型 → `encodeToBits()` で `IRDecodedBits` → **encode（BITS→RAW）**（`IRSender::encodeFromBits()`）で RAW → RMT 送信。
+- RAW / BITS / Frame と変換呼称は上記で統一する。
 
 ---
 
