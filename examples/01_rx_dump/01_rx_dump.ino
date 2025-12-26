@@ -114,6 +114,13 @@ void loop()
   Serial.print((unsigned)r.raw.len);
   Serial.print(" flags=0x");
   Serial.println((unsigned)r.flags, HEX);
+  Serial.print("raw (us):");
+  for (size_t i = 0; i < r.raw.len; ++i)
+  {
+    Serial.print(" ");
+    Serial.print((unsigned)(r.raw.ticks[i] * 10)); // ticks are 10us
+  }
+  Serial.println();
 
   if (r.count == 0)
   {
