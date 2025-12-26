@@ -56,6 +56,7 @@ namespace esp32irpk
     if (begun_)
       return false;
     IRProtocolSpec copy = spec;
+    copy.order = order_counter_++;
     auto it = std::find_if(protocols_.begin(), protocols_.end(),
                            [&](const IRProtocolSpec &item)
                            { return item.protocol_id == spec.protocol_id; });
@@ -74,6 +75,7 @@ namespace esp32irpk
     if (begun_)
       return false;
     protocols_.clear();
+    order_counter_ = 0;
     return true;
   }
 
@@ -85,6 +87,10 @@ namespace esp32irpk
 
     if (decode_candidates_ > 0 && protocols_.empty())
       detail::addDefaultProtocols(protocols_);
+    for (auto &spec : protocols_)
+    {
+      spec.order = order_counter_++;
+    }
 
     uint32_t idle_threshold = idle_threshold_us_;
     if (decode_candidates_ > 0)

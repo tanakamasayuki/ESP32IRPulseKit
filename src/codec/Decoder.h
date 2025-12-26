@@ -262,14 +262,20 @@ namespace esp32irpk::codec
       }
       else
       {
-        if (cand.score <= out.candidates[limit - 1].score)
+        if (cand.score < out.candidates[limit - 1].score)
+          return;
+        if (cand.score == out.candidates[limit - 1].score &&
+            cand.order >= out.candidates[limit - 1].order)
           return;
         out.candidates[limit - 1] = cand;
       }
 
       for (int i = static_cast<int>(out.count) - 1; i > 0; --i)
       {
-        if (out.candidates[i].score > out.candidates[i - 1].score)
+        bool better = out.candidates[i].score > out.candidates[i - 1].score;
+        if (!better && out.candidates[i].score == out.candidates[i - 1].score)
+          better = out.candidates[i].order < out.candidates[i - 1].order;
+        if (better)
         {
           IRDecodeCandidate tmp = out.candidates[i - 1];
           out.candidates[i - 1] = out.candidates[i];
@@ -298,40 +304,66 @@ namespace esp32irpk::codec
     if (max_candidates == 0)
       return false;
 
-    for (size_t i = 0; i < spec_count; ++i)
+    out.raw = raw;
+    size_t offset = 0;
+    const size_t total_len = raw.len;
+    while (offset < total_len)
     {
-      const IRProtocolSpec &spec = specs[i];
-      if (spec.scheme != IRProtocolScheme::SPACE_ENC)
-        continue;
+      IRRawTickView seg{raw.ticks + offset, total_len - offset};
+      size_t next_offset = total_len;
+      bool any_decoded = false;
 
-      size_t effective_len = detail::maybeTrimByGap(raw, spec);
-      IRRawTickView sub_raw = raw;
-      if (effective_len < raw.len)
+      for (size_t i = 0; i < spec_count; ++i)
+      {
+        const IRProtocolSpec &spec = specs[i];
+        if (spec.scheme != IRProtocolScheme::SPACE_ENC)
+          continue;
+
+        size_t effective_len = detail::maybeTrimByGap(seg, spec);
+        if (effective_len < seg.len && offset + effective_len < next_offset)
+          next_offset = offset + effective_len;
+
+        IRRawTickView sub_raw = seg;
         sub_raw.len = effective_len;
 
-      IRDecodedBits decoded{};
-      int16_t score = 0;
-      bool ok = detail::decodeNormal(sub_raw, spec, decoded, score);
-      if (!ok && spec.has_repeat)
-      {
-        ok = detail::decodeRepeat(sub_raw, spec, decoded, score);
-      }
-      if (!ok)
-        continue;
+        IRDecodedBits decoded{};
+        int16_t score = 0;
+        bool ok = detail::decodeNormal(sub_raw, spec, decoded, score);
+        if (!ok && spec.has_repeat)
+        {
+          ok = detail::decodeRepeat(sub_raw, spec, decoded, score);
+        }
+        if (!ok)
+          continue;
 
-      if (effective_len < out.raw.len)
-        out.raw.len = effective_len;
-
-      IRDecodeCandidate cand{};
-      cand.protocol_id = decoded.protocol_id;
-      if (spec.name[0] != '\0')
-      {
-        std::strncpy(cand.name, spec.name, sizeof(cand.name) - 1);
-        cand.name[sizeof(cand.name) - 1] = '\0';
+        any_decoded = true;
+        IRDecodeCandidate cand{};
+        cand.protocol_id = decoded.protocol_id;
+        if (spec.name[0] != '\0')
+        {
+          std::strncpy(cand.name, spec.name, sizeof(cand.name) - 1);
+          cand.name[sizeof(cand.name) - 1] = '\0';
+        }
+        cand.order = spec.order;
+        cand.consumed_len = effective_len;
+        cand.score = score;
+        cand.decoded = decoded;
+        detail::insertCandidate(out, max_candidates, cand);
       }
-      cand.score = score;
-      cand.decoded = decoded;
-      detail::insertCandidate(out, max_candidates, cand);
+
+      if (out.count > 0)
+      {
+        size_t consumed = out.candidates[0].consumed_len > 0 ? out.candidates[0].consumed_len
+                                                             : out.raw.len;
+        if (consumed < out.raw.len)
+          out.raw.len = consumed;
+      }
+
+      if (next_offset <= offset)
+        break;
+      if (next_offset >= total_len)
+        break;
+      offset = next_offset;
     }
 
     return out.count > 0;

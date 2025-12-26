@@ -129,13 +129,17 @@ namespace esp32irpk
 
     uint16_t bit_tol_pct = 25;
     uint16_t endgap_tol_pct = 30;
+
+    uint8_t order = 0; // registration order (tie-breaker)
   };
 
   struct IRDecodeCandidate
   {
     IRProtocolID protocol_id = IRProtocolID::UNKNOWN;
     char name[16] = {};
+    uint8_t order = 0;
     int16_t score = 0;
+    size_t consumed_len = 0; // ticks consumed for this decode
     IRDecodedBits decoded{};
   };
 
@@ -190,6 +194,7 @@ namespace esp32irpk
     int gpio_;
     bool inverted_;
     bool begun_ = false;
+    uint8_t order_counter_ = 0;
     uint8_t decode_candidates_ = MaxCandidates;
     uint32_t idle_threshold_us_ = 30000;
     IRRxStats stats_{};
@@ -225,6 +230,7 @@ namespace esp32irpk
     int gpio_;
     bool inverted_;
     bool begun_ = false;
+    uint8_t order_counter_ = 0;
     std::vector<IRProtocolSpec> protocols_{};
     hal::RmtTx rmt_tx_{};
     static constexpr size_t kMaxEncodedTicks = 2 * 64 + 6;
