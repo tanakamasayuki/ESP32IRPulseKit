@@ -21,12 +21,12 @@ namespace esp32irpk::specs
   // RC-6 Mode 0 (16bit payload, total 21 bits including start/mode/toggle)
   // clang-format off
   inline constexpr IRProtocolSpec RC6_M0_16 = {
-      .protocol_id = IRProtocolID::RC6_M0_16,
-      .name = "RC6_M0_16",
-      .scheme = IRProtocolScheme::BIPHASE,
-      .family = IRProtocolFamily::RC6,
-      .bit_length = 21, // start(1)+mode(3)+toggle(1)+payload(16)
-      .bit_tol_pct = 25,
+      .protocol_id    = IRProtocolID::RC6_M0_16,
+      .name           = "RC6_M0_16",
+      .scheme         = IRProtocolScheme::BIPHASE,
+      .family         = IRProtocolFamily::RC6,
+      .bit_length     = 21, // start(1)+mode(3)+toggle(1)+payload(16)
+      .bit_tol_pct    = 25,
       .endgap_tol_pct = 25,
   };
   // clang-format on
@@ -34,12 +34,12 @@ namespace esp32irpk::specs
   // RC-6 Mode 6 (32bit payload, total 36 bits including start/mode)
   // clang-format off
   inline constexpr IRProtocolSpec RC6_M6_32 = {
-      .protocol_id = IRProtocolID::RC6_M6_32,
-      .name = "RC6_M6_32",
-      .scheme = IRProtocolScheme::BIPHASE,
-      .family = IRProtocolFamily::RC6,
-      .bit_length = 36, // start(1)+mode(3)+payload(32)
-      .bit_tol_pct = 25,
+      .protocol_id    = IRProtocolID::RC6_M6_32,
+      .name           = "RC6_M6_32",
+      .scheme         = IRProtocolScheme::BIPHASE,
+      .family         = IRProtocolFamily::RC6,
+      .bit_length     = 36, // start(1)+mode(3)+payload(32)
+      .bit_tol_pct    = 25,
       .endgap_tol_pct = 25,
   };
   // clang-format on
