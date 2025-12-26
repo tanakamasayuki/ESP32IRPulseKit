@@ -8,6 +8,7 @@ namespace esp32irpk::specs
   // clang-format off
   inline constexpr IRProtocolSpec SAMSUNG32 = {
       .protocol_id      = IRProtocolID::SAMSUNG32,
+      .name             = "SAMSUNG32",
       .scheme           = IRProtocolScheme::SPACE_ENC,
       .family           = IRProtocolFamily::NEC_LIKE,
       .header           = {.mark_us = 4500, .space_us = 4500},
@@ -21,6 +22,7 @@ namespace esp32irpk::specs
 
   inline constexpr IRProtocolSpec SAMSUNG36 = {
       .protocol_id      = IRProtocolID::SAMSUNG36,
+      .name             = "SAMSUNG36",
       .scheme           = IRProtocolScheme::SPACE_ENC,
       .family           = IRProtocolFamily::NEC_LIKE,
       .header           = {.mark_us = 4500, .space_us = 4500},

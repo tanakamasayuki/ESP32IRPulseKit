@@ -8,6 +8,7 @@ namespace esp32irpk::specs
   // clang-format off
   inline constexpr IRProtocolSpec SONY12 = {
       .protocol_id      = IRProtocolID::SONY12,
+      .name             = "SONY12",
       .scheme           = IRProtocolScheme::SPACE_ENC,
       .family           = IRProtocolFamily::UNKNOWN,
       .header           = {.mark_us = 2400, .space_us =  600},
@@ -21,6 +22,7 @@ namespace esp32irpk::specs
 
   inline constexpr IRProtocolSpec SONY15 = {
       .protocol_id      = IRProtocolID::SONY15,
+      .name             = "SONY15",
       .scheme           = IRProtocolScheme::SPACE_ENC,
       .family           = IRProtocolFamily::UNKNOWN,
       .header           = {.mark_us = 2400, .space_us =  600},
@@ -34,6 +36,7 @@ namespace esp32irpk::specs
 
   inline constexpr IRProtocolSpec SONY20 = {
       .protocol_id      = IRProtocolID::SONY20,
+      .name             = "SONY20",
       .scheme           = IRProtocolScheme::SPACE_ENC,
       .family           = IRProtocolFamily::UNKNOWN,
       .header           = {.mark_us = 2400, .space_us =  600},

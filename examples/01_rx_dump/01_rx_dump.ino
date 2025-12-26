@@ -39,8 +39,8 @@ void loop()
     const esp32irpk::IRDecodedBits &b = c.decoded;
     Serial.print("#");
     Serial.print(i);
-    Serial.print(" pid=");
-    Serial.print((unsigned)c.protocol_id);
+    Serial.print(" protocol=");
+    Serial.print(c.name ? c.name : esp32irpk::protocolName(c.protocol_id));
     Serial.print(" score=");
     Serial.print((int)c.score);
     Serial.print(" len=");

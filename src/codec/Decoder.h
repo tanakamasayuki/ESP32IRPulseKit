@@ -285,6 +285,7 @@ namespace esp32irpk::codec
 
       IRDecodeCandidate cand{};
       cand.protocol_id = decoded.protocol_id;
+      cand.name = spec.name;
       cand.score = score;
       cand.decoded = decoded;
       detail::insertCandidate(out, max_candidates, cand);

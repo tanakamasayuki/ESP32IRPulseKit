@@ -55,15 +55,21 @@ namespace esp32irpk
   {
     if (begun_)
       return false;
+    IRProtocolSpec copy = spec;
+    if (spec.name)
+    {
+      protocol_names_.emplace_back(spec.name);
+      copy.name = protocol_names_.back().c_str();
+    }
     auto it = std::find_if(protocols_.begin(), protocols_.end(),
                            [&](const IRProtocolSpec &item)
                            { return item.protocol_id == spec.protocol_id; });
     if (it != protocols_.end())
     {
-      *it = spec;
+      *it = copy;
       return true;
     }
-    protocols_.push_back(spec);
+    protocols_.push_back(copy);
     return true;
   }
 
@@ -73,6 +79,7 @@ namespace esp32irpk
     if (begun_)
       return false;
     protocols_.clear();
+    protocol_names_.clear();
     return true;
   }
 
@@ -84,6 +91,15 @@ namespace esp32irpk
 
     if (decode_candidates_ > 0 && protocols_.empty())
       detail::addDefaultProtocols(protocols_);
+    protocol_names_.clear();
+    for (auto &spec : protocols_)
+    {
+      if (spec.name)
+      {
+        protocol_names_.emplace_back(spec.name);
+        spec.name = protocol_names_.back().c_str();
+      }
+    }
 
     uint32_t idle_threshold = idle_threshold_us_;
     if (decode_candidates_ > 0)

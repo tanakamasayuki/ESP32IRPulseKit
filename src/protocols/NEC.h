@@ -8,6 +8,7 @@ namespace esp32irpk::specs
   // clang-format off
   inline constexpr IRProtocolSpec NEC = {
       .protocol_id      = IRProtocolID::NEC,
+      .name             = "NEC",
       .scheme           = IRProtocolScheme::SPACE_ENC,
       .family           = IRProtocolFamily::NEC_LIKE,
       .header           = {.mark_us = 9000, .space_us = 4500},
