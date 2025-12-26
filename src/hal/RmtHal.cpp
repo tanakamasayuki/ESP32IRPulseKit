@@ -234,11 +234,27 @@ namespace esp32irpk::hal
     return startReceiveInternal();
   }
 
+  bool RmtRx::consumeTruncatedFlag()
+  {
+    bool v = last_truncated_;
+    last_truncated_ = false;
+    return v;
+  }
+
+  bool RmtRx::consumeOverflowFlag()
+  {
+    bool v = last_overflow_;
+    last_overflow_ = false;
+    return v;
+  }
+
   bool RmtRx::startReceiveInternal()
   {
     if (!rx_channel_)
       return false;
     receiving_ = false;
+    last_truncated_ = false;
+    last_overflow_ = false;
     sym_buf_.resize(kMaxRxSymbols);
     rmt_receive_config_t rcfg = {};
     rcfg.signal_range_min_ns = 0;
@@ -255,6 +271,11 @@ namespace esp32irpk::hal
   bool IRAM_ATTR RmtRx::handleRecvDone(const rmt_rx_done_event_data_t *edata)
   {
     sym_count_ = edata->num_symbols;
+    if (sym_count_ > kMaxRxSymbols)
+    {
+      sym_count_ = kMaxRxSymbols;
+      last_truncated_ = true;
+    }
     has_frame_ = true;
     BaseType_t hp_task_woken = pdFALSE;
     xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(rx_sem_), &hp_task_woken);
@@ -317,6 +338,16 @@ namespace esp32irpk::hal
   }
 
   bool RmtRx::startReceive()
+  {
+    return false;
+  }
+
+  bool RmtRx::consumeTruncatedFlag()
+  {
+    return false;
+  }
+
+  bool RmtRx::consumeOverflowFlag()
   {
     return false;
   }

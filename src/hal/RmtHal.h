@@ -41,6 +41,8 @@ namespace esp32irpk::hal
     bool begin(int gpio, bool inverted, uint32_t idle_threshold_us);
     void end();
     bool read(/*out*/ esp32irpk::IRRawTickView &raw);
+    bool consumeTruncatedFlag();
+    bool consumeOverflowFlag();
 
   private:
     bool startReceive();
@@ -59,6 +61,8 @@ namespace esp32irpk::hal
     size_t sym_count_ = 0;
     bool has_frame_ = false;
     bool receiving_ = false;
+    bool last_truncated_ = false;
+    bool last_overflow_ = false;
     std::vector<uint16_t> ticks_buf_;
   };
 

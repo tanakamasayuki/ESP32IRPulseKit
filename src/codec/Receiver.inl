@@ -126,6 +126,16 @@ namespace esp32irpk
     }
 
     decode(out.raw, out);
+    if (rmt_rx_.consumeTruncatedFlag())
+    {
+      out.flags |= IRResultFlags::RAW_TRUNCATED;
+      stats_.raw_truncated_count++;
+    }
+    if (rmt_rx_.consumeOverflowFlag())
+    {
+      out.flags |= IRResultFlags::RMT_OVERFLOW;
+      stats_.rmt_overflow_count++;
+    }
     return true;
   }
 
