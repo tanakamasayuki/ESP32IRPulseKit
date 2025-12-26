@@ -148,5 +148,6 @@ void loop()
     Serial.print(" frame_type=");
     Serial.println(b.frame_type == esp32irpk::IRFrameType::REPEAT ? "REPEAT" : "NORMAL");
     printFrame(b);
+    Serial.println();
   }
 }
