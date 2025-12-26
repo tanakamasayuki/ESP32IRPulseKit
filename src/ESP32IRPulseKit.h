@@ -2,6 +2,10 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <algorithm>
+#include <vector>
+
+#include "hal/RmtHal.h"
 
 namespace esp32irpk
 {
@@ -186,6 +190,8 @@ namespace esp32irpk
     uint8_t decode_candidates_ = MaxCandidates;
     uint32_t idle_threshold_us_ = 30000;
     IRRxStats stats_{};
+    std::vector<IRProtocolSpec> protocols_{};
+    hal::RmtRx rmt_rx_{};
   };
 
   class IRSender
@@ -216,11 +222,41 @@ namespace esp32irpk
     int gpio_;
     bool inverted_;
     bool begun_ = false;
+    std::vector<IRProtocolSpec> protocols_{};
+    hal::RmtTx rmt_tx_{};
+    static constexpr size_t kMaxEncodedTicks = 2 * 64 + 6;
+    uint16_t encode_buf_[kMaxEncodedTicks]{};
   };
 
 } // namespace esp32irpk
 
-#include "codec/Receiver.inl"
 #include "protocols/NEC.h"
 #include "protocols/Sony.h"
 #include "protocols/Samsung.h"
+
+namespace esp32irpk::detail
+{
+  inline void addDefaultProtocols(std::vector<IRProtocolSpec> &out)
+  {
+    auto has = [&](IRProtocolID id)
+    {
+      return std::any_of(out.begin(), out.end(),
+                         [&](const IRProtocolSpec &spec)
+                         { return spec.protocol_id == id; });
+    };
+    if (!has(specs::NEC.protocol_id))
+      out.push_back(specs::NEC);
+    if (!has(specs::SONY12.protocol_id))
+      out.push_back(specs::SONY12);
+    if (!has(specs::SONY15.protocol_id))
+      out.push_back(specs::SONY15);
+    if (!has(specs::SONY20.protocol_id))
+      out.push_back(specs::SONY20);
+    if (!has(specs::SAMSUNG32.protocol_id))
+      out.push_back(specs::SAMSUNG32);
+    if (!has(specs::SAMSUNG36.protocol_id))
+      out.push_back(specs::SAMSUNG36);
+  }
+} // namespace esp32irpk::detail
+
+#include "codec/Receiver.inl"

@@ -28,10 +28,19 @@ namespace esp32irpk
     return true;
   }
 
-  bool IRSender::addProtocol(const IRProtocolSpec &)
+  bool IRSender::addProtocol(const IRProtocolSpec &spec)
   {
     if (begun_)
       return false;
+    auto it = std::find_if(protocols_.begin(), protocols_.end(),
+                           [&](const IRProtocolSpec &item)
+                           { return item.protocol_id == spec.protocol_id; });
+    if (it != protocols_.end())
+    {
+      *it = spec;
+      return true;
+    }
+    protocols_.push_back(spec);
     return true;
   }
 
@@ -39,28 +48,34 @@ namespace esp32irpk
   {
     if (begun_)
       return false;
+    protocols_.clear();
     return true;
   }
 
   bool IRSender::begin()
   {
+    if (begun_)
+      return false;
+    detail::addDefaultProtocols(protocols_);
+    if (!rmt_tx_.begin(gpio_, inverted_))
+      return false;
     begun_ = true;
-    // TODO: hook up hal::RmtTx
     return true;
   }
 
   void IRSender::end()
   {
+    rmt_tx_.end();
     begun_ = false;
   }
 
   bool IRSender::send(const esp32irpk::IRRawTickView &raw, uint8_t repeat_count)
   {
-    (void)raw;
-    (void)repeat_count;
     if (!begun_)
       return false;
-    return false;
+    if (!raw.ticks || raw.len == 0)
+      return false;
+    return rmt_tx_.send(raw, repeat_count);
   }
 
   bool IRSender::send(const esp32irpk::IRRawTickView *raw, uint8_t repeat_count)
@@ -72,11 +87,19 @@ namespace esp32irpk
 
   bool IRSender::send(const IRDecodedBits &decoded, uint8_t repeat_count)
   {
-    (void)decoded;
-    (void)repeat_count;
     if (!begun_)
       return false;
-    return false;
+    IRRawTickBuffer out_raw{};
+    out_raw.ticks = encode_buf_;
+    out_raw.capacity = kMaxEncodedTicks;
+    out_raw.len = 0;
+    if (!codec::encodeBitsToRaw(decoded, protocols_.data(), protocols_.size(), out_raw))
+      return false;
+
+    IRRawTickView view{};
+    view.ticks = out_raw.ticks;
+    view.len = out_raw.len;
+    return send(view, repeat_count);
   }
 
   bool IRSender::send(const IRDecodedBits *decoded, uint8_t repeat_count)
@@ -88,11 +111,9 @@ namespace esp32irpk
 
   bool IRSender::encode(const IRDecodedBits &decoded, IRRawTickBuffer &out_raw)
   {
-    (void)decoded;
-    (void)out_raw;
     if (!begun_)
       return false;
-    return false;
+    return codec::encodeBitsToRaw(decoded, protocols_.data(), protocols_.size(), out_raw);
   }
 
   bool IRSender::sendNEC(uint16_t address, uint8_t command, bool repeat)
@@ -117,7 +138,7 @@ namespace esp32irpk
       v |= (static_cast<uint64_t>(~command) << 24);
       bits.bits = v;
     }
-    return send(bits, repeat ? 0 : 0);
+    return send(bits, 0);
   }
 
   // ---- Receiver template instantiation (inline in codec/Receiver.inl) ----

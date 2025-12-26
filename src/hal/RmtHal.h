@@ -7,6 +7,7 @@ namespace esp32irpk
 {
   struct IRRawTickView;
   struct IRRawTickBuffer;
+  struct IRDecodedBits;
 }
 
 namespace esp32irpk::hal

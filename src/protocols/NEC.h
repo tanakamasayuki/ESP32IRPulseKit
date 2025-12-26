@@ -38,13 +38,39 @@ namespace esp32irpk::frames
 
     static NECFrame fromBits(const esp32irpk::IRDecodedBits &in)
     {
-      (void)in;
-      return NECFrame{};
+      NECFrame out{};
+      if (in.frame_type == esp32irpk::IRFrameType::REPEAT)
+      {
+        out.is_repeat = true;
+        return out;
+      }
+
+      uint64_t bits = in.bits;
+      out.address = static_cast<uint16_t>(bits & 0xFFFFULL);
+      out.command = static_cast<uint8_t>((bits >> 16) & 0xFFULL);
+      return out;
     }
 
     esp32irpk::IRDecodedBits toBits() const
     {
       esp32irpk::IRDecodedBits out{};
+      out.protocol_id = esp32irpk::IRProtocolID::NEC;
+      if (is_repeat)
+      {
+        out.frame_type = esp32irpk::IRFrameType::REPEAT;
+        out.bit_length = 0;
+        out.bits = 0xFFFFFFFFFFFFFFFFULL;
+        return out;
+      }
+
+      uint64_t bits = 0;
+      bits |= static_cast<uint64_t>(address);
+      bits |= (static_cast<uint64_t>(command) << 16);
+      bits |= (static_cast<uint64_t>(~command) << 24);
+
+      out.frame_type = esp32irpk::IRFrameType::NORMAL;
+      out.bit_length = 32;
+      out.bits = bits;
       return out;
     }
   };

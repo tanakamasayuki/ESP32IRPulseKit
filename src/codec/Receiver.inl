@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Decoder.h"
+
 namespace esp32irpk
 {
 
@@ -49,10 +51,19 @@ namespace esp32irpk
   }
 
   template <size_t MaxCandidates>
-  bool IRReceiver<MaxCandidates>::addProtocol(const IRProtocolSpec &)
+  bool IRReceiver<MaxCandidates>::addProtocol(const IRProtocolSpec &spec)
   {
     if (begun_)
       return false;
+    auto it = std::find_if(protocols_.begin(), protocols_.end(),
+                           [&](const IRProtocolSpec &item)
+                           { return item.protocol_id == spec.protocol_id; });
+    if (it != protocols_.end())
+    {
+      *it = spec;
+      return true;
+    }
+    protocols_.push_back(spec);
     return true;
   }
 
@@ -61,12 +72,31 @@ namespace esp32irpk
   {
     if (begun_)
       return false;
+    protocols_.clear();
     return true;
   }
 
   template <size_t MaxCandidates>
   bool IRReceiver<MaxCandidates>::begin()
   {
+    if (begun_)
+      return false;
+
+    if (decode_candidates_ > 0 && protocols_.empty())
+      detail::addDefaultProtocols(protocols_);
+
+    uint32_t idle_threshold = idle_threshold_us_;
+    if (decode_candidates_ > 0)
+    {
+      for (const auto &spec : protocols_)
+      {
+        if (spec.frame_end_gap_us > idle_threshold)
+          idle_threshold = spec.frame_end_gap_us;
+      }
+    }
+
+    if (!rmt_rx_.begin(gpio_, inverted_, idle_threshold))
+      return false;
     begun_ = true;
     return true;
   }
@@ -74,23 +104,43 @@ namespace esp32irpk
   template <size_t MaxCandidates>
   void IRReceiver<MaxCandidates>::end()
   {
+    rmt_rx_.end();
     begun_ = false;
   }
 
   template <size_t MaxCandidates>
   bool IRReceiver<MaxCandidates>::read(IRReceiveResult<MaxCandidates> &out)
   {
-    (void)out;
-    return false;
+    if (!begun_)
+      return false;
+
+    out.flags = IRResultFlags::NONE;
+    out.count = 0;
+    if (!rmt_rx_.read(out.raw))
+      return false;
+
+    if (decode_candidates_ == 0)
+    {
+      out.flags |= IRResultFlags::DECODE_SKIPPED;
+      return true;
+    }
+
+    decode(out.raw, out);
+    return true;
   }
 
   template <size_t MaxCandidates>
   bool IRReceiver<MaxCandidates>::decode(const IRRawTickView &raw,
                                          IRReceiveResult<MaxCandidates> &out) const
   {
-    (void)raw;
-    (void)out;
-    return false;
+    out.count = 0;
+    out.raw = raw;
+    bool ok = codec::decodeRawToBits(raw,
+                                     protocols_.data(),
+                                     protocols_.size(),
+                                     decode_candidates_,
+                                     out);
+    return ok;
   }
 
   template <size_t MaxCandidates>
