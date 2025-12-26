@@ -26,6 +26,8 @@ namespace esp32irpk::hal
     int gpio_ = -1;
     bool inverted_ = false;
     bool begun_ = false;
+    void *tx_channel_ = nullptr;
+    void *tx_encoder_ = nullptr;
   };
 
   class RmtRx
@@ -40,6 +42,7 @@ namespace esp32irpk::hal
     bool inverted_ = false;
     bool begun_ = false;
     uint32_t idle_threshold_us_ = 30000;
+    void *rx_channel_ = nullptr;
   };
 
 } // namespace esp32irpk::hal
