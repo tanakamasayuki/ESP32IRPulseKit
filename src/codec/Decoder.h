@@ -305,65 +305,47 @@ namespace esp32irpk::codec
       return false;
 
     out.raw = raw;
-    size_t offset = 0;
-    const size_t total_len = raw.len;
-    while (offset < total_len)
+
+    for (size_t i = 0; i < spec_count; ++i)
     {
-      IRRawTickView seg{raw.ticks + offset, total_len - offset};
-      size_t next_offset = total_len;
-      bool any_decoded = false;
+      const IRProtocolSpec &spec = specs[i];
+      if (spec.scheme != IRProtocolScheme::SPACE_ENC)
+        continue;
 
-      for (size_t i = 0; i < spec_count; ++i)
+      size_t effective_len = detail::maybeTrimByGap(raw, spec);
+      IRRawTickView sub_raw = raw;
+      sub_raw.len = effective_len;
+
+      IRDecodedBits decoded{};
+      int16_t score = 0;
+      bool ok = detail::decodeNormal(sub_raw, spec, decoded, score);
+      if (!ok && spec.has_repeat)
       {
-        const IRProtocolSpec &spec = specs[i];
-        if (spec.scheme != IRProtocolScheme::SPACE_ENC)
-          continue;
-
-        size_t effective_len = detail::maybeTrimByGap(seg, spec);
-        if (effective_len < seg.len && offset + effective_len < next_offset)
-          next_offset = offset + effective_len;
-
-        IRRawTickView sub_raw = seg;
-        sub_raw.len = effective_len;
-
-        IRDecodedBits decoded{};
-        int16_t score = 0;
-        bool ok = detail::decodeNormal(sub_raw, spec, decoded, score);
-        if (!ok && spec.has_repeat)
-        {
-          ok = detail::decodeRepeat(sub_raw, spec, decoded, score);
-        }
-        if (!ok)
-          continue;
-
-        any_decoded = true;
-        IRDecodeCandidate cand{};
-        cand.protocol_id = decoded.protocol_id;
-        if (spec.name[0] != '\0')
-        {
-          std::strncpy(cand.name, spec.name, sizeof(cand.name) - 1);
-          cand.name[sizeof(cand.name) - 1] = '\0';
-        }
-        cand.order = spec.order;
-        cand.consumed_len = effective_len;
-        cand.score = score;
-        cand.decoded = decoded;
-        detail::insertCandidate(out, max_candidates, cand);
+        ok = detail::decodeRepeat(sub_raw, spec, decoded, score);
       }
+      if (!ok)
+        continue;
 
-      if (out.count > 0)
+      IRDecodeCandidate cand{};
+      cand.protocol_id = decoded.protocol_id;
+      if (spec.name[0] != '\0')
       {
-        size_t consumed = out.candidates[0].consumed_len > 0 ? out.candidates[0].consumed_len
-                                                             : out.raw.len;
-        if (consumed < out.raw.len)
-          out.raw.len = consumed;
+        std::strncpy(cand.name, spec.name, sizeof(cand.name) - 1);
+        cand.name[sizeof(cand.name) - 1] = '\0';
       }
+      cand.order = spec.order;
+      cand.consumed_len = effective_len;
+      cand.score = score;
+      cand.decoded = decoded;
+      detail::insertCandidate(out, max_candidates, cand);
+    }
 
-      if (next_offset <= offset)
-        break;
-      if (next_offset >= total_len)
-        break;
-      offset = next_offset;
+    if (out.count > 0)
+    {
+      size_t consumed = out.candidates[0].consumed_len > 0 ? out.candidates[0].consumed_len
+                                                           : out.raw.len;
+      if (consumed < out.raw.len)
+        out.raw.len = consumed;
     }
 
     return out.count > 0;

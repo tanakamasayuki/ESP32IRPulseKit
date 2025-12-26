@@ -2,6 +2,7 @@
 #include "../ESP32IRPulseKit.h"
 
 #include <vector>
+#include <utility>
 
 #if defined(ESP_PLATFORM)
 #include <driver/rmt_encoder.h>
@@ -22,6 +23,7 @@ namespace esp32irpk::hal
     constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us (RMT resolution)
     constexpr uint32_t kRmtTickUs = 10;
     constexpr size_t kMaxRxSymbols = 256;
+    constexpr size_t kMaxQueuedFrames = 4;
     constexpr uint32_t kTickUs = 10; // library tick = 10us
 
     std::vector<rmt_symbol_word_t> toSymbols(const esp32irpk::IRRawTickView &raw, bool mark_high)
@@ -181,17 +183,18 @@ namespace esp32irpk::hal
       return false;
     }
 
-    ticks_buf_.reserve(kMaxRxSymbols * 2);
     last_truncated_ = false;
     last_overflow_ = false;
     sym_count_ = 0;
     has_frame_ = false;
+    queue_.clear();
+    current_ = RxFrame{};
+    queue_overflow_count_ = 0;
     if (!startReceiveInternal())
     {
       end();
       return false;
     }
-
     begun_ = true;
     return true;
   }
@@ -212,40 +215,29 @@ namespace esp32irpk::hal
     sym_count_ = 0;
     has_frame_ = false;
     receiving_ = false;
+    queue_.clear();
+    current_ = RxFrame{};
+    queue_overflow_count_ = 0;
+    last_truncated_ = false;
+    last_overflow_ = false;
     begun_ = false;
   }
 
   bool RmtRx::read(/*out*/ esp32irpk::IRRawTickView &raw)
   {
+    raw = {};
     if (!begun_)
       return false;
 
-    if (xSemaphoreTake(static_cast<SemaphoreHandle_t>(rx_sem_), 0) != pdTRUE)
-      return false;
-    has_frame_ = false;
-
-    ticks_buf_.clear();
-    auto *sym = reinterpret_cast<const rmt_symbol_word_t *>(sym_buf_.data());
-    for (size_t i = 0; i < sym_count_; ++i)
+    drainRxQueue();
+    if (!hasCurrent())
     {
-      const auto &s = sym[i];
-      uint32_t t0 = static_cast<uint32_t>(s.duration0);
-      if (t0 > 0xFFFF)
-        t0 = 0xFFFF;
-      ticks_buf_.push_back(static_cast<uint16_t>(t0));
-      if (s.duration1 > 0)
-      {
-        uint32_t t1 = static_cast<uint32_t>(s.duration1);
-        if (t1 > 0xFFFF)
-          t1 = 0xFFFF;
-        ticks_buf_.push_back(static_cast<uint16_t>(t1));
-      }
+      if (!loadNextFrame())
+        return false;
     }
 
-    raw.ticks = ticks_buf_.data();
-    raw.len = ticks_buf_.size();
-
-    startReceiveInternal();
+    raw.ticks = current_.ticks.data() + current_.start;
+    raw.len = current_.ticks.size() - current_.start;
     return raw.len > 0;
   }
 
@@ -254,17 +246,101 @@ namespace esp32irpk::hal
     return startReceiveInternal();
   }
 
+  void RmtRx::drainRxQueue()
+  {
+    if (!rx_sem_)
+      return;
+
+    while (xSemaphoreTake(static_cast<SemaphoreHandle_t>(rx_sem_), 0) == pdTRUE)
+    {
+      has_frame_ = false;
+      if (sym_count_ == 0)
+      {
+        startReceiveInternal();
+        continue;
+      }
+
+      RxFrame frame{};
+      frame.truncated = last_truncated_;
+      frame.overflow = last_overflow_;
+      last_truncated_ = false;
+      last_overflow_ = false;
+
+      auto *sym = reinterpret_cast<const rmt_symbol_word_t *>(sym_buf_.data());
+      frame.ticks.reserve(sym_count_ * 2);
+      for (size_t i = 0; i < sym_count_; ++i)
+      {
+        const auto &s = sym[i];
+        uint32_t t0 = static_cast<uint32_t>(s.duration0);
+        if (t0 > 0xFFFF)
+          t0 = 0xFFFF;
+        frame.ticks.push_back(static_cast<uint16_t>(t0));
+        if (s.duration1 > 0)
+        {
+          uint32_t t1 = static_cast<uint32_t>(s.duration1);
+          if (t1 > 0xFFFF)
+            t1 = 0xFFFF;
+          frame.ticks.push_back(static_cast<uint16_t>(t1));
+        }
+      }
+      sym_count_ = 0;
+
+      if (queue_.size() >= kMaxQueuedFrames)
+      {
+        queue_.pop_front();
+        ++queue_overflow_count_;
+      }
+      queue_.push_back(std::move(frame));
+
+      startReceiveInternal();
+    }
+  }
+
+  bool RmtRx::hasCurrent() const
+  {
+    return current_.start < current_.ticks.size();
+  }
+
+  bool RmtRx::loadNextFrame()
+  {
+    if (queue_.empty())
+      return false;
+    current_ = std::move(queue_.front());
+    queue_.pop_front();
+    if (current_.start >= current_.ticks.size())
+      return loadNextFrame();
+    return true;
+  }
+
   bool RmtRx::consumeTruncatedFlag()
   {
-    bool v = last_truncated_;
-    last_truncated_ = false;
+    bool v = current_.truncated;
+    current_.truncated = false;
     return v;
   }
 
   bool RmtRx::consumeOverflowFlag()
   {
-    bool v = last_overflow_;
-    last_overflow_ = false;
+    bool v = current_.overflow;
+    current_.overflow = false;
+    return v;
+  }
+
+  void RmtRx::consume(size_t ticks)
+  {
+    if (!hasCurrent() || ticks == 0)
+      return;
+    size_t remaining = current_.ticks.size() - current_.start;
+    size_t adv = ticks > remaining ? remaining : ticks;
+    current_.start += adv;
+    if (current_.start > current_.ticks.size())
+      current_.start = current_.ticks.size();
+  }
+
+  uint32_t RmtRx::consumeQueueOverflowCount()
+  {
+    uint32_t v = queue_overflow_count_;
+    queue_overflow_count_ = 0;
     return v;
   }
 
@@ -340,18 +416,30 @@ namespace esp32irpk::hal
     gpio_ = gpio;
     inverted_ = inverted;
     idle_threshold_us_ = idle_threshold_us;
+    queue_.clear();
+    current_ = RxFrame{};
+    queue_overflow_count_ = 0;
     begun_ = true;
     return true;
   }
 
   void RmtRx::end()
   {
+    queue_.clear();
+    current_ = RxFrame{};
+    queue_overflow_count_ = 0;
     begun_ = false;
   }
 
   bool RmtRx::read(/*out*/ esp32irpk::IRRawTickView &raw)
   {
-    (void)raw;
+    raw = {};
+    if (hasCurrent())
+    {
+      raw.ticks = current_.ticks.data() + current_.start;
+      raw.len = current_.ticks.size() - current_.start;
+      return raw.len > 0;
+    }
     if (!begun_)
       return false;
     return false;
@@ -362,6 +450,22 @@ namespace esp32irpk::hal
     return false;
   }
 
+  void RmtRx::drainRxQueue() {}
+
+  bool RmtRx::hasCurrent() const
+  {
+    return current_.start < current_.ticks.size();
+  }
+
+  bool RmtRx::loadNextFrame()
+  {
+    if (queue_.empty())
+      return false;
+    current_ = std::move(queue_.front());
+    queue_.pop_front();
+    return hasCurrent();
+  }
+
   bool RmtRx::consumeTruncatedFlag()
   {
     return false;
@@ -370,6 +474,22 @@ namespace esp32irpk::hal
   bool RmtRx::consumeOverflowFlag()
   {
     return false;
+  }
+
+  void RmtRx::consume(size_t ticks)
+  {
+    if (!hasCurrent() || ticks == 0)
+      return;
+    size_t remaining = current_.ticks.size() - current_.start;
+    size_t adv = ticks > remaining ? remaining : ticks;
+    current_.start += adv;
+  }
+
+  uint32_t RmtRx::consumeQueueOverflowCount()
+  {
+    uint32_t v = queue_overflow_count_;
+    queue_overflow_count_ = 0;
+    return v;
   }
 
 #endif // ESP_PLATFORM

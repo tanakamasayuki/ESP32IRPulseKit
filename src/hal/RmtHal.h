@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <deque>
 #include <vector>
 
 #if defined(ESP_PLATFORM)
@@ -43,8 +44,21 @@ namespace esp32irpk::hal
     bool read(/*out*/ esp32irpk::IRRawTickView &raw);
     bool consumeTruncatedFlag();
     bool consumeOverflowFlag();
+    void consume(size_t ticks);
+    uint32_t consumeQueueOverflowCount();
 
   private:
+    struct RxFrame
+    {
+      std::vector<uint16_t> ticks;
+      size_t start = 0;
+      bool truncated = false;
+      bool overflow = false;
+    };
+
+    void drainRxQueue();
+    bool hasCurrent() const;
+    bool loadNextFrame();
     bool startReceive();
 #if defined(ESP_PLATFORM)
     bool startReceiveInternal();
@@ -63,7 +77,9 @@ namespace esp32irpk::hal
     bool receiving_ = false;
     bool last_truncated_ = false;
     bool last_overflow_ = false;
-    std::vector<uint16_t> ticks_buf_;
+    std::deque<RxFrame> queue_;
+    RxFrame current_;
+    uint32_t queue_overflow_count_ = 0;
   };
 
 } // namespace esp32irpk::hal

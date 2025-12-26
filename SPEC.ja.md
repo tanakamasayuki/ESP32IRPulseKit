@@ -180,6 +180,7 @@ namespace esp32irpk {
 
 struct IRProtocolSpec {
   IRProtocolID protocol_id;          // 一意なプロトコルID
+  char name[16];                     // 表示用の短い名前（省略可、15文字+終端）
 
   IRProtocolScheme scheme;           // ビット表現方式（例：SPACE_ENC）
   IRProtocolFamily family;           // プロトコル系統（例：NEC_LIKE）
@@ -201,6 +202,8 @@ struct IRProtocolSpec {
 
   uint16_t bit_tol_pct = 25;         // パルス許容誤差（%）
   uint16_t endgap_tol_pct = 30;      // 終端 gap の許容誤差（%）
+
+  uint8_t order = 0;                 // 登録順（スコア同値時の優先度）
 };
 
 } // namespace
@@ -309,6 +312,8 @@ namespace esp32irpk {
 
 struct IRDecodeCandidate {
   IRProtocolID protocol_id;   // 判定されたプロトコル
+  char name[16];              // Spec 由来の表示名（省略可）
+  uint8_t order = 0;          // 登録順（同スコア時の優先度）
   size_t consumed_len = 0;    // この候補が処理した RAW ticks 長（デコード終端位置）
   int16_t score = 0;          // 減点後のスコア（大きいほど良い）
   IRDecodedBits decoded;      // 正規化された BITS
@@ -368,16 +373,16 @@ public:
 - `true`：out.raw が有効（len>0）
 - `false`：取得可能データなし（out内容は未定義）
 
-### 6.5 受信キュー溢れ
-- 実装は古いデータから破棄する（drop oldest）
-- フレーム単位で対処できないため flags では返さない
-- `IRRxStats.queue_overflow_count` に累積反映する
+### 6.5 受信キューと分割
+- HAL は RMT で受信したシンボル列を tick 配列へ変換したうえで内部キューに蓄積する。キューが満杯の場合は最古のエントリを破棄し、`IRRxStats.queue_overflow_count` を加算する（flags では返さない）。
+- `read()` はまず内部キューをドレインし、新規受信分を溜めつつ「処理中フレーム」の残りがあればそれを優先して返す。返却する `IRRawTickView` は元配列へのポインタと開始オフセット（start 相当）＋残長で表現し、元配列自体は切り詰めない。
+- 処理中フレームを使い切った場合のみ、キューから次のフレームを取り出して処理する。キューも空なら `false` を返す。
 
 ### 6.6 GAP と RAW 分割の扱い
 - RMT の `idle_threshold_us` は登録済みプロトコルの `frame_end_gap_us` の最大値を採用する（5.4 参照）。このため GAP が短いプロトコル（例: NEC）の複数フレームが連結した RAW が返る場合がある。
 - デコード時は各プロトコルの `frame_end_gap_us` を基準に、先頭から GAP を検出した位置までをそのプロトコルの解析対象とし、それ以降の波形は見ない。
 - 各プロトコルの解析結果 (`IRDecodeCandidate`) には、そのプロトコルが処理に使用した RAW ticks 長 (`consumed_len`) を含める。
-- 最上位スコアの候補の `consumed_len` に合わせて `IRReceiveResult.raw.len` を切り詰め、次回 `read()` で残りの波形を処理するループを回す。
+- 最上位スコアの候補の `consumed_len` 分だけ処理オフセットを前進させ、`IRReceiveResult.raw.len` もその範囲に合わせて返す。実データは保持したままなので、次回 `read()` は残りの波形から再開する。
 
 ---
 

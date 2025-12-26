@@ -129,10 +129,29 @@ namespace esp32irpk
     if (decode_candidates_ == 0)
     {
       out.flags |= IRResultFlags::DECODE_SKIPPED;
+      rmt_rx_.consume(out.raw.len);
+      stats_.queue_overflow_count += rmt_rx_.consumeQueueOverflowCount();
+      if (rmt_rx_.consumeTruncatedFlag())
+      {
+        out.flags |= IRResultFlags::RAW_TRUNCATED;
+        stats_.raw_truncated_count++;
+      }
+      if (rmt_rx_.consumeOverflowFlag())
+      {
+        out.flags |= IRResultFlags::RMT_OVERFLOW;
+        stats_.rmt_overflow_count++;
+      }
       return true;
     }
 
     decode(out.raw, out);
+
+    size_t consumed = out.raw.len;
+    if (out.count > 0 && out.candidates[0].consumed_len > 0)
+      consumed = out.candidates[0].consumed_len;
+    rmt_rx_.consume(consumed);
+
+    stats_.queue_overflow_count += rmt_rx_.consumeQueueOverflowCount();
     if (rmt_rx_.consumeTruncatedFlag())
     {
       out.flags |= IRResultFlags::RAW_TRUNCATED;
