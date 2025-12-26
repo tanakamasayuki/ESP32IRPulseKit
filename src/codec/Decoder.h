@@ -91,6 +91,40 @@ namespace esp32irpk::codec
       return finalizeScore(scaled);
     }
 
+    inline void adjustFamilyScore(const IRProtocolSpec &spec,
+                                  const IRDecodedBits &decoded,
+                                  int16_t &score)
+    {
+      switch (spec.family)
+      {
+      case IRProtocolFamily::AEHA:
+      {
+        if (decoded.bit_length >= 20)
+        {
+          uint16_t customer = static_cast<uint16_t>(decoded.bits & 0xFFFFu);
+          uint8_t parity = static_cast<uint8_t>((decoded.bits >> 16) & 0xFu);
+          uint8_t expected = static_cast<uint8_t>((customer ^ (customer >> 4) ^ (customer >> 8) ^ (customer >> 12)) & 0xFu);
+          if (parity == expected)
+          {
+            score += 20;
+          }
+          else
+          {
+            score -= 40;
+          }
+        }
+        break;
+      }
+      case IRProtocolFamily::PANASONIC:
+      {
+        // No special check for now
+        break;
+      }
+      default:
+        break;
+      }
+    }
+
     inline size_t maybeTrimByGap(const IRRawTickView &raw, const IRProtocolSpec &spec)
     {
       if (spec.frame_end_gap_us == 0 || raw.len == 0)
@@ -413,6 +447,7 @@ namespace esp32irpk::codec
       cand.consumed_len = effective_len;
       cand.score = score;
       cand.decoded = decoded;
+      detail::adjustFamilyScore(spec, cand.decoded, cand.score);
       detail::insertCandidate(out, max_candidates, cand);
     }
 

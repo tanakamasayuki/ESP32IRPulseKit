@@ -23,6 +23,8 @@ namespace esp32irpk
   {
     UNKNOWN = 0,
     NEC_LIKE = 1,
+    AEHA = 2,
+    PANASONIC = 3,
   };
 
   enum class IRProtocolID : uint16_t
