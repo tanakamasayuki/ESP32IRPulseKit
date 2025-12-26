@@ -125,6 +125,7 @@ void loop()
   if (r.count == 0)
   {
     Serial.println("no decoded candidates");
+    Serial.println();
     return;
   }
 

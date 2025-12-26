@@ -18,6 +18,7 @@ namespace esp32irpk::specs
       .frame_end_gap_us = 24000, // 45000 - (2400 + 600) - (900 + 600)*12
       .lsb_first        = true,
       .bit_length       = 12,
+      .bit_tol_pct      = 55,
   };
 
   inline constexpr IRProtocolSpec SONY15 = {
@@ -32,6 +33,7 @@ namespace esp32irpk::specs
       .frame_end_gap_us = 19500, // 45000 - (2400 + 600) - (900 + 600)*15
       .lsb_first        = true,
       .bit_length       = 15,
+      .bit_tol_pct      = 55,
   };
 
   inline constexpr IRProtocolSpec SONY20 = {
@@ -46,6 +48,7 @@ namespace esp32irpk::specs
       .frame_end_gap_us = 12000, // 45000 - (2400 + 600) - (900 + 600)*20
       .lsb_first        = true,
       .bit_length       = 20,
+      .bit_tol_pct      = 55,
   };
   // clang-format on
 
