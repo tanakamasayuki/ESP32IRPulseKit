@@ -25,6 +25,7 @@ namespace esp32irpk
     NEC_LIKE = 1,
     AEHA = 2,
     PANASONIC = 3,
+    SONY = 4,
   };
 
   enum class IRProtocolID : uint16_t
