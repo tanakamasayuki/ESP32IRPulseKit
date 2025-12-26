@@ -38,15 +38,15 @@ namespace esp32irpk::specs
 namespace esp32irpk::frames
 {
 
-  struct SamsungFrame
+  struct Samsung32Frame
   {
-    uint32_t address = 0;
-    uint32_t command = 0;
+    uint16_t address = 0;
+    uint16_t command = 0;
     bool is_repeat = false;
 
-    static SamsungFrame fromBits(const esp32irpk::IRDecodedBits &in)
+    static Samsung32Frame fromBits(const esp32irpk::IRDecodedBits &in)
     {
-      SamsungFrame out{};
+      Samsung32Frame out{};
       if (in.frame_type == esp32irpk::IRFrameType::REPEAT)
       {
         out.is_repeat = true;
@@ -54,24 +54,15 @@ namespace esp32irpk::frames
       }
 
       uint64_t bits = in.bits;
-      out.address = static_cast<uint32_t>(bits & 0xFFFFULL);
-      if (in.protocol_id == esp32irpk::IRProtocolID::SAMSUNG36 || in.bit_length == 36)
-      {
-        out.command = static_cast<uint32_t>((bits >> 16) & 0xFFFFFULL);
-      }
-      else
-      {
-        out.command = static_cast<uint32_t>((bits >> 16) & 0xFFFFULL);
-      }
+      out.address = static_cast<uint16_t>(bits & 0xFFFFULL);
+      out.command = static_cast<uint16_t>((bits >> 16) & 0xFFFFULL);
       return out;
     }
 
     esp32irpk::IRDecodedBits toBits() const
     {
       esp32irpk::IRDecodedBits out{};
-      bool use36 = command > 0xFFFFu;
-      out.protocol_id = use36 ? esp32irpk::IRProtocolID::SAMSUNG36
-                              : esp32irpk::IRProtocolID::SAMSUNG32;
+      out.protocol_id = esp32irpk::IRProtocolID::SAMSUNG32;
       if (is_repeat)
       {
         out.frame_type = esp32irpk::IRFrameType::REPEAT;
@@ -81,11 +72,55 @@ namespace esp32irpk::frames
       }
 
       uint64_t bits = 0;
-      bits |= static_cast<uint64_t>(address & 0xFFFFu);
-      bits |= (static_cast<uint64_t>(command & (use36 ? 0xFFFFFu : 0xFFFFu)) << 16);
+      bits |= static_cast<uint64_t>(address);
+      bits |= (static_cast<uint64_t>(command) << 16);
 
       out.frame_type = esp32irpk::IRFrameType::NORMAL;
-      out.bit_length = use36 ? 36 : 32;
+      out.bit_length = 32;
+      out.bits = bits;
+      return out;
+    }
+  };
+
+  struct Samsung36Frame
+  {
+    uint16_t address = 0;
+    uint32_t command = 0;
+    bool is_repeat = false;
+
+    static Samsung36Frame fromBits(const esp32irpk::IRDecodedBits &in)
+    {
+      Samsung36Frame out{};
+      if (in.frame_type == esp32irpk::IRFrameType::REPEAT)
+      {
+        out.is_repeat = true;
+        return out;
+      }
+
+      uint64_t bits = in.bits;
+      out.address = static_cast<uint16_t>(bits & 0xFFFFULL);
+      out.command = static_cast<uint32_t>((bits >> 16) & 0xFFFFFULL);
+      return out;
+    }
+
+    esp32irpk::IRDecodedBits toBits() const
+    {
+      esp32irpk::IRDecodedBits out{};
+      out.protocol_id = esp32irpk::IRProtocolID::SAMSUNG36;
+      if (is_repeat)
+      {
+        out.frame_type = esp32irpk::IRFrameType::REPEAT;
+        out.bit_length = 0;
+        out.bits = 0xFFFFFFFFFFFFFFFFULL;
+        return out;
+      }
+
+      uint64_t bits = 0;
+      bits |= static_cast<uint64_t>(address);
+      bits |= (static_cast<uint64_t>(command & 0xFFFFFULL) << 16);
+
+      out.frame_type = esp32irpk::IRFrameType::NORMAL;
+      out.bit_length = 36;
       out.bits = bits;
       return out;
     }

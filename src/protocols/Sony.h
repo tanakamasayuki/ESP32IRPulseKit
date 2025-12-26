@@ -51,49 +51,29 @@ namespace esp32irpk::specs
 namespace esp32irpk::frames
 {
 
-  struct SonyFrame
+  struct Sony12Frame
   {
     uint32_t data = 0;
     bool is_repeat = false;
 
-    static SonyFrame fromBits(const esp32irpk::IRDecodedBits &in)
+    static Sony12Frame fromBits(const esp32irpk::IRDecodedBits &in)
     {
-      SonyFrame out{};
+      Sony12Frame out{};
       if (in.frame_type == esp32irpk::IRFrameType::REPEAT)
       {
         out.is_repeat = true;
         return out;
       }
 
-      if (in.bit_length > 0 && in.bit_length < 32)
-      {
-        uint32_t mask = static_cast<uint32_t>((1ULL << in.bit_length) - 1ULL);
-        out.data = static_cast<uint32_t>(in.bits & mask);
-      }
-      else
-      {
-        out.data = static_cast<uint32_t>(in.bits);
-      }
+      uint32_t mask = (1U << 12) - 1U;
+      out.data = static_cast<uint32_t>(in.bits) & mask;
       return out;
     }
 
     esp32irpk::IRDecodedBits toBits() const
     {
       esp32irpk::IRDecodedBits out{};
-      uint16_t bit_length = 12;
-      esp32irpk::IRProtocolID pid = esp32irpk::IRProtocolID::SONY12;
-      if (data > 0x0FFFu)
-      {
-        bit_length = 15;
-        pid = esp32irpk::IRProtocolID::SONY15;
-      }
-      if (data > 0x7FFFu)
-      {
-        bit_length = 20;
-        pid = esp32irpk::IRProtocolID::SONY20;
-      }
-
-      out.protocol_id = pid;
+      out.protocol_id = esp32irpk::IRProtocolID::SONY12;
       if (is_repeat)
       {
         out.frame_type = esp32irpk::IRFrameType::REPEAT;
@@ -102,10 +82,88 @@ namespace esp32irpk::frames
         return out;
       }
 
-      uint64_t mask = (bit_length == 64) ? 0xFFFFFFFFFFFFFFFFULL : ((1ULL << bit_length) - 1ULL);
+      uint32_t mask = (1U << 12) - 1U;
       out.frame_type = esp32irpk::IRFrameType::NORMAL;
-      out.bit_length = bit_length;
-      out.bits = static_cast<uint64_t>(data) & mask;
+      out.bit_length = 12;
+      out.bits = static_cast<uint64_t>(data & mask);
+      return out;
+    }
+  };
+
+  struct Sony15Frame
+  {
+    uint32_t data = 0;
+    bool is_repeat = false;
+
+    static Sony15Frame fromBits(const esp32irpk::IRDecodedBits &in)
+    {
+      Sony15Frame out{};
+      if (in.frame_type == esp32irpk::IRFrameType::REPEAT)
+      {
+        out.is_repeat = true;
+        return out;
+      }
+
+      uint32_t mask = (1U << 15) - 1U;
+      out.data = static_cast<uint32_t>(in.bits) & mask;
+      return out;
+    }
+
+    esp32irpk::IRDecodedBits toBits() const
+    {
+      esp32irpk::IRDecodedBits out{};
+      out.protocol_id = esp32irpk::IRProtocolID::SONY15;
+      if (is_repeat)
+      {
+        out.frame_type = esp32irpk::IRFrameType::REPEAT;
+        out.bit_length = 0;
+        out.bits = 0xFFFFFFFFFFFFFFFFULL;
+        return out;
+      }
+
+      uint32_t mask = (1U << 15) - 1U;
+      out.frame_type = esp32irpk::IRFrameType::NORMAL;
+      out.bit_length = 15;
+      out.bits = static_cast<uint64_t>(data & mask);
+      return out;
+    }
+  };
+
+  struct Sony20Frame
+  {
+    uint32_t data = 0;
+    bool is_repeat = false;
+
+    static Sony20Frame fromBits(const esp32irpk::IRDecodedBits &in)
+    {
+      Sony20Frame out{};
+      if (in.frame_type == esp32irpk::IRFrameType::REPEAT)
+      {
+        out.is_repeat = true;
+        return out;
+      }
+
+      uint32_t mask = (1U << 20) - 1U;
+      out.data = static_cast<uint32_t>(in.bits) & mask;
+      return out;
+    }
+
+    esp32irpk::IRDecodedBits toBits() const
+    {
+      esp32irpk::IRDecodedBits out{};
+      out.protocol_id = esp32irpk::IRProtocolID::SONY20;
+      if (is_repeat)
+      {
+        out.frame_type = esp32irpk::IRFrameType::REPEAT;
+        out.bit_length = 0;
+        out.bits = 0xFFFFFFFFFFFFFFFFULL;
+        return out;
+      }
+
+      uint32_t mask = (1U << 20) - 1U;
+      out.frame_type = esp32irpk::IRFrameType::NORMAL;
+      out.bit_length = 20;
+      out.bits = static_cast<uint64_t>(data & mask);
       return out;
     }
   };
