@@ -79,6 +79,18 @@ namespace esp32irpk::codec
       return static_cast<int16_t>(score);
     }
 
+    inline int16_t finalizeWeightedScore(uint32_t header_err,
+                                         uint32_t body_err,
+                                         uint32_t extra_err = 0)
+    {
+      uint64_t weighted = static_cast<uint64_t>(header_err) * 8ULL +
+                          static_cast<uint64_t>(body_err) +
+                          static_cast<uint64_t>(extra_err);
+      // scale down to reduce over-penalizing while keeping header impact higher
+      uint32_t scaled = static_cast<uint32_t>((weighted + 3ULL) / 4ULL);
+      return finalizeScore(scaled);
+    }
+
     inline size_t maybeTrimByGap(const IRRawTickView &raw, const IRProtocolSpec &spec)
     {
       if (spec.frame_end_gap_us == 0 || raw.len == 0)
@@ -126,10 +138,12 @@ namespace esp32irpk::codec
       if (spec.bit_length == 0)
         return false;
       size_t idx = 0;
-      uint32_t error_sum = 0;
+      uint32_t header_err = 0;
+      uint32_t body_err = 0;
+      uint32_t extra_err = 0;
 
-      if (!consumePulse(raw, idx, spec.header.mark_us, spec.bit_tol_pct, error_sum) ||
-          !consumePulse(raw, idx, spec.header.space_us, spec.bit_tol_pct, error_sum))
+      if (!consumePulse(raw, idx, spec.header.mark_us, spec.bit_tol_pct, header_err) ||
+          !consumePulse(raw, idx, spec.header.space_us, spec.bit_tol_pct, header_err))
         return false;
 
       uint64_t bits = 0;
@@ -190,10 +204,9 @@ namespace esp32irpk::codec
 
         if (space_is_gap)
         {
-          if (has_space)
-            bit_err += errorPct(space_us, spec.frame_end_gap_us);
-          else
-            bit_err += errorPct(0, spec.frame_end_gap_us);
+          uint32_t gap_err = has_space ? errorPct(space_us, spec.frame_end_gap_us)
+                                       : errorPct(0, spec.frame_end_gap_us);
+          body_err += gap_err;
         }
 
         if (spec.lsb_first)
@@ -207,12 +220,12 @@ namespace esp32irpk::codec
             bits |= (1ULL << (spec.bit_length - 1 - i));
         }
 
-        error_sum += bit_err;
+        body_err += bit_err;
         idx += 2;
       }
 
-      if (!consumePulse(raw, idx, spec.trailer.mark_us, spec.bit_tol_pct, error_sum) ||
-          !consumePulse(raw, idx, spec.trailer.space_us, spec.bit_tol_pct, error_sum))
+      if (!consumePulse(raw, idx, spec.trailer.mark_us, spec.bit_tol_pct, header_err) ||
+          !consumePulse(raw, idx, spec.trailer.space_us, spec.bit_tol_pct, header_err))
         return false;
 
       if (idx < raw.len)
@@ -222,7 +235,7 @@ namespace esp32irpk::codec
           if (spec.frame_end_gap_us > 0)
           {
             uint32_t gap_us = ticksToUs(raw.ticks[idx]);
-            error_sum += errorPct(gap_us, spec.frame_end_gap_us);
+            extra_err += errorPct(gap_us, spec.frame_end_gap_us);
           }
           ++idx;
         }
@@ -236,7 +249,7 @@ namespace esp32irpk::codec
       decoded.frame_type = IRFrameType::NORMAL;
       decoded.bit_length = spec.bit_length;
       decoded.bits = bits;
-      score_out = finalizeScore(error_sum);
+      score_out = finalizeWeightedScore(header_err, body_err, extra_err);
       return true;
     }
 
@@ -248,14 +261,16 @@ namespace esp32irpk::codec
       if (!spec.has_repeat)
         return false;
       size_t idx = 0;
-      uint32_t error_sum = 0;
+      uint32_t header_err = 0;
+      uint32_t body_err = 0;
+      uint32_t extra_err = 0;
 
-      if (!consumePulse(raw, idx, spec.repeat_header.mark_us, spec.bit_tol_pct, error_sum) ||
-          !consumePulse(raw, idx, spec.repeat_header.space_us, spec.bit_tol_pct, error_sum))
+      if (!consumePulse(raw, idx, spec.repeat_header.mark_us, spec.bit_tol_pct, header_err) ||
+          !consumePulse(raw, idx, spec.repeat_header.space_us, spec.bit_tol_pct, header_err))
         return false;
 
-      if (!consumePulse(raw, idx, spec.trailer.mark_us, spec.bit_tol_pct, error_sum) ||
-          !consumePulse(raw, idx, spec.trailer.space_us, spec.bit_tol_pct, error_sum))
+      if (!consumePulse(raw, idx, spec.trailer.mark_us, spec.bit_tol_pct, header_err) ||
+          !consumePulse(raw, idx, spec.trailer.space_us, spec.bit_tol_pct, header_err))
         return false;
 
       if (idx < raw.len)
@@ -265,7 +280,7 @@ namespace esp32irpk::codec
           uint32_t gap_us = ticksToUs(raw.ticks[idx]);
           uint32_t expected_gap = spec.repeat_gap_us > 0 ? spec.repeat_gap_us : spec.frame_end_gap_us;
           if (expected_gap > 0)
-            error_sum += errorPct(gap_us, expected_gap);
+            extra_err += errorPct(gap_us, expected_gap);
           ++idx;
         }
         else
@@ -278,7 +293,7 @@ namespace esp32irpk::codec
       decoded.frame_type = IRFrameType::REPEAT;
       decoded.bit_length = 0;
       decoded.bits = 0xFFFFFFFFFFFFFFFFULL;
-      score_out = finalizeScore(error_sum);
+      score_out = finalizeWeightedScore(header_err, body_err, extra_err);
       return true;
     }
 
