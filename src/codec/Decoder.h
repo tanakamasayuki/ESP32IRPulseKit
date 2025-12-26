@@ -140,11 +140,19 @@ namespace esp32irpk::codec
 
         uint32_t mark_us = ticksToUs(raw.ticks[idx]);
         uint32_t space_us = ticksToUs(raw.ticks[idx + 1]);
+        bool is_last_bit = (i + 1 == spec.bit_length);
+        bool space_is_gap = false;
+        if (is_last_bit && (idx + 1 == raw.len - 1) && spec.frame_end_gap_us > 0)
+        {
+          space_is_gap = withinTol(space_us, spec.frame_end_gap_us, spec.endgap_tol_pct);
+        }
 
         PulseMatch one_mark = matchPulse(mark_us, spec.one.mark_us, spec.bit_tol_pct);
-        PulseMatch one_space = matchPulse(space_us, spec.one.space_us, spec.bit_tol_pct);
+        PulseMatch one_space = space_is_gap ? PulseMatch{true, 0}
+                                            : matchPulse(space_us, spec.one.space_us, spec.bit_tol_pct);
         PulseMatch zero_mark = matchPulse(mark_us, spec.zero.mark_us, spec.bit_tol_pct);
-        PulseMatch zero_space = matchPulse(space_us, spec.zero.space_us, spec.bit_tol_pct);
+        PulseMatch zero_space = space_is_gap ? PulseMatch{true, 0}
+                                             : matchPulse(space_us, spec.zero.space_us, spec.bit_tol_pct);
 
         bool one_ok = one_mark.ok && one_space.ok;
         bool zero_ok = zero_mark.ok && zero_space.ok;
@@ -165,6 +173,11 @@ namespace esp32irpk::codec
         {
           bit_is_one = false;
           bit_err = zero_err;
+        }
+
+        if (space_is_gap)
+        {
+          bit_err += errorPct(space_us, spec.frame_end_gap_us);
         }
 
         if (spec.lsb_first)
