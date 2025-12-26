@@ -174,6 +174,10 @@ namespace esp32irpk::hal
     }
 
     ticks_buf_.reserve(kMaxRxSymbols * 2);
+    last_truncated_ = false;
+    last_overflow_ = false;
+    sym_count_ = 0;
+    has_frame_ = false;
     if (!startReceiveInternal())
     {
       end();
@@ -253,8 +257,6 @@ namespace esp32irpk::hal
     if (!rx_channel_)
       return false;
     receiving_ = false;
-    last_truncated_ = false;
-    last_overflow_ = false;
     sym_buf_.resize(kMaxRxSymbols);
     rmt_receive_config_t rcfg = {};
     rcfg.signal_range_min_ns = 0;
@@ -265,6 +267,8 @@ namespace esp32irpk::hal
                                 sym_buf_.size() * sizeof(uint32_t),
                                 &rcfg);
     receiving_ = (err == ESP_OK);
+    if (!receiving_)
+      last_overflow_ = true;
     return receiving_;
   }
 
