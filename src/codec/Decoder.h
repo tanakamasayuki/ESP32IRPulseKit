@@ -79,11 +79,48 @@ namespace esp32irpk::codec
       return static_cast<int16_t>(score);
     }
 
+    inline size_t maybeTrimByGap(const IRRawTickView &raw, const IRProtocolSpec &spec)
+    {
+      if (spec.frame_end_gap_us == 0 || raw.len == 0)
+        return raw.len;
+
+      uint32_t gap_ticks = (spec.frame_end_gap_us + (kTickUs - 1)) / kTickUs;
+
+      // minimal symbols to consider a complete frame before gap:
+      size_t min_symbols = 0;
+      if (spec.header.mark_us || spec.header.space_us)
+        min_symbols += 2;
+      if (spec.trailer.mark_us || spec.trailer.space_us)
+        min_symbols += 2;
+      min_symbols += static_cast<size_t>(spec.bit_length) * 2;
+
+      size_t symbols = raw.len;
+      for (size_t i = 0; i < raw.len; ++i)
+      {
+        if ((i % 2) == 1) // space index
+        {
+          if (raw.ticks[i] >= gap_ticks && i + 1 >= min_symbols)
+          {
+            symbols = i + 1;
+            break;
+          }
+        }
+      }
+      return symbols;
+    }
+
     inline bool decodeNormal(const IRRawTickView &raw,
                              const IRProtocolSpec &spec,
                              IRDecodedBits &decoded,
                              int16_t &score_out)
     {
+      size_t effective_len = maybeTrimByGap(raw, spec);
+      if (effective_len < raw.len)
+      {
+        IRRawTickView sub{raw.ticks, effective_len};
+        return decodeNormal(sub, spec, decoded, score_out);
+      }
+
       if (spec.bit_length == 0)
         return false;
       size_t idx = 0;
@@ -177,6 +214,13 @@ namespace esp32irpk::codec
                              IRDecodedBits &decoded,
                              int16_t &score_out)
     {
+      size_t effective_len = maybeTrimByGap(raw, spec);
+      if (effective_len < raw.len)
+      {
+        IRRawTickView sub{raw.ticks, effective_len};
+        return decodeRepeat(sub, spec, decoded, score_out);
+      }
+
       if (!spec.has_repeat)
         return false;
       size_t idx = 0;
