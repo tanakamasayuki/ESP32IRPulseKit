@@ -97,8 +97,13 @@ namespace esp32irpk
     {
       for (const auto &spec : protocols_)
       {
-        if (spec.frame_end_gap_us > idle_threshold)
-          idle_threshold = spec.frame_end_gap_us;
+        if (spec.frame_end_gap_us == 0)
+          continue;
+        uint32_t tol = spec.endgap_tol_pct;
+        uint64_t upper_gap = static_cast<uint64_t>(spec.frame_end_gap_us) * (100ULL + static_cast<uint64_t>(tol));
+        upper_gap = (upper_gap + 99ULL) / 100ULL; // ceil
+        if (upper_gap > idle_threshold)
+          idle_threshold = static_cast<uint32_t>(upper_gap);
       }
     }
 

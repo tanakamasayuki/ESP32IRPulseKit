@@ -276,7 +276,7 @@ esp32irpk::specs::SAMSUNG36
 
 ### 5.4 idle threshold 決定
 - base：`setIdleThresholdUs()` 指定値、未指定は 30000us
-- decode有効時：`max(base, max(spec.frame_end_gap_us))`
+- decode有効時：各 Spec の終端ギャップを上振れ込みで見積もる。`upper_gap = frame_end_gap_us * (1 + endgap_tol_pct/100)`（端数は繰上げ可）を計算し、`idle_threshold_us = max(base, max(upper_gap))` とする。
 - RAW-only：baseのみ
 
 ---

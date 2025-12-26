@@ -22,7 +22,7 @@ namespace esp32irpk::specs
       .repeat_header    = {.mark_us = 9000, .space_us = 2250},
       .repeat_gap_us    = 110000,
       .bit_tol_pct      = 25,
-      .endgap_tol_pct   = 30,
+      .endgap_tol_pct   = 40,
   };
   // clang-format on
 
