@@ -7,6 +7,8 @@
 #include <driver/rmt_encoder.h>
 #include <driver/rmt_rx.h>
 #include <driver/rmt_tx.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #endif
 
 namespace esp32irpk::hal
@@ -17,6 +19,7 @@ namespace esp32irpk::hal
   namespace
   {
     constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us
+    constexpr size_t kMaxRxSymbols = 256;
 
     std::vector<rmt_symbol_word_t> toSymbols(const esp32irpk::IRRawTickView &raw, bool mark_high)
     {
@@ -124,24 +127,138 @@ namespace esp32irpk::hal
 
   bool RmtRx::begin(int gpio, bool inverted, uint32_t idle_threshold_us)
   {
+    if (begun_)
+      return false;
     gpio_ = gpio;
     inverted_ = inverted;
     idle_threshold_us_ = idle_threshold_us;
+
+    rmt_rx_channel_config_t cfg = {};
+    cfg.clk_src = RMT_CLK_SRC_DEFAULT;
+    cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
+    cfg.mem_block_symbols = 64;
+    cfg.resolution_hz = kRmtResolutionHz;
+    cfg.flags.invert_in = inverted_;
+    cfg.flags.with_dma = false;
+
+    if (rmt_new_rx_channel(&cfg, reinterpret_cast<rmt_channel_handle_t *>(&rx_channel_)) != ESP_OK)
+      return false;
+
+    rmt_rx_event_callbacks_t cbs = {};
+    cbs.on_recv_done = [](rmt_channel_handle_t channel,
+                          const rmt_rx_done_event_data_t *edata,
+                          void *user_ctx) -> bool
+    {
+      (void)channel;
+      auto *self = static_cast<RmtRx *>(user_ctx);
+      return self ? self->handleRecvDone(edata) : false;
+    };
+    if (rmt_rx_register_event_callbacks(reinterpret_cast<rmt_channel_handle_t>(rx_channel_), &cbs, this) != ESP_OK)
+    {
+      rmt_del_channel(reinterpret_cast<rmt_channel_handle_t>(rx_channel_));
+      rx_channel_ = nullptr;
+      return false;
+    }
+
+    if (rmt_enable(reinterpret_cast<rmt_channel_handle_t>(rx_channel_)) != ESP_OK)
+    {
+      end();
+      return false;
+    }
+
+    rx_sem_ = xSemaphoreCreateBinary();
+    if (!rx_sem_)
+    {
+      end();
+      return false;
+    }
+
+    ticks_buf_.reserve(kMaxRxSymbols * 2);
+    if (!startReceiveInternal())
+    {
+      end();
+      return false;
+    }
+
     begun_ = true;
     return true;
   }
 
   void RmtRx::end()
   {
+    if (rx_channel_)
+    {
+      rmt_disable(reinterpret_cast<rmt_channel_handle_t>(rx_channel_));
+      rmt_del_channel(reinterpret_cast<rmt_channel_handle_t>(rx_channel_));
+      rx_channel_ = nullptr;
+    }
+    if (rx_sem_)
+    {
+      vSemaphoreDelete(static_cast<SemaphoreHandle_t>(rx_sem_));
+      rx_sem_ = nullptr;
+    }
+    sym_count_ = 0;
+    has_frame_ = false;
+    receiving_ = false;
     begun_ = false;
   }
 
   bool RmtRx::read(/*out*/ esp32irpk::IRRawTickView &raw)
   {
-    (void)raw;
     if (!begun_)
       return false;
-    return false;
+
+    if (xSemaphoreTake(static_cast<SemaphoreHandle_t>(rx_sem_), 0) != pdTRUE)
+      return false;
+    has_frame_ = false;
+
+    ticks_buf_.clear();
+    auto *sym = reinterpret_cast<const rmt_symbol_word_t *>(sym_buf_.data());
+    for (size_t i = 0; i < sym_count_; ++i)
+    {
+      const auto &s = sym[i];
+      ticks_buf_.push_back(s.duration0);
+      if (s.duration1 > 0)
+        ticks_buf_.push_back(s.duration1);
+    }
+
+    raw.ticks = ticks_buf_.data();
+    raw.len = ticks_buf_.size();
+
+    startReceiveInternal();
+    return raw.len > 0;
+  }
+
+  bool RmtRx::startReceive()
+  {
+    return startReceiveInternal();
+  }
+
+  bool RmtRx::startReceiveInternal()
+  {
+    if (!rx_channel_)
+      return false;
+    receiving_ = false;
+    sym_buf_.resize(kMaxRxSymbols);
+    rmt_receive_config_t rcfg = {};
+    rcfg.signal_range_min_ns = 0;
+    rcfg.signal_range_max_ns = idle_threshold_us_ * 1000;
+
+    esp_err_t err = rmt_receive(reinterpret_cast<rmt_channel_handle_t>(rx_channel_),
+                                sym_buf_.data(),
+                                sym_buf_.size() * sizeof(uint32_t),
+                                &rcfg);
+    receiving_ = (err == ESP_OK);
+    return receiving_;
+  }
+
+  bool IRAM_ATTR RmtRx::handleRecvDone(const rmt_rx_done_event_data_t *edata)
+  {
+    sym_count_ = edata->num_symbols;
+    has_frame_ = true;
+    BaseType_t hp_task_woken = pdFALSE;
+    xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(rx_sem_), &hp_task_woken);
+    return hp_task_woken == pdTRUE;
   }
 
 #else // !ESP_PLATFORM
@@ -196,6 +313,11 @@ namespace esp32irpk::hal
     (void)raw;
     if (!begun_)
       return false;
+    return false;
+  }
+
+  bool RmtRx::startReceive()
+  {
     return false;
   }
 
