@@ -4,6 +4,7 @@
 
 namespace esp32irpk::specs
 {
+  // https://ww1.microchip.com/downloads/jp/AppNotes/01064A.pdf
 
   // clang-format off
   inline constexpr IRProtocolSpec SONY12 = {

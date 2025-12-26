@@ -4,6 +4,7 @@
 
 namespace esp32irpk::specs
 {
+  // https://www.renesas.com/ja/document/apn/1184-remote-control-ir-receiver-decoder
 
   // clang-format off
   inline constexpr IRProtocolSpec NEC = {

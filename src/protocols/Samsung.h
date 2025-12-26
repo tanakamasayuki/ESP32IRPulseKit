@@ -4,6 +4,7 @@
 
 namespace esp32irpk::specs
 {
+  // Samsung Electronics, S3F80KB IR REMOTE CONTROLLER (Application Note, Oct 2008)
 
   // clang-format off
   inline constexpr IRProtocolSpec SAMSUNG32 = {
