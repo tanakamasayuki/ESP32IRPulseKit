@@ -471,7 +471,8 @@ namespace esp32irpk::codec
         return false;
       if (halves.size() < bits * 2)
         return false;
-      halves.resize(bits * 2);
+      if (halves.size() > bits * 2)
+        halves.resize(bits * 2);
 
       uint64_t bits_out = 0;
       for (size_t i = 0; i < bits; ++i)
