@@ -10,6 +10,7 @@
 #include <driver/rmt_tx.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <esp_log.h>
 #endif
 
 namespace esp32irpk::hal
@@ -19,6 +20,7 @@ namespace esp32irpk::hal
 
   namespace
   {
+    constexpr const char *kTag = "ESP32IRPulseKit";
     // RMT clock: use REF_TICK (1MHz) with divider 10 => resolution 100kHz (1 tick = 10us)
     constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us (RMT resolution)
     constexpr uint32_t kRmtTickUs = 10;
@@ -284,6 +286,12 @@ namespace esp32irpk::hal
         }
       }
       sym_count_ = 0;
+
+      ESP_LOGV(kTag, "RMT RX: symbols=%zu ticks=%zu truncated=%d overflow=%d",
+               frame.ticks.size() / 2 + frame.ticks.size() % 2,
+               frame.ticks.size(),
+               frame.truncated ? 1 : 0,
+               frame.overflow ? 1 : 0);
 
       if (queue_.size() >= kMaxQueuedFrames)
       {
