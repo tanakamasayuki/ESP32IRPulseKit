@@ -114,13 +114,6 @@ namespace esp32irpk::codec
                              IRDecodedBits &decoded,
                              int16_t &score_out)
     {
-      size_t effective_len = maybeTrimByGap(raw, spec);
-      if (effective_len < raw.len)
-      {
-        IRRawTickView sub{raw.ticks, effective_len};
-        return decodeNormal(sub, spec, decoded, score_out);
-      }
-
       if (spec.bit_length == 0)
         return false;
       size_t idx = 0;
@@ -214,13 +207,6 @@ namespace esp32irpk::codec
                              IRDecodedBits &decoded,
                              int16_t &score_out)
     {
-      size_t effective_len = maybeTrimByGap(raw, spec);
-      if (effective_len < raw.len)
-      {
-        IRRawTickView sub{raw.ticks, effective_len};
-        return decodeRepeat(sub, spec, decoded, score_out);
-      }
-
       if (!spec.has_repeat)
         return false;
       size_t idx = 0;
@@ -318,15 +304,23 @@ namespace esp32irpk::codec
       if (spec.scheme != IRProtocolScheme::SPACE_ENC)
         continue;
 
+      size_t effective_len = detail::maybeTrimByGap(raw, spec);
+      IRRawTickView sub_raw = raw;
+      if (effective_len < raw.len)
+        sub_raw.len = effective_len;
+
       IRDecodedBits decoded{};
       int16_t score = 0;
-      bool ok = detail::decodeNormal(raw, spec, decoded, score);
+      bool ok = detail::decodeNormal(sub_raw, spec, decoded, score);
       if (!ok && spec.has_repeat)
       {
-        ok = detail::decodeRepeat(raw, spec, decoded, score);
+        ok = detail::decodeRepeat(sub_raw, spec, decoded, score);
       }
       if (!ok)
         continue;
+
+      if (effective_len < out.raw.len)
+        out.raw.len = effective_len;
 
       IRDecodeCandidate cand{};
       cand.protocol_id = decoded.protocol_id;
