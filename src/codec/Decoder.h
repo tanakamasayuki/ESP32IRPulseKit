@@ -404,19 +404,22 @@ namespace esp32irpk::codec
     inline bool appendHalves(uint32_t duration_us,
                              uint32_t unit_us,
                              uint16_t tol_pct,
-                             bool level,
+                             bool &level,
                              std::vector<bool> &halves,
                              uint32_t &err_sum)
     {
       if (unit_us == 0)
         return false;
-      uint32_t units = (duration_us + unit_us / 2U) / unit_us;
+      uint32_t units = (duration_us + unit_us - 1U) / unit_us; // ceil to avoid losing halves
       if (units == 0)
         return false;
       uint32_t expected = units * unit_us;
       err_sum += detail::errorPct(duration_us, expected);
       for (uint32_t i = 0; i < units; ++i)
+      {
         halves.push_back(level);
+        level = !level; // Manchester toggles every half-bit
+      }
       return true;
     }
 
@@ -433,7 +436,6 @@ namespace esp32irpk::codec
         uint32_t dur = detail::ticksToUs(raw.ticks[i]);
         if (!appendHalves(dur, unit_us, tol_pct, level, halves, err_sum))
           return false;
-        level = !level;
       }
       return true;
     }
