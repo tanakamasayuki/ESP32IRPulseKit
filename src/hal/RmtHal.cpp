@@ -18,22 +18,30 @@ namespace esp32irpk::hal
 
   namespace
   {
-    constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us
+    // RMT clock: use REF_TICK (1MHz) with divider 10 => resolution 100kHz (1 tick = 10us)
+    constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us (RMT resolution)
+    constexpr uint32_t kRmtTickUs = 10;
     constexpr size_t kMaxRxSymbols = 256;
+    constexpr uint32_t kTickUs = 10; // library tick = 10us
 
     std::vector<rmt_symbol_word_t> toSymbols(const esp32irpk::IRRawTickView &raw, bool mark_high)
     {
+      constexpr uint16_t kMaxDuration = 0x7FFF; // RMT duration field limit
       std::vector<rmt_symbol_word_t> syms;
       syms.reserve((raw.len + 1) / 2);
       for (size_t i = 0; i < raw.len; i += 2)
       {
         rmt_symbol_word_t s{};
-        uint16_t mark_ticks = raw.ticks[i];
-        uint16_t space_ticks = (i + 1 < raw.len) ? raw.ticks[i + 1] : 0;
+        uint32_t mark_ticks = raw.ticks[i];
+        uint32_t space_ticks = (i + 1 < raw.len) ? static_cast<uint32_t>(raw.ticks[i + 1]) : 0;
+        if (mark_ticks > kMaxDuration)
+          mark_ticks = kMaxDuration;
+        if (space_ticks > kMaxDuration)
+          space_ticks = kMaxDuration;
         s.level0 = mark_high ? 1 : 0;
-        s.duration0 = mark_ticks;
+        s.duration0 = static_cast<uint16_t>(mark_ticks);
         s.level1 = mark_high ? 0 : 1;
-        s.duration1 = space_ticks;
+        s.duration1 = static_cast<uint16_t>(space_ticks);
         syms.push_back(s);
       }
       return syms;
@@ -48,7 +56,7 @@ namespace esp32irpk::hal
     inverted_ = inverted;
 
     rmt_tx_channel_config_t cfg = {};
-    cfg.clk_src = RMT_CLK_SRC_DEFAULT;
+    cfg.clk_src = RMT_CLK_SRC_REF_TICK; // 1MHz base
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
     cfg.mem_block_symbols = 64;
     cfg.resolution_hz = kRmtResolutionHz;
@@ -134,7 +142,7 @@ namespace esp32irpk::hal
     idle_threshold_us_ = idle_threshold_us;
 
     rmt_rx_channel_config_t cfg = {};
-    cfg.clk_src = RMT_CLK_SRC_DEFAULT;
+    cfg.clk_src = RMT_CLK_SRC_REF_TICK; // 1MHz base, divider to 100kHz
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
     cfg.mem_block_symbols = 64;
     cfg.resolution_hz = kRmtResolutionHz;
@@ -221,9 +229,17 @@ namespace esp32irpk::hal
     for (size_t i = 0; i < sym_count_; ++i)
     {
       const auto &s = sym[i];
-      ticks_buf_.push_back(s.duration0);
+      uint32_t t0 = static_cast<uint32_t>(s.duration0);
+      if (t0 > 0xFFFF)
+        t0 = 0xFFFF;
+      ticks_buf_.push_back(static_cast<uint16_t>(t0));
       if (s.duration1 > 0)
-        ticks_buf_.push_back(s.duration1);
+      {
+        uint32_t t1 = static_cast<uint32_t>(s.duration1);
+        if (t1 > 0xFFFF)
+          t1 = 0xFFFF;
+        ticks_buf_.push_back(static_cast<uint16_t>(t1));
+      }
     }
 
     raw.ticks = ticks_buf_.data();
