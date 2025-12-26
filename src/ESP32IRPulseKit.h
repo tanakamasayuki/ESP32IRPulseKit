@@ -34,6 +34,8 @@ namespace esp32irpk
     SONY20 = 4,
     SAMSUNG32 = 5,
     SAMSUNG36 = 6,
+    JVC24 = 7,
+    JVC32 = 8,
     USER1 = 1000,
     USER2 = 1001,
     USER3 = 1002,
@@ -242,6 +244,7 @@ namespace esp32irpk
 #include "protocols/NEC.h"
 #include "protocols/Sony.h"
 #include "protocols/Samsung.h"
+#include "protocols/JVC.h"
 
 namespace esp32irpk::detail
 {
@@ -265,6 +268,10 @@ namespace esp32irpk::detail
       out.push_back(specs::SAMSUNG32);
     if (!has(specs::SAMSUNG36.protocol_id))
       out.push_back(specs::SAMSUNG36);
+    if (!has(specs::JVC24.protocol_id))
+      out.push_back(specs::JVC24);
+    if (!has(specs::JVC32.protocol_id))
+      out.push_back(specs::JVC32);
   }
 } // namespace esp32irpk::detail
 
