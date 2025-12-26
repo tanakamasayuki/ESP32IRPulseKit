@@ -380,7 +380,7 @@ public:
 
 ### 6.6 GAP と RAW 分割の扱い
 - RMT の `idle_threshold_us` は登録済みプロトコルの `frame_end_gap_us` の最大値を採用する（5.4 参照）。このため GAP が短いプロトコル（例: NEC）の複数フレームが連結した RAW が返る場合がある。
-- デコード時は各プロトコルの `frame_end_gap_us` を基準に、先頭から GAP を検出した位置までをそのプロトコルの解析対象とし、それ以降の波形は見ない。
+- デコード時は各プロトコルの `frame_end_gap_us` を中央値として扱い、`endgap_tol_pct` を掛けた下限（expected*(1 - tol)）を超えるスペースを GAP と判定する。判定位置までをそのプロトコルの解析対象とし、それ以降の波形は見ない。
 - 各プロトコルの解析結果 (`IRDecodeCandidate`) には、そのプロトコルが処理に使用した RAW ticks 長 (`consumed_len`) を含める。
 - 最上位スコアの候補の `consumed_len` 分だけ処理オフセットを前進させ、`IRReceiveResult.raw.len` もその範囲に合わせて返す。実データは保持したままなので、次回 `read()` は残りの波形から再開する。
 

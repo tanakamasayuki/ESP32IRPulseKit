@@ -15,7 +15,7 @@ namespace esp32irpk::specs
       .one              = {.mark_us = 1200, .space_us =  600},
       .zero             = {.mark_us =  600, .space_us =  600},
       .trailer          = {.mark_us =    0, .space_us =    0},
-      .frame_end_gap_us = 45000,
+      .frame_end_gap_us = 24000, // 45000 - (2400 + 600) - (900 + 600)*12
       .lsb_first        = true,
       .bit_length       = 12,
   };
@@ -29,7 +29,7 @@ namespace esp32irpk::specs
       .one              = {.mark_us = 1200, .space_us =  600},
       .zero             = {.mark_us =  600, .space_us =  600},
       .trailer          = {.mark_us =    0, .space_us =    0},
-      .frame_end_gap_us = 45000,
+      .frame_end_gap_us = 19500, // 45000 - (2400 + 600) - (900 + 600)*15
       .lsb_first        = true,
       .bit_length       = 15,
   };
@@ -43,7 +43,7 @@ namespace esp32irpk::specs
       .one              = {.mark_us = 1200, .space_us =  600},
       .zero             = {.mark_us =  600, .space_us =  600},
       .trailer          = {.mark_us =    0, .space_us =    0},
-      .frame_end_gap_us = 45000,
+      .frame_end_gap_us = 12000, // 45000 - (2400 + 600) - (900 + 600)*20
       .lsb_first        = true,
       .bit_length       = 20,
   };

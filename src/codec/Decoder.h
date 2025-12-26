@@ -84,7 +84,16 @@ namespace esp32irpk::codec
       if (spec.frame_end_gap_us == 0 || raw.len == 0)
         return raw.len;
 
-      uint32_t gap_ticks = (spec.frame_end_gap_us + (kTickUs - 1)) / kTickUs;
+      uint32_t gap_us_min = spec.frame_end_gap_us;
+      if (spec.endgap_tol_pct < 100)
+      {
+        uint32_t tol = spec.endgap_tol_pct;
+        gap_us_min = static_cast<uint32_t>((static_cast<uint64_t>(spec.frame_end_gap_us) * (100U - tol) + 99U) / 100U);
+        if (gap_us_min == 0)
+          gap_us_min = 1;
+      }
+
+      uint32_t gap_ticks = (gap_us_min + (kTickUs - 1)) / kTickUs;
 
       // minimal symbols to consider a complete frame before gap:
       size_t min_symbols = 0;
