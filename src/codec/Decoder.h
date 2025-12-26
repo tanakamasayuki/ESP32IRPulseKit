@@ -113,7 +113,8 @@ namespace esp32irpk::codec
         min_symbols += 2;
       if (spec.trailer.mark_us || spec.trailer.space_us)
         min_symbols += 2;
-      min_symbols += static_cast<size_t>(spec.bit_length) * 2;
+      uint16_t max_bits = spec.max_bit_length ? spec.max_bit_length : spec.bit_length;
+      min_symbols += static_cast<size_t>(max_bits) * 2;
 
       size_t symbols = raw.len;
       for (size_t i = 0; i < raw.len; ++i)
@@ -135,8 +136,30 @@ namespace esp32irpk::codec
                              IRDecodedBits &decoded,
                              int16_t &score_out)
     {
-      if (spec.bit_length == 0)
+      uint16_t min_bits = spec.min_bit_length ? spec.min_bit_length : spec.bit_length;
+      uint16_t max_bits = spec.max_bit_length ? spec.max_bit_length : spec.bit_length;
+      if (min_bits == 0 || max_bits == 0 || min_bits > max_bits)
         return false;
+      size_t header_syms = 0;
+      if (spec.header.mark_us)
+        header_syms++;
+      if (spec.header.space_us)
+        header_syms++;
+      size_t trailer_syms = 0;
+      if (spec.trailer.mark_us)
+        trailer_syms++;
+      if (spec.trailer.space_us)
+        trailer_syms++;
+      if (raw.len < header_syms + trailer_syms + static_cast<size_t>(min_bits) * 2)
+        return false;
+
+      size_t bit_syms = raw.len - header_syms - trailer_syms;
+      if (bit_syms % 2 != 0)
+        return false;
+      size_t bit_count_sz = bit_syms / 2;
+      if (bit_count_sz < min_bits || bit_count_sz > max_bits)
+        return false;
+      uint16_t bit_count = static_cast<uint16_t>(bit_count_sz);
       size_t idx = 0;
       uint32_t header_err = 0;
       uint32_t body_err = 0;
@@ -147,7 +170,7 @@ namespace esp32irpk::codec
         return false;
 
       uint64_t bits = 0;
-      for (uint16_t i = 0; i < spec.bit_length; ++i)
+      for (uint16_t i = 0; i < bit_count; ++i)
       {
         uint32_t mark_us = ticksToUs(raw.ticks[idx]);
         uint32_t space_us = 0;
@@ -155,7 +178,7 @@ namespace esp32irpk::codec
         if (has_space)
           space_us = ticksToUs(raw.ticks[idx + 1]);
 
-        bool is_last_bit = (i + 1 == spec.bit_length);
+        bool is_last_bit = (i + 1 == bit_count);
         bool space_is_gap = false;
         if (is_last_bit && spec.frame_end_gap_us > 0)
         {
@@ -247,7 +270,7 @@ namespace esp32irpk::codec
 
       decoded.protocol_id = spec.protocol_id;
       decoded.frame_type = IRFrameType::NORMAL;
-      decoded.bit_length = spec.bit_length;
+      decoded.bit_length = bit_count;
       decoded.bits = bits;
       score_out = finalizeWeightedScore(header_err, body_err, extra_err);
       return true;

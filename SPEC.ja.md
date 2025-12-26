@@ -194,7 +194,9 @@ struct IRProtocolSpec {
 
   bool lsb_first = true;             // ビット順序（true: LSB first）
 
-  uint16_t bit_length = 0;           // 既定のビット長
+  uint16_t bit_length = 0;           // 既定のビット長（固定長の場合はこれを使用）
+  uint16_t min_bit_length = 0;       // 可変長の下限（0ならbit_lengthを下限とみなす）
+  uint16_t max_bit_length = 0;       // 可変長の上限（0ならbit_lengthを上限とみなす）
 
   bool has_repeat = false;           // REPEAT シーケンスがあるか
   IRPulseUs repeat_header;           // REPEAT 用ヘッダ
@@ -237,11 +239,16 @@ constexpr esp32irpk::IRProtocolSpec MyProto = {
 ### 4.2 参照方法
 ```cpp
 esp32irpk::specs::NEC
+esp32irpk::specs::AEHA
+esp32irpk::specs::PANASONIC40
+esp32irpk::specs::PANASONIC48
 esp32irpk::specs::SONY12
 esp32irpk::specs::SONY15
 esp32irpk::specs::SONY20
 esp32irpk::specs::SAMSUNG32
 esp32irpk::specs::SAMSUNG36
+esp32irpk::specs::JVC24
+esp32irpk::specs::JVC32
 ```
 
 ### 4.3 bit_length バリエーションと protocol_id 分離方針（論理互換性）

@@ -29,13 +29,16 @@ namespace esp32irpk
   {
     UNKNOWN = 0,
     NEC = 1,
-    SONY12 = 2,
-    SONY15 = 3,
-    SONY20 = 4,
-    SAMSUNG32 = 5,
-    SAMSUNG36 = 6,
-    JVC24 = 7,
-    JVC32 = 8,
+    AEHA = 2,
+    PANASONIC40 = 3,
+    PANASONIC48 = 4,
+    SONY12 = 5,
+    SONY15 = 6,
+    SONY20 = 7,
+    SAMSUNG32 = 8,
+    SAMSUNG36 = 9,
+    JVC24 = 10,
+    JVC32 = 11,
     USER1 = 1000,
     USER2 = 1001,
     USER3 = 1002,
@@ -124,6 +127,8 @@ namespace esp32irpk
     bool lsb_first = true;
 
     uint16_t bit_length = 0;
+    uint16_t min_bit_length = 0; // optional: variable-length protocols
+    uint16_t max_bit_length = 0; // optional: variable-length protocols
 
     bool has_repeat = false;
     IRPulseUs repeat_header{};
@@ -245,6 +250,7 @@ namespace esp32irpk
 #include "protocols/Sony.h"
 #include "protocols/Samsung.h"
 #include "protocols/JVC.h"
+#include "protocols/AEHA.h"
 
 namespace esp32irpk::detail
 {
@@ -258,6 +264,12 @@ namespace esp32irpk::detail
     };
     if (!has(specs::NEC.protocol_id))
       out.push_back(specs::NEC);
+    if (!has(specs::AEHA.protocol_id))
+      out.push_back(specs::AEHA);
+    if (!has(specs::PANASONIC40.protocol_id))
+      out.push_back(specs::PANASONIC40);
+    if (!has(specs::PANASONIC48.protocol_id))
+      out.push_back(specs::PANASONIC48);
     if (!has(specs::SONY12.protocol_id))
       out.push_back(specs::SONY12);
     if (!has(specs::SONY15.protocol_id))
