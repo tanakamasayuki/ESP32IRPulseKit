@@ -4,6 +4,7 @@
 
 namespace esp32irpk::specs
 {
+  // https://support.jvc.com/consumer/support/documents/RemoteCodes.pdf
 
   // clang-format off
   inline constexpr IRProtocolSpec JVC24 = {
