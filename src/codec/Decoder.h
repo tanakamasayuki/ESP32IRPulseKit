@@ -135,16 +135,29 @@ namespace esp32irpk::codec
       uint64_t bits = 0;
       for (uint16_t i = 0; i < spec.bit_length; ++i)
       {
-        if (idx + 1 >= raw.len)
-          return false;
-
         uint32_t mark_us = ticksToUs(raw.ticks[idx]);
-        uint32_t space_us = ticksToUs(raw.ticks[idx + 1]);
+        uint32_t space_us = 0;
+        bool has_space = (idx + 1 < raw.len);
+        if (has_space)
+          space_us = ticksToUs(raw.ticks[idx + 1]);
+
         bool is_last_bit = (i + 1 == spec.bit_length);
         bool space_is_gap = false;
-        if (is_last_bit && (idx + 1 == raw.len - 1) && spec.frame_end_gap_us > 0)
+        if (is_last_bit && spec.frame_end_gap_us > 0)
         {
-          space_is_gap = withinTol(space_us, spec.frame_end_gap_us, spec.endgap_tol_pct);
+          if (has_space)
+          {
+            space_is_gap = withinTol(space_us, spec.frame_end_gap_us, spec.endgap_tol_pct);
+          }
+          else
+          {
+            // gap may be clipped; accept missing space as end gap
+            space_is_gap = true;
+          }
+        }
+        else if (!has_space)
+        {
+          return false;
         }
 
         PulseMatch one_mark = matchPulse(mark_us, spec.one.mark_us, spec.bit_tol_pct);
@@ -177,7 +190,10 @@ namespace esp32irpk::codec
 
         if (space_is_gap)
         {
-          bit_err += errorPct(space_us, spec.frame_end_gap_us);
+          if (has_space)
+            bit_err += errorPct(space_us, spec.frame_end_gap_us);
+          else
+            bit_err += errorPct(0, spec.frame_end_gap_us);
         }
 
         if (spec.lsb_first)
