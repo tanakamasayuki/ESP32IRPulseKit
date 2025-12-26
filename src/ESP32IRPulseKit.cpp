@@ -6,44 +6,6 @@
 namespace esp32irpk
 {
 
-  const char *protocolName(IRProtocolID id)
-  {
-    switch (id)
-    {
-    case IRProtocolID::NEC:
-      return "NEC";
-    case IRProtocolID::SONY12:
-      return "SONY12";
-    case IRProtocolID::SONY15:
-      return "SONY15";
-    case IRProtocolID::SONY20:
-      return "SONY20";
-    case IRProtocolID::SAMSUNG32:
-      return "SAMSUNG32";
-    case IRProtocolID::SAMSUNG36:
-      return "SAMSUNG36";
-    case IRProtocolID::USER1:
-      return "USER1";
-    case IRProtocolID::USER2:
-      return "USER2";
-    case IRProtocolID::USER3:
-      return "USER3";
-    case IRProtocolID::USER4:
-      return "USER4";
-    case IRProtocolID::USER5:
-      return "USER5";
-    case IRProtocolID::USER6:
-      return "USER6";
-    case IRProtocolID::USER7:
-      return "USER7";
-    case IRProtocolID::USER8:
-      return "USER8";
-    case IRProtocolID::UNKNOWN:
-    default:
-      return "UNKNOWN";
-    }
-  }
-
   // ---- IRSender --------------------------------------------------------------
 
   IRSender::IRSender(int gpio) : gpio_(gpio), inverted_(false) {}
@@ -71,11 +33,6 @@ namespace esp32irpk
     if (begun_)
       return false;
     IRProtocolSpec copy = spec;
-    if (spec.name)
-    {
-      protocol_names_.emplace_back(spec.name);
-      copy.name = protocol_names_.back().c_str();
-    }
     auto it = std::find_if(protocols_.begin(), protocols_.end(),
                            [&](const IRProtocolSpec &item)
                            { return item.protocol_id == spec.protocol_id; });
@@ -93,7 +50,6 @@ namespace esp32irpk
     if (begun_)
       return false;
     protocols_.clear();
-    protocol_names_.clear();
     return true;
   }
 
@@ -102,15 +58,6 @@ namespace esp32irpk
     if (begun_)
       return false;
     detail::addDefaultProtocols(protocols_);
-    protocol_names_.clear();
-    for (auto &spec : protocols_)
-    {
-      if (spec.name)
-      {
-        protocol_names_.emplace_back(spec.name);
-        spec.name = protocol_names_.back().c_str();
-      }
-    }
     if (!rmt_tx_.begin(gpio_, inverted_))
       return false;
     begun_ = true;

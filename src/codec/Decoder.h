@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../ESP32IRPulseKit.h"
+#include <cstring>
 
 namespace esp32irpk::codec
 {
@@ -285,7 +286,11 @@ namespace esp32irpk::codec
 
       IRDecodeCandidate cand{};
       cand.protocol_id = decoded.protocol_id;
-      cand.name = spec.name;
+      if (spec.name[0] != '\0')
+      {
+        std::strncpy(cand.name, spec.name, sizeof(cand.name) - 1);
+        cand.name[sizeof(cand.name) - 1] = '\0';
+      }
       cand.score = score;
       cand.decoded = decoded;
       detail::insertCandidate(out, max_candidates, cand);

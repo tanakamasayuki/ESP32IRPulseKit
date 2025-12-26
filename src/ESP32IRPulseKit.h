@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <algorithm>
-#include <string>
 #include <vector>
 
 #include "hal/RmtHal.h"
@@ -44,8 +43,6 @@ namespace esp32irpk
     USER7 = 1006,
     USER8 = 1007,
   };
-
-  const char *protocolName(IRProtocolID id);
 
   struct IRPulseUs
   {
@@ -111,7 +108,7 @@ namespace esp32irpk
   struct IRProtocolSpec
   {
     IRProtocolID protocol_id = IRProtocolID::UNKNOWN;
-    const char *name = nullptr; // optional display name (static storage or internal copy)
+    char name[16] = {}; // optional display name (null-terminated, max 15 chars)
     IRProtocolScheme scheme = IRProtocolScheme::UNKNOWN;
     IRProtocolFamily family = IRProtocolFamily::UNKNOWN;
 
@@ -137,7 +134,7 @@ namespace esp32irpk
   struct IRDecodeCandidate
   {
     IRProtocolID protocol_id = IRProtocolID::UNKNOWN;
-    const char *name = nullptr;
+    char name[16] = {};
     int16_t score = 0;
     IRDecodedBits decoded{};
   };
@@ -197,7 +194,6 @@ namespace esp32irpk
     uint32_t idle_threshold_us_ = 30000;
     IRRxStats stats_{};
     std::vector<IRProtocolSpec> protocols_{};
-    std::vector<std::string> protocol_names_{};
     hal::RmtRx rmt_rx_{};
   };
 
@@ -230,7 +226,6 @@ namespace esp32irpk
     bool inverted_;
     bool begun_ = false;
     std::vector<IRProtocolSpec> protocols_{};
-    std::vector<std::string> protocol_names_{};
     hal::RmtTx rmt_tx_{};
     static constexpr size_t kMaxEncodedTicks = 2 * 64 + 6;
     uint16_t encode_buf_[kMaxEncodedTicks]{};

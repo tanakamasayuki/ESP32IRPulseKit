@@ -39,8 +39,10 @@ void loop()
     const esp32irpk::IRDecodedBits &b = c.decoded;
     Serial.print("#");
     Serial.print(i);
+    Serial.print(" pid=");
+    Serial.print((unsigned)c.protocol_id);
     Serial.print(" protocol=");
-    Serial.print(c.name ? c.name : esp32irpk::protocolName(c.protocol_id));
+    Serial.print(c.name);
     Serial.print(" score=");
     Serial.print((int)c.score);
     Serial.print(" len=");
@@ -49,6 +51,6 @@ void loop()
     Serial.print((uint32_t)(b.bits >> 32), HEX);
     Serial.print((uint32_t)(b.bits & 0xFFFFFFFFu), HEX);
     Serial.print(" frame_type=");
-    Serial.println((unsigned)b.frame_type);
+    Serial.println(b.frame_type == esp32irpk::IRFrameType::REPEAT ? "REPEAT" : "NORMAL");
   }
 }
