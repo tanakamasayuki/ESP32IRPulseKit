@@ -23,7 +23,9 @@ namespace esp32irpk::specs
       .bit_tol_pct      = 30,
       .endgap_tol_pct   = 35,
   };
+  // clang-format on
 
+  // clang-format off
   inline constexpr IRProtocolSpec PANASONIC40 = {
       .protocol_id      = IRProtocolID::PANASONIC40,
       .name             = "PANASONIC40",
@@ -39,7 +41,9 @@ namespace esp32irpk::specs
       .bit_tol_pct      = 30,
       .endgap_tol_pct   = 35,
   };
+  // clang-format on
 
+  // clang-format off
   inline constexpr IRProtocolSpec PANASONIC48 = {
       .protocol_id      = IRProtocolID::PANASONIC48,
       .name             = "PANASONIC48",

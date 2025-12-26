@@ -20,7 +20,9 @@ namespace esp32irpk::specs
       .lsb_first        = true,
       .bit_length       = 32,
   };
+  // clang-format on
 
+  // clang-format off
   inline constexpr IRProtocolSpec SAMSUNG36 = {
       .protocol_id      = IRProtocolID::SAMSUNG36,
       .name             = "SAMSUNG36",

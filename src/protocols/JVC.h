@@ -22,7 +22,9 @@ namespace esp32irpk::specs
       .bit_tol_pct      = 30,
       .endgap_tol_pct   = 40,
   };
+  // clang-format on
 
+  // clang-format off
   inline constexpr IRProtocolSpec JVC32 = {
       .protocol_id      = IRProtocolID::JVC32,
       .name             = "JVC32",

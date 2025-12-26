@@ -399,6 +399,217 @@ namespace esp32irpk::codec
     }
   } // namespace detail
 
+  namespace rc_detail
+  {
+    inline bool appendHalves(uint32_t duration_us,
+                             uint32_t unit_us,
+                             uint16_t tol_pct,
+                             bool level,
+                             std::vector<bool> &halves,
+                             uint32_t &err_sum)
+    {
+      if (unit_us == 0)
+        return false;
+      uint32_t units = (duration_us + unit_us / 2U) / unit_us;
+      if (units == 0)
+        return false;
+      uint32_t expected = units * unit_us;
+      err_sum += detail::errorPct(duration_us, expected);
+      for (uint32_t i = 0; i < units; ++i)
+        halves.push_back(level);
+      return true;
+    }
+
+    inline bool buildHalves(const IRRawTickView &raw,
+                            size_t start_idx,
+                            uint32_t unit_us,
+                            uint16_t tol_pct,
+                            std::vector<bool> &halves,
+                            uint32_t &err_sum)
+    {
+      bool level = true; // starts with mark
+      for (size_t i = start_idx; i < raw.len; ++i)
+      {
+        uint32_t dur = detail::ticksToUs(raw.ticks[i]);
+        if (!appendHalves(dur, unit_us, tol_pct, level, halves, err_sum))
+          return false;
+        level = !level;
+      }
+      return true;
+    }
+
+    inline bool decodeManBit(const std::vector<bool> &halves,
+                             size_t idx,
+                             size_t half_count,
+                             bool &bit_out)
+    {
+      if (idx + half_count > halves.size() || half_count < 2 || (half_count % 2) != 0)
+        return false;
+      bool first = halves[idx];
+      bool mid = halves[idx + half_count / 2];
+      if (first == mid)
+        return false;
+      bit_out = first; // high->low = 1, low->high = 0
+      return true;
+    }
+
+    inline bool decodeRC5(const IRRawTickView &raw,
+                          const IRProtocolSpec &spec,
+                          IRDecodedBits &decoded,
+                          int16_t &score_out)
+    {
+      const uint32_t unit_us = 889;
+      const size_t bits = 14;
+      if (raw.len < 2)
+        return false;
+
+      std::vector<bool> halves;
+      uint32_t err_sum = 0;
+      if (!buildHalves(raw, 0, unit_us, spec.bit_tol_pct, halves, err_sum))
+        return false;
+      if (halves.size() < bits * 2)
+        return false;
+      halves.resize(bits * 2);
+
+      uint64_t bits_out = 0;
+      for (size_t i = 0; i < bits; ++i)
+      {
+        bool bit = false;
+        if (!decodeManBit(halves, i * 2, 2, bit))
+          return false;
+        size_t pos = spec.lsb_first ? i : (bits - 1 - i);
+        if (bit)
+          bits_out |= (1ULL << pos);
+      }
+
+      // Start bits (first two) should be 1
+      if (!((bits_out >> (bits - 1)) & 0x1ULL))
+        err_sum += 50;
+      if (!((bits_out >> (bits - 2)) & 0x1ULL))
+        err_sum += 50;
+
+      decoded.protocol_id = spec.protocol_id;
+      decoded.frame_type = IRFrameType::NORMAL;
+      decoded.bit_length = bits;
+      decoded.bits = bits_out;
+      score_out = detail::finalizeScore(err_sum);
+      return true;
+    }
+
+    inline bool decodeRC6Common(const IRRawTickView &raw,
+                                const IRProtocolSpec &spec,
+                                uint8_t mode_expect,
+                                uint16_t payload_bits,
+                                bool has_toggle,
+                                IRDecodedBits &decoded,
+                                int16_t &score_out)
+    {
+      const uint32_t unit_us = 444;
+      if (raw.len < 2)
+        return false;
+
+      size_t idx = 0;
+      uint32_t header_err = 0;
+      // Leader: 6T mark + 2T space
+      uint32_t lead_mark = detail::ticksToUs(raw.ticks[idx]);
+      uint32_t lead_space = (idx + 1 < raw.len) ? detail::ticksToUs(raw.ticks[idx + 1]) : 0;
+      header_err += detail::errorPct(lead_mark, unit_us * 6U);
+      if (raw.ticks[idx] == 0 || raw.ticks[idx + 1] == 0)
+        return false;
+      header_err += detail::errorPct(lead_space, unit_us * 2U);
+      idx += 2;
+
+      std::vector<bool> halves;
+      uint32_t body_err = 0;
+      if (!buildHalves(raw, idx, unit_us, spec.bit_tol_pct, halves, body_err))
+        return false;
+
+      size_t start_bit_halves = 4; // double width
+      size_t toggle_halves = has_toggle ? 4 : 0;
+      size_t total_bits = 1 + 3 + (has_toggle ? 1 : 0) + payload_bits;
+      size_t expected_halves = start_bit_halves + toggle_halves + (total_bits - 1 - (has_toggle ? 1 : 0)) * 2 + (has_toggle ? 0 : 0);
+      if (halves.size() < expected_halves)
+        return false;
+      size_t pos = 0;
+
+      auto decodeBitWidth = [&](size_t width_halves, bool &bit_out) -> bool
+      {
+        if (!decodeManBit(halves, pos, width_halves, bit_out))
+          return false;
+        pos += width_halves;
+        return true;
+      };
+
+      uint64_t bits_out = 0;
+      size_t bit_index = 0;
+
+      bool bit = false;
+      if (!decodeBitWidth(start_bit_halves, bit))
+        return false;
+      size_t target = spec.lsb_first ? bit_index : (total_bits - 1 - bit_index);
+      if (bit)
+        bits_out |= (1ULL << target);
+      bit_index++;
+
+      uint8_t mode = 0;
+      for (int i = 0; i < 3; ++i, ++bit_index)
+      {
+        if (!decodeBitWidth(2, bit))
+          return false;
+        if (bit)
+          mode |= (1U << (2 - i)); // MSB first for mode
+        target = spec.lsb_first ? bit_index : (total_bits - 1 - bit_index);
+        if (bit)
+          bits_out |= (1ULL << target);
+      }
+
+      if (mode != mode_expect)
+        body_err += 80;
+
+      if (has_toggle)
+      {
+        if (!decodeBitWidth(toggle_halves, bit))
+          return false;
+        target = spec.lsb_first ? bit_index : (total_bits - 1 - bit_index);
+        if (bit)
+          bits_out |= (1ULL << target);
+        ++bit_index;
+      }
+
+      for (uint16_t p = 0; p < payload_bits; ++p, ++bit_index)
+      {
+        if (!decodeBitWidth(2, bit))
+          return false;
+        target = spec.lsb_first ? bit_index : (total_bits - 1 - bit_index);
+        if (bit)
+          bits_out |= (1ULL << target);
+      }
+
+      decoded.protocol_id = spec.protocol_id;
+      decoded.frame_type = IRFrameType::NORMAL;
+      decoded.bit_length = static_cast<uint16_t>(total_bits);
+      decoded.bits = bits_out;
+      score_out = detail::finalizeWeightedScore(header_err, body_err, 0);
+      return true;
+    }
+
+    inline bool decodeRC6M0(const IRRawTickView &raw,
+                            const IRProtocolSpec &spec,
+                            IRDecodedBits &decoded,
+                            int16_t &score_out)
+    {
+      return decodeRC6Common(raw, spec, /*mode_expect=*/0, /*payload_bits=*/16, /*has_toggle=*/true, decoded, score_out);
+    }
+
+    inline bool decodeRC6M6(const IRRawTickView &raw,
+                            const IRProtocolSpec &spec,
+                            IRDecodedBits &decoded,
+                            int16_t &score_out)
+    {
+      return decodeRC6Common(raw, spec, /*mode_expect=*/6, /*payload_bits=*/32, /*has_toggle=*/false, decoded, score_out);
+    }
+  } // namespace rc_detail
+
   template <size_t MaxCandidates>
   bool decodeRawToBits(const IRRawTickView &raw,
                        const IRProtocolSpec *specs,
@@ -419,20 +630,42 @@ namespace esp32irpk::codec
     for (size_t i = 0; i < spec_count; ++i)
     {
       const IRProtocolSpec &spec = specs[i];
-      if (spec.scheme != IRProtocolScheme::SPACE_ENC)
-        continue;
-
-      size_t effective_len = detail::maybeTrimByGap(raw, spec);
-      IRRawTickView sub_raw = raw;
-      sub_raw.len = effective_len;
-
       IRDecodedBits decoded{};
       int16_t score = 0;
-      bool ok = detail::decodeNormal(sub_raw, spec, decoded, score);
-      if (!ok && spec.has_repeat)
+      size_t effective_len = raw.len;
+      bool ok = false;
+
+      if (spec.scheme == IRProtocolScheme::SPACE_ENC)
       {
-        ok = detail::decodeRepeat(sub_raw, spec, decoded, score);
+        effective_len = detail::maybeTrimByGap(raw, spec);
+        IRRawTickView sub_raw = raw;
+        sub_raw.len = effective_len;
+
+        ok = detail::decodeNormal(sub_raw, spec, decoded, score);
+        if (!ok && spec.has_repeat)
+        {
+          ok = detail::decodeRepeat(sub_raw, spec, decoded, score);
+        }
       }
+      else if (spec.scheme == IRProtocolScheme::BIPHASE)
+      {
+        switch (spec.protocol_id)
+        {
+        case IRProtocolID::RC5:
+          ok = rc_detail::decodeRC5(raw, spec, decoded, score);
+          break;
+        case IRProtocolID::RC6_M0_16:
+          ok = rc_detail::decodeRC6M0(raw, spec, decoded, score);
+          break;
+        case IRProtocolID::RC6_M6_32:
+          ok = rc_detail::decodeRC6M6(raw, spec, decoded, score);
+          break;
+        default:
+          ok = false;
+          break;
+        }
+      }
+
       if (!ok)
         continue;
 

@@ -153,6 +153,27 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.data, HEX);
     break;
   }
+  case IRProtocolID::RC5:
+  {
+    frames::RC5Frame f = frames::RC5Frame::fromBits(b);
+    Serial.print("  frame: RC5 data=0x");
+    Serial.println(f.data, HEX);
+    break;
+  }
+  case IRProtocolID::RC6_M0_16:
+  {
+    frames::RC6M0Frame f = frames::RC6M0Frame::fromBits(b);
+    Serial.print("  frame: RC6_M0_16 data=0x");
+    Serial.println(f.data, HEX);
+    break;
+  }
+  case IRProtocolID::RC6_M6_32:
+  {
+    frames::RC6M6Frame f = frames::RC6M6Frame::fromBits(b);
+    Serial.print("  frame: RC6_M6_32 data=0x");
+    Serial.println((uint32_t)(f.data & 0xFFFFFFFFu), HEX);
+    break;
+  }
   default:
     break;
   }

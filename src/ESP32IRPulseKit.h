@@ -17,6 +17,7 @@ namespace esp32irpk
   {
     UNKNOWN = 0,
     SPACE_ENC = 1,
+    BIPHASE = 2,
   };
 
   enum class IRProtocolFamily : uint8_t
@@ -26,6 +27,8 @@ namespace esp32irpk
     AEHA = 2,
     PANASONIC = 3,
     SONY = 4,
+    RC5 = 5,
+    RC6 = 6,
   };
 
   enum class IRProtocolID : uint16_t
@@ -42,6 +45,9 @@ namespace esp32irpk
     SAMSUNG36 = 9,
     JVC24 = 10,
     JVC32 = 11,
+    RC5 = 12,
+    RC6_M0_16 = 13,
+    RC6_M6_32 = 14,
     USER1 = 1000,
     USER2 = 1001,
     USER3 = 1002,
@@ -254,6 +260,7 @@ namespace esp32irpk
 #include "protocols/Samsung.h"
 #include "protocols/JVC.h"
 #include "protocols/AEHA.h"
+#include "protocols/RC.h"
 
 namespace esp32irpk::detail
 {
@@ -287,6 +294,12 @@ namespace esp32irpk::detail
       out.push_back(specs::JVC24);
     if (!has(specs::JVC32.protocol_id))
       out.push_back(specs::JVC32);
+    if (!has(specs::RC5.protocol_id))
+      out.push_back(specs::RC5);
+    if (!has(specs::RC6_M0_16.protocol_id))
+      out.push_back(specs::RC6_M0_16);
+    if (!has(specs::RC6_M6_32.protocol_id))
+      out.push_back(specs::RC6_M6_32);
   }
 } // namespace esp32irpk::detail
 

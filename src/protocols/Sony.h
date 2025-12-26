@@ -21,7 +21,9 @@ namespace esp32irpk::specs
       .bit_length       = 12,
       .bit_tol_pct      = 55,
   };
+  // clang-format on
 
+  // clang-format off
   inline constexpr IRProtocolSpec SONY15 = {
       .protocol_id      = IRProtocolID::SONY15,
       .name             = "SONY15",
@@ -36,7 +38,9 @@ namespace esp32irpk::specs
       .bit_length       = 15,
       .bit_tol_pct      = 55,
   };
+  // clang-format on
 
+  // clang-format off
   inline constexpr IRProtocolSpec SONY20 = {
       .protocol_id      = IRProtocolID::SONY20,
       .name             = "SONY20",
