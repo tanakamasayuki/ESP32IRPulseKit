@@ -6,6 +6,94 @@
 // ja: GPIO番号はご利用環境の配線に合わせて変更してください。
 esp32irpk::IRReceiver rx(32, true); // en: common IR receiver modules output inverted / ja: よく使われる受信モジュールは出力が反転
 
+static void printFrame(const esp32irpk::IRDecodedBits &b)
+{
+  using namespace esp32irpk;
+  switch (b.protocol_id)
+  {
+  case IRProtocolID::NEC:
+  {
+    frames::NECFrame f = frames::NECFrame::fromBits(b);
+    if (f.is_repeat)
+    {
+      Serial.println("  frame: NEC REPEAT");
+      break;
+    }
+    Serial.print("  frame: NEC addr=0x");
+    Serial.print(f.address, HEX);
+    Serial.print(" cmd=0x");
+    Serial.println(f.command, HEX);
+    break;
+  }
+  case IRProtocolID::SONY12:
+  {
+    frames::Sony12Frame f = frames::Sony12Frame::fromBits(b);
+    if (f.is_repeat)
+    {
+      Serial.println("  frame: SONY12 REPEAT");
+      break;
+    }
+    Serial.print("  frame: SONY12 data=0x");
+    Serial.println(f.data, HEX);
+    break;
+  }
+  case IRProtocolID::SONY15:
+  {
+    frames::Sony15Frame f = frames::Sony15Frame::fromBits(b);
+    if (f.is_repeat)
+    {
+      Serial.println("  frame: SONY15 REPEAT");
+      break;
+    }
+    Serial.print("  frame: SONY15 data=0x");
+    Serial.println(f.data, HEX);
+    break;
+  }
+  case IRProtocolID::SONY20:
+  {
+    frames::Sony20Frame f = frames::Sony20Frame::fromBits(b);
+    if (f.is_repeat)
+    {
+      Serial.println("  frame: SONY20 REPEAT");
+      break;
+    }
+    Serial.print("  frame: SONY20 data=0x");
+    Serial.println(f.data, HEX);
+    break;
+  }
+  case IRProtocolID::SAMSUNG32:
+  {
+    frames::Samsung32Frame f = frames::Samsung32Frame::fromBits(b);
+    if (f.is_repeat)
+    {
+      Serial.println("  frame: SAMSUNG32 REPEAT");
+      break;
+    }
+    Serial.print("  frame: SAMSUNG32 addr=0x");
+    Serial.print(f.address, HEX);
+    Serial.print(" cmd=0x");
+    Serial.println(f.command, HEX);
+    break;
+  }
+  case IRProtocolID::SAMSUNG36:
+  {
+    frames::Samsung36Frame f = frames::Samsung36Frame::fromBits(b);
+    if (f.is_repeat)
+    {
+      Serial.println("  frame: SAMSUNG36 REPEAT");
+      break;
+    }
+    Serial.print("  frame: SAMSUNG36 addr=0x");
+    Serial.print(f.address, HEX);
+    Serial.print(" cmd=0x");
+    Serial.println(f.command, HEX);
+    break;
+  }
+  default:
+    break;
+  }
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -52,5 +140,6 @@ void loop()
     Serial.print((uint32_t)(b.bits & 0xFFFFFFFFu), HEX);
     Serial.print(" frame_type=");
     Serial.println(b.frame_type == esp32irpk::IRFrameType::REPEAT ? "REPEAT" : "NORMAL");
+    printFrame(b);
   }
 }
