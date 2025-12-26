@@ -144,6 +144,8 @@ namespace esp32irpk::hal
     gpio_ = gpio;
     inverted_ = inverted;
     idle_threshold_us_ = idle_threshold_us;
+    ESP_LOGV(kTag, "RMT RX begin: gpio=%d inverted=%d idle_threshold_us=%u tick_us=%u",
+             gpio_, inverted_ ? 1 : 0, idle_threshold_us_, kRmtTickUs);
 
     rmt_rx_channel_config_t cfg = {};
     cfg.clk_src = RMT_CLK_SRC_REF_TICK; // 1MHz base, divider to 100kHz
