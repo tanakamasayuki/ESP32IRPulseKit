@@ -31,7 +31,7 @@ void loop()
   for (size_t i = 0; i < r.raw.len; ++i)
   {
     Serial.print(" ");
-    Serial.print((unsigned)(r.raw.ticks[i] * 10)); // ticks are 10us
+    Serial.print((unsigned)(r.raw.ticks[i] * 10)); // en: ticks are 10us / ja: tickは10us
   }
   Serial.println();
 
