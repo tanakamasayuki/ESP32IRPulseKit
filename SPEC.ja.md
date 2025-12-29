@@ -367,6 +367,7 @@ public:
 
   bool setDecodeCandidates(uint8_t n);  // 0..MaxCandidates
   bool setIdleThresholdUs(uint32_t us);
+  bool setScoreThreshold(int16_t score); // decodeスコアの下限（デフォルト0）
 
   bool addProtocol(const IRProtocolSpec& spec);
   bool clearProtocols();
@@ -453,9 +454,10 @@ public:
 - decodeは登録済み全Specに対して実行する
 - デコード判定は「早期除外（ハードNG）」と「スコアリング（減点方式）」の2段階で行う
   - 早期除外：ヘッダー不一致、必要パルス数不足、bit長不一致、mark/space列の破綻など明らかに成立しない候補を除外
-  - スコアリング：成立候補について、各パルス（mark/space）の期待値に対する誤差を評価し、誤差の累積（平均誤差・最大誤差・分散等）に基づき減点方式でスコアを算出。極端に大きい誤差にはキャップ（上限）を設けてもよい
+- スコアリング：成立候補について、各パルス（mark/space）の期待値に対する誤差を評価し、誤差の累積（平均誤差・最大誤差・分散等）に基づき減点方式でスコアを算出。極端に大きい誤差にはキャップ（上限）を設けてもよい
 - この方式により送信ばらつきや受信ノイズに耐性を持たせつつ、近似プロトコル間の判定はスコア差で選択する
 - `gap_threshold_us` に達した gap はスコア減点せずに分割のみ行う。gap 長のブレは判定要素にしない。
+- スコア下限（デフォルト0）を下回る候補はリストに追加しない。`setScoreThreshold()` で変更可能。
 - 判定順序や重み付け、最適化は実装責務
 - スコアが同一の場合の優先順位は登録順（`addProtocol()`/デフォルト登録の順序）に従う。実装が別の同順位ルールを用いる場合はドキュメント化すること。
 
