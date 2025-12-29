@@ -233,6 +233,19 @@ void loop()
     Serial.print((uint32_t)(b.bits & 0xFFFFFFFFu), HEX);
     Serial.print(" frame_type=");
     Serial.println(b.frame_type == esp32irpk::IRFrameType::REPEAT ? "REPEAT" : "NORMAL");
+    const esp32irpk::IRScoreDetail &sd = c.score_detail;
+    Serial.print("  score_detail: header_err=");
+    Serial.print(sd.header_err_pct_sum);
+    Serial.print(" body_err=");
+    Serial.print(sd.body_err_pct_sum);
+    Serial.print(" extra_err=");
+    Serial.print(sd.extra_err_pct_sum);
+    Serial.print(" scaled=");
+    Serial.print(sd.weighted_err_scaled);
+    Serial.print(" base=");
+    Serial.print((int)sd.score_base);
+    Serial.print(" family_adj=");
+    Serial.println((int)sd.family_adjust);
     printFrame(b);
     Serial.println();
   }

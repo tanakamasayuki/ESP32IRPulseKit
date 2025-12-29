@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../ESP32IRPulseKit.h"
+#include <algorithm>
 #include <cstring>
 
 namespace esp32irpk::codec
@@ -163,7 +164,8 @@ namespace esp32irpk::codec
     inline bool decodeNormal(const IRRawTickView &raw,
                              const IRProtocolSpec &spec,
                              IRDecodedBits &decoded,
-                             int16_t &score_out)
+                             int16_t &score_out,
+                             esp32irpk::IRScoreDetail *detail_out = nullptr)
     {
       uint16_t min_bits = spec.min_bit_length ? spec.min_bit_length : spec.bit_length;
       uint16_t max_bits = spec.max_bit_length ? spec.max_bit_length : spec.bit_length;
@@ -285,14 +287,30 @@ namespace esp32irpk::codec
       decoded.frame_type = IRFrameType::NORMAL;
       decoded.bit_length = bit_count;
       decoded.bits = bits;
-      score_out = finalizeWeightedScore(header_err, body_err, extra_err);
+
+      uint64_t weighted = static_cast<uint64_t>(header_err) * 8ULL +
+                          static_cast<uint64_t>(body_err) +
+                          static_cast<uint64_t>(extra_err);
+      uint32_t scaled = static_cast<uint32_t>((weighted + 3ULL) / 4ULL);
+      score_out = finalizeScore(scaled);
+
+      if (detail_out)
+      {
+        detail_out->header_err_pct_sum = static_cast<uint16_t>(std::min<uint32_t>(header_err, 0xFFFFu));
+        detail_out->body_err_pct_sum = static_cast<uint16_t>(std::min<uint32_t>(body_err, 0xFFFFu));
+        detail_out->extra_err_pct_sum = static_cast<uint16_t>(std::min<uint32_t>(extra_err, 0xFFFFu));
+        detail_out->weighted_err_scaled = static_cast<uint16_t>(std::min<uint32_t>(scaled, 0xFFFFu));
+        detail_out->score_base = score_out;
+        detail_out->family_adjust = 0;
+      }
       return true;
     }
 
     inline bool decodeRepeat(const IRRawTickView &raw,
                              const IRProtocolSpec &spec,
                              IRDecodedBits &decoded,
-                             int16_t &score_out)
+                             int16_t &score_out,
+                             esp32irpk::IRScoreDetail *detail_out = nullptr)
     {
       if (!spec.has_repeat)
         return false;
@@ -341,7 +359,22 @@ namespace esp32irpk::codec
       decoded.frame_type = IRFrameType::REPEAT;
       decoded.bit_length = 0;
       decoded.bits = 0xFFFFFFFFFFFFFFFFULL;
-      score_out = finalizeWeightedScore(header_err, body_err, extra_err);
+
+      uint64_t weighted = static_cast<uint64_t>(header_err) * 8ULL +
+                          static_cast<uint64_t>(body_err) +
+                          static_cast<uint64_t>(extra_err);
+      uint32_t scaled = static_cast<uint32_t>((weighted + 3ULL) / 4ULL);
+      score_out = finalizeScore(scaled);
+
+      if (detail_out)
+      {
+        detail_out->header_err_pct_sum = static_cast<uint16_t>(std::min<uint32_t>(header_err, 0xFFFFu));
+        detail_out->body_err_pct_sum = static_cast<uint16_t>(std::min<uint32_t>(body_err, 0xFFFFu));
+        detail_out->extra_err_pct_sum = static_cast<uint16_t>(std::min<uint32_t>(extra_err, 0xFFFFu));
+        detail_out->weighted_err_scaled = static_cast<uint16_t>(std::min<uint32_t>(scaled, 0xFFFFu));
+        detail_out->score_base = score_out;
+        detail_out->family_adjust = 0;
+      }
       return true;
     }
 
@@ -449,7 +482,8 @@ namespace esp32irpk::codec
     inline bool decodeRC5(const IRRawTickView &raw,
                           const IRProtocolSpec &spec,
                           IRDecodedBits &decoded,
-                          int16_t &score_out)
+                          int16_t &score_out,
+                          esp32irpk::IRScoreDetail *detail_out = nullptr)
     {
       const uint32_t unit_us = 889;
       const size_t bits = 14;
@@ -487,6 +521,15 @@ namespace esp32irpk::codec
       decoded.bit_length = bits;
       decoded.bits = bits_out;
       score_out = detail::finalizeScore(err_sum);
+      if (detail_out)
+      {
+        detail_out->header_err_pct_sum = 0;
+        detail_out->body_err_pct_sum = static_cast<uint16_t>(std::min<uint32_t>(err_sum, 0xFFFFu));
+        detail_out->extra_err_pct_sum = 0;
+        detail_out->weighted_err_scaled = static_cast<uint16_t>(std::min<uint32_t>(err_sum, 0xFFFFu));
+        detail_out->score_base = score_out;
+        detail_out->family_adjust = 0;
+      }
       return true;
     }
 
@@ -496,7 +539,8 @@ namespace esp32irpk::codec
                                 uint16_t payload_bits,
                                 bool has_toggle,
                                 IRDecodedBits &decoded,
-                                int16_t &score_out)
+                                int16_t &score_out,
+                                esp32irpk::IRScoreDetail *detail_out = nullptr)
     {
       const uint32_t unit_us = 444;
       if (raw.len < 2)
@@ -583,24 +627,38 @@ namespace esp32irpk::codec
       decoded.frame_type = IRFrameType::NORMAL;
       decoded.bit_length = static_cast<uint16_t>(total_bits);
       decoded.bits = bits_out;
-      score_out = detail::finalizeWeightedScore(header_err, body_err, 0);
+      uint64_t weighted = static_cast<uint64_t>(header_err) * 8ULL +
+                          static_cast<uint64_t>(body_err);
+      uint32_t scaled = static_cast<uint32_t>((weighted + 3ULL) / 4ULL);
+      score_out = detail::finalizeScore(scaled);
+      if (detail_out)
+      {
+        detail_out->header_err_pct_sum = static_cast<uint16_t>(std::min<uint32_t>(header_err, 0xFFFFu));
+        detail_out->body_err_pct_sum = static_cast<uint16_t>(std::min<uint32_t>(body_err, 0xFFFFu));
+        detail_out->extra_err_pct_sum = 0;
+        detail_out->weighted_err_scaled = static_cast<uint16_t>(std::min<uint32_t>(scaled, 0xFFFFu));
+        detail_out->score_base = score_out;
+        detail_out->family_adjust = 0;
+      }
       return true;
     }
 
     inline bool decodeRC6M0(const IRRawTickView &raw,
                             const IRProtocolSpec &spec,
                             IRDecodedBits &decoded,
-                            int16_t &score_out)
+                            int16_t &score_out,
+                            esp32irpk::IRScoreDetail *detail_out = nullptr)
     {
-      return decodeRC6Common(raw, spec, /*mode_expect=*/0, /*payload_bits=*/16, /*has_toggle=*/true, decoded, score_out);
+      return decodeRC6Common(raw, spec, /*mode_expect=*/0, /*payload_bits=*/16, /*has_toggle=*/true, decoded, score_out, detail_out);
     }
 
     inline bool decodeRC6M6(const IRRawTickView &raw,
                             const IRProtocolSpec &spec,
                             IRDecodedBits &decoded,
-                            int16_t &score_out)
+                            int16_t &score_out,
+                            esp32irpk::IRScoreDetail *detail_out = nullptr)
     {
-      return decodeRC6Common(raw, spec, /*mode_expect=*/6, /*payload_bits=*/32, /*has_toggle=*/false, decoded, score_out);
+      return decodeRC6Common(raw, spec, /*mode_expect=*/6, /*payload_bits=*/32, /*has_toggle=*/false, decoded, score_out, detail_out);
     }
   } // namespace rc_detail
 
@@ -628,6 +686,7 @@ namespace esp32irpk::codec
       int16_t score = 0;
       size_t effective_len = raw.len;
       bool ok = false;
+      esp32irpk::IRScoreDetail score_detail{};
 
       if (spec.scheme == IRProtocolScheme::SPACE_ENC)
       {
@@ -667,10 +726,11 @@ namespace esp32irpk::codec
         IRRawTickView sub_raw = raw;
         sub_raw.len = decode_len;
 
-        ok = detail::decodeNormal(sub_raw, spec, decoded, score);
+        ok = detail::decodeNormal(sub_raw, spec, decoded, score, &score_detail);
         if (!ok && spec.has_repeat)
         {
-          ok = detail::decodeRepeat(sub_raw, spec, decoded, score);
+          score_detail = esp32irpk::IRScoreDetail{};
+          ok = detail::decodeRepeat(sub_raw, spec, decoded, score, &score_detail);
         }
       }
       else if (spec.scheme == IRProtocolScheme::BIPHASE)
@@ -678,13 +738,13 @@ namespace esp32irpk::codec
         switch (spec.protocol_id)
         {
         case IRProtocolID::RC5:
-          ok = rc_detail::decodeRC5(raw, spec, decoded, score);
+          ok = rc_detail::decodeRC5(raw, spec, decoded, score, &score_detail);
           break;
         case IRProtocolID::RC6_M0_16:
-          ok = rc_detail::decodeRC6M0(raw, spec, decoded, score);
+          ok = rc_detail::decodeRC6M0(raw, spec, decoded, score, &score_detail);
           break;
         case IRProtocolID::RC6_M6_32:
-          ok = rc_detail::decodeRC6M6(raw, spec, decoded, score);
+          ok = rc_detail::decodeRC6M6(raw, spec, decoded, score, &score_detail);
           break;
         default:
           ok = false;
@@ -706,7 +766,14 @@ namespace esp32irpk::codec
       cand.consumed_len = effective_len;
       cand.score = score;
       cand.decoded = decoded;
+      cand.score_detail = score_detail;
       detail::adjustFamilyScore(spec, cand.decoded, cand.score);
+      int32_t fam_adj = static_cast<int32_t>(cand.score) - static_cast<int32_t>(cand.score_detail.score_base);
+      if (fam_adj > 32767)
+        fam_adj = 32767;
+      else if (fam_adj < -32768)
+        fam_adj = -32768;
+      cand.score_detail.family_adjust = static_cast<int16_t>(fam_adj);
       detail::insertCandidate(out, max_candidates, cand);
     }
 

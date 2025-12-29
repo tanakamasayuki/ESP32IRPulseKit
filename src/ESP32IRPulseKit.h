@@ -119,6 +119,16 @@ namespace esp32irpk
     uint32_t raw_truncated_count = 0;
   };
 
+  struct IRScoreDetail
+  {
+    uint16_t header_err_pct_sum = 0;  // header/trailer の errorPct 合計
+    uint16_t body_err_pct_sum = 0;    // ビット本体の errorPct 合計
+    uint16_t extra_err_pct_sum = 0;   // gap ずれ等の追加 errorPct 合計
+    uint16_t weighted_err_scaled = 0; // (header*8 + body + extra + 3) / 4 などのスケール後誤差
+    int16_t score_base = 0;           // family 補正前のスコア
+    int16_t family_adjust = 0;        // family 補正による加減分
+  };
+
   struct IRProtocolSpec
   {
     IRProtocolID protocol_id = IRProtocolID::UNKNOWN;
@@ -158,6 +168,7 @@ namespace esp32irpk
     int16_t score = 0;
     size_t consumed_len = 0; // ticks consumed for this decode
     IRDecodedBits decoded{};
+    IRScoreDetail score_detail{};
   };
 
   template <size_t MaxCandidates = esp32irpk::kDefaultMaxDecodeCandidates>
