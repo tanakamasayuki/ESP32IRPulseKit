@@ -134,10 +134,14 @@ namespace esp32irpk::codec
 
       // minimal symbols to consider a complete frame before gap:
       size_t min_symbols = 0;
-      if (spec.header.mark_us || spec.header.space_us)
-        min_symbols += 2;
-      if (spec.trailer.mark_us || spec.trailer.space_us)
-        min_symbols += 2;
+      if (spec.header.mark_us)
+        min_symbols += 1;
+      if (spec.header.space_us)
+        min_symbols += 1;
+      if (spec.trailer.mark_us)
+        min_symbols += 1;
+      if (spec.trailer.space_us)
+        min_symbols += 1;
       uint16_t max_bits = spec.max_bit_length ? spec.max_bit_length : spec.bit_length;
       min_symbols += static_cast<size_t>(max_bits) * 2;
 
@@ -628,8 +632,40 @@ namespace esp32irpk::codec
       if (spec.scheme == IRProtocolScheme::SPACE_ENC)
       {
         effective_len = detail::maybeTrimByGap(raw, spec);
+        size_t decode_len = effective_len;
+
+        // Drop a trailing gap tick from the decode view if it would leave an odd bit symbol count.
+        if (decode_len > 0)
+        {
+          size_t header_syms = 0;
+          if (spec.header.mark_us)
+            header_syms++;
+          if (spec.header.space_us)
+            header_syms++;
+          size_t trailer_syms = 0;
+          if (spec.trailer.mark_us)
+            trailer_syms++;
+          if (spec.trailer.space_us)
+            trailer_syms++;
+
+          if (decode_len > header_syms + trailer_syms)
+          {
+            size_t bit_syms = decode_len - header_syms - trailer_syms;
+            bool last_is_space = ((decode_len % 2) == 0); // mark-first streams end on space when a gap is present
+            if (last_is_space && (bit_syms % 2) != 0)
+            {
+              bool gap_candidate = (spec.gap_threshold_us == 0);
+              uint32_t tail_us = detail::ticksToUs(raw.ticks[decode_len - 1]);
+              if (!gap_candidate)
+                gap_candidate = tail_us >= spec.gap_threshold_us;
+              if (gap_candidate)
+                --decode_len;
+            }
+          }
+        }
+
         IRRawTickView sub_raw = raw;
-        sub_raw.len = effective_len;
+        sub_raw.len = decode_len;
 
         ok = detail::decodeNormal(sub_raw, spec, decoded, score);
         if (!ok && spec.has_repeat)
