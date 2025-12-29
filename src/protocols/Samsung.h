@@ -16,9 +16,11 @@ namespace esp32irpk::specs
       .one              = {.mark_us =  560, .space_us = 1690},
       .zero             = {.mark_us =  560, .space_us =  560},
       .trailer          = {.mark_us =  560, .space_us =    0},
-      .frame_end_gap_us = 30000,
+      .gap_threshold_us = 30000,
+      .idle_threshold_us= 30000,
       .lsb_first        = true,
       .bit_length       = 32,
+      .default_repeat_count = 0,
   };
   // clang-format on
 
@@ -32,9 +34,11 @@ namespace esp32irpk::specs
       .one              = {.mark_us =  560, .space_us = 1690},
       .zero             = {.mark_us =  560, .space_us =  560},
       .trailer          = {.mark_us =  560, .space_us =    0},
-      .frame_end_gap_us = 30000,
+      .gap_threshold_us = 30000,
+      .idle_threshold_us= 30000,
       .lsb_first        = true,
       .bit_length       = 36,
+      .default_repeat_count = 0,
   };
   // clang-format on
 

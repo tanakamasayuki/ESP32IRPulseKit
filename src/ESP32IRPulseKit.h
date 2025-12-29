@@ -131,7 +131,8 @@ namespace esp32irpk
     IRPulseUs zero{};
     IRPulseUs trailer{};
 
-    uint32_t frame_end_gap_us = 0;
+    uint32_t gap_threshold_us = 0;  // minimum gap to split frames; 0 disables gap-based split
+    uint32_t idle_threshold_us = 0; // preferred RMT idle threshold; 0 = use receiver setting
 
     bool lsb_first = true;
 
@@ -142,9 +143,9 @@ namespace esp32irpk
     bool has_repeat = false;
     IRPulseUs repeat_header{};
     uint32_t repeat_gap_us = 0;
+    int8_t default_repeat_count = 0; // repeats used when send(..., repeat_count < 0)
 
     uint16_t bit_tol_pct = 25;
-    uint16_t endgap_tol_pct = 30;
 
     uint8_t order = 0; // registration order (tie-breaker)
   };
@@ -233,10 +234,10 @@ namespace esp32irpk
     bool begin();
     void end();
 
-    bool send(const esp32irpk::IRRawTickView &raw, uint8_t repeat_count = 0);
-    bool send(const esp32irpk::IRRawTickView *raw, uint8_t repeat_count = 0); // nullptr -> false
-    bool send(const IRDecodedBits &decoded, uint8_t repeat_count = 0);
-    bool send(const IRDecodedBits *decoded, uint8_t repeat_count = 0); // nullptr -> false
+    bool send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count = -1);
+    bool send(const esp32irpk::IRRawTickView *raw, int8_t repeat_count = -1); // nullptr -> false
+    bool send(const IRDecodedBits &decoded, int8_t repeat_count = -1);
+    bool send(const IRDecodedBits *decoded, int8_t repeat_count = -1); // nullptr -> false
 
     bool encode(const IRDecodedBits &decoded, IRRawTickBuffer &out_raw);
 

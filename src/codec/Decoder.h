@@ -127,19 +127,10 @@ namespace esp32irpk::codec
 
     inline size_t maybeTrimByGap(const IRRawTickView &raw, const IRProtocolSpec &spec)
     {
-      if (spec.frame_end_gap_us == 0 || raw.len == 0)
+      if (spec.gap_threshold_us == 0 || raw.len == 0)
         return raw.len;
 
-      uint32_t gap_us_min = spec.frame_end_gap_us;
-      if (spec.endgap_tol_pct < 100)
-      {
-        uint32_t tol = spec.endgap_tol_pct;
-        gap_us_min = static_cast<uint32_t>((static_cast<uint64_t>(spec.frame_end_gap_us) * (100U - tol) + 99U) / 100U);
-        if (gap_us_min == 0)
-          gap_us_min = 1;
-      }
-
-      uint32_t gap_ticks = (gap_us_min + (kTickUs - 1)) / kTickUs;
+      uint32_t gap_ticks = (spec.gap_threshold_us + (kTickUs - 1)) / kTickUs;
 
       // minimal symbols to consider a complete frame before gap:
       size_t min_symbols = 0;
@@ -214,17 +205,12 @@ namespace esp32irpk::codec
 
         bool is_last_bit = (i + 1 == bit_count);
         bool space_is_gap = false;
-        if (is_last_bit && spec.frame_end_gap_us > 0)
+        if (is_last_bit)
         {
-          if (has_space)
-          {
-            space_is_gap = withinTol(space_us, spec.frame_end_gap_us, spec.endgap_tol_pct);
-          }
-          else
-          {
-            // gap may be clipped; accept missing space as end gap
-            space_is_gap = true;
-          }
+          if (has_space && spec.gap_threshold_us > 0)
+            space_is_gap = space_us >= spec.gap_threshold_us;
+          else if (!has_space)
+            space_is_gap = true; // allow clipped gap
         }
         else if (!has_space)
         {
@@ -259,13 +245,6 @@ namespace esp32irpk::codec
           bit_err = zero_err;
         }
 
-        if (space_is_gap)
-        {
-          uint32_t gap_err = has_space ? errorPct(space_us, spec.frame_end_gap_us)
-                                       : errorPct(0, spec.frame_end_gap_us);
-          body_err += gap_err;
-        }
-
         if (spec.lsb_first)
         {
           if (bit_is_one)
@@ -289,11 +268,7 @@ namespace esp32irpk::codec
       {
         if (raw.len - idx == 1)
         {
-          if (spec.frame_end_gap_us > 0)
-          {
-            uint32_t gap_us = ticksToUs(raw.ticks[idx]);
-            extra_err += errorPct(gap_us, spec.frame_end_gap_us);
-          }
+          // trailing gap: ignore without penalty
           ++idx;
         }
         else
@@ -335,7 +310,19 @@ namespace esp32irpk::codec
         if (raw.len - idx == 1)
         {
           uint32_t gap_us = ticksToUs(raw.ticks[idx]);
-          uint32_t expected_gap = spec.repeat_gap_us > 0 ? spec.repeat_gap_us : spec.frame_end_gap_us;
+          uint32_t expected_gap = 0;
+          if (spec.repeat_gap_us > 0)
+          {
+            uint64_t consumed_us = 0;
+            for (size_t j = 0; j < idx; ++j)
+              consumed_us += ticksToUs(raw.ticks[j]);
+            if (consumed_us < spec.repeat_gap_us)
+              expected_gap = static_cast<uint32_t>(spec.repeat_gap_us - consumed_us);
+          }
+          else if (spec.gap_threshold_us > 0)
+          {
+            expected_gap = spec.gap_threshold_us;
+          }
           if (expected_gap > 0)
             extra_err += errorPct(gap_us, expected_gap);
           ++idx;

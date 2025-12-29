@@ -39,7 +39,9 @@
 | unpack（BITS→Frame） | BITS をプロトコル別 Frame 型に展開する処理。関数名 `fromBits()` を推奨。 |
 | pack（Frame→BITS） | Frame を BITS に正規化する処理。関数名 `toBits()` を推奨。 |
 | idle threshold | RMT が「無信号期間」としてフレームを切る閾値。 |
-| frame_end_gap_us | Spec が定義するフレーム終端 gap（最小）。idle threshold 算出に使う。 |
+| gap_threshold_us | フレーム間の分割判定に使う gap の下限（us）。これ以上の space はフレーム区切りとみなす。 |
+| idle_threshold_us | RMT が「無信号期間」と扱う閾値（us）。gap 判定とは独立して設定する。 |
+| default_repeat_count | 送信時に repeat_count を省略/負値指定した際に使うプロトコル既定の再送回数。 |
 | 候補（candidate） | decode が成立したプロトコル判定結果。score 付きで返る。 |
 | score | 候補の信頼度。高いほど良い。減点方式で算出。 |
 | RAW_TRUNCATED | 返却 RAW が最大長超過により切り詰められたことを示すフラグ。 |
@@ -190,7 +192,8 @@ struct IRProtocolSpec {
   IRPulseUs zero;                    // ビット0の mark/space
   IRPulseUs trailer;                 // トレーラ（終端） mark/space
 
-  uint32_t frame_end_gap_us = 0;     // フレーム終端 gap（us）
+  uint32_t gap_threshold_us = 0;     // フレーム分割に使う gap 下限（us）
+  uint32_t idle_threshold_us = 0;    // RMT idle threshold 推奨値（us）。0なら受信側の設定/既定を使用。
 
   bool lsb_first = true;             // ビット順序（true: LSB first）
 
@@ -200,16 +203,21 @@ struct IRProtocolSpec {
 
   bool has_repeat = false;           // REPEAT シーケンスがあるか
   IRPulseUs repeat_header;           // REPEAT 用ヘッダ
-  uint32_t repeat_gap_us = 0;        // REPEAT 間の gap（us）
+  uint32_t repeat_gap_us = 0;        // フレーム開始→次フレーム開始までの周期（us）。ペイロード長で gap が伸び縮みする場合に利用。
+  int8_t default_repeat_count = 0;   // 送信時 repeat_count<0 のときに使う既定の再送回数（0: 1回だけ送る）
 
   uint16_t bit_tol_pct = 25;         // パルス許容誤差（%）
-  uint16_t endgap_tol_pct = 30;      // 終端 gap の許容誤差（%）
 
   uint8_t order = 0;                 // 登録順（スコア同値時の優先度）
 };
 
 } // namespace
 ```
+
+- `gap_threshold_us` は decode 時のフレーム分割専用。これ以上の space があればそこで区切る。0 は「分割しない」扱い。
+- `idle_threshold_us` は RMT の無信号判定閾値の推奨値。未指定（0）の場合は受信インスタンスの設定値/既定値を用いる。
+- `repeat_gap_us` はフレーム開始から次フレーム開始までの周期を表し、ペイロードが短いほど実 gap が長くなるプロトコルで利用する（期待 gap = `repeat_gap_us - フレーム長` などの計算に使用）。
+- `default_repeat_count` は送信時の既定再送回数。`send(..., repeat_count=-1)` で参照され、SONY系は3、その他は0を想定する。
 
 ### 3.4 指定初期化の例（参考）
 ```cpp
@@ -223,9 +231,11 @@ constexpr esp32irpk::IRProtocolSpec MyProto = {
   .zero        = { .mark_us = 600,  .space_us = 600  },    // 0
   .trailer     = { .mark_us = 600,  .space_us = 0    },    // トレーラ
 
-  .frame_end_gap_us = 30000,                               // 終端ギャップ
-  .lsb_first        = true,                                // LSB first
-  .bit_length       = 24,                                  // 既定ビット長
+  .gap_threshold_us    = 30000,                            // gap 判定下限
+  .idle_threshold_us   = 0,                                // 0: 受信側の既定を使う
+  .lsb_first           = true,                             // LSB first
+  .bit_length          = 24,                               // 既定ビット長
+  .default_repeat_count = 0,                               // 既定の再送回数
 };
 ```
 
@@ -283,7 +293,7 @@ esp32irpk::specs::JVC32
 
 ### 5.4 idle threshold 決定
 - base：`setIdleThresholdUs()` 指定値、未指定は 30000us
-- decode有効時：各 Spec の終端ギャップを上振れ込みで見積もる。`upper_gap = frame_end_gap_us * (1 + endgap_tol_pct/100)`（端数は繰上げ可）を計算し、`idle_threshold_us = max(base, max(upper_gap))` とする。
+- decode有効時：登録済み Spec の `idle_threshold_us`（0を除く）の最大値と base の大きい方を採用する。Spec が 0 のみの場合は base を使う。
 - RAW-only：baseのみ
 
 ---
@@ -386,8 +396,8 @@ public:
 - 処理中フレームを使い切った場合のみ、キューから次のフレームを取り出して処理する。キューも空なら `false` を返す。
 
 ### 6.6 GAP と RAW 分割の扱い
-- RMT の `idle_threshold_us` は登録済みプロトコルの `frame_end_gap_us` の最大値を採用する（5.4 参照）。このため GAP が短いプロトコル（例: NEC）の複数フレームが連結した RAW が返る場合がある。
-- デコード時は各プロトコルの `frame_end_gap_us` を中央値として扱い、`endgap_tol_pct` を掛けた下限（expected*(1 - tol)）を超えるスペースを GAP と判定する。判定位置までをそのプロトコルの解析対象とし、それ以降の波形は見ない。
+- RMT の `idle_threshold_us` は 5.4 のルールで決定し、`gap_threshold_us` とは独立に設定する。閾値次第では複数フレームが連結した RAW が返る場合がある。
+- デコード時は各プロトコルの `gap_threshold_us`（0は無効）以上の space を GAP とみなし、それ以降を分割対象とする。gap 長さのブレによる減点は行わない。
 - 各プロトコルの解析結果 (`IRDecodeCandidate`) には、そのプロトコルが処理に使用した RAW ticks 長 (`consumed_len`) を含める。
 - 最上位スコアの候補の `consumed_len` 分だけ処理オフセットを前進させ、`IRReceiveResult.raw.len` もその範囲に合わせて返す。実データは保持したままなので、次回 `read()` は残りの波形から再開する。
 
@@ -419,10 +429,10 @@ public:
   bool begin();
   void end();
 
-  bool send(const esp32irpk::IRRawTickView& raw, uint8_t repeat_count = 0);
-  bool send(const esp32irpk::IRRawTickView* raw, uint8_t repeat_count = 0); // raw==nullptr は送信せず false
-  bool send(const IRDecodedBits& decoded, uint8_t repeat_count = 0);
-  bool send(const IRDecodedBits* decoded, uint8_t repeat_count = 0); // decoded==nullptr は送信せず false
+  bool send(const esp32irpk::IRRawTickView& raw, int8_t repeat_count = -1);
+  bool send(const esp32irpk::IRRawTickView* raw, int8_t repeat_count = -1); // raw==nullptr は送信せず false
+  bool send(const IRDecodedBits& decoded, int8_t repeat_count = -1);
+  bool send(const IRDecodedBits* decoded, int8_t repeat_count = -1); // decoded==nullptr は送信せず false
 
   bool encode(const IRDecodedBits& decoded,
               /*out*/ IRRawTickBuffer& out_raw); // optional
@@ -435,6 +445,7 @@ public:
 - `IRRawTickBuffer` は呼び出し側がバッファと capacity を用意し、`encode()`/`send()` が `len` を設定する（`len <= capacity` になるよう実装する）。
 - `send(const IRRawTickView*)` は `raw == nullptr` の場合は送信せず `false` を返す（参照版と同様、送信失敗時も `false` を返す）。
 - `send(const IRDecodedBits*)` は `decoded == nullptr` の場合は送信せず `false` を返す（参照版と同様、送信失敗時も `false` を返す）。
+- `repeat_count < 0` の場合は Spec の `default_repeat_count` を用いる（例：SONY系は3、その他は0を想定）。`repeat_count >= 0` なら呼び出し値を優先する。
 
 ---
 
@@ -444,7 +455,7 @@ public:
   - 早期除外：ヘッダー不一致、必要パルス数不足、bit長不一致、mark/space列の破綻など明らかに成立しない候補を除外
   - スコアリング：成立候補について、各パルス（mark/space）の期待値に対する誤差を評価し、誤差の累積（平均誤差・最大誤差・分散等）に基づき減点方式でスコアを算出。極端に大きい誤差にはキャップ（上限）を設けてもよい
 - この方式により送信ばらつきや受信ノイズに耐性を持たせつつ、近似プロトコル間の判定はスコア差で選択する
-- end gap tolerance は減点対象（失格条件にしない）。終端GAPは連打/長押し・受信モジュール特性・環境光・搬送波ずれ・`idle threshold` によるクリップ等で揺らぎやすく、header/bit列が一致していれば同一プロトコルの可能性が高いため。減点強度の細部は実装責務
+- `gap_threshold_us` に達した gap はスコア減点せずに分割のみ行う。gap 長のブレは判定要素にしない。
 - 判定順序や重み付け、最適化は実装責務
 - スコアが同一の場合の優先順位は登録順（`addProtocol()`/デフォルト登録の順序）に従う。実装が別の同順位ルールを用いる場合はドキュメント化すること。
 
@@ -665,6 +676,7 @@ f.address = 0x00FF;
 f.command = 0x12;
 
 esp32irpk::IRDecodedBits b = f.toBits();
+tx.send(b);                     // repeat_count=-1 -> Specのdefault_repeat_countを使う（NECは0）
 tx.send(b, /*repeat_count=*/2); // 合計3回送信（実装がNEC repeat frameを使ってもよい）
 ```
 
@@ -727,7 +739,7 @@ void loop() {
   esp32irpk::IRReceiveResult r;
   if (rx.read(r)) {
     // best候補のBITSを送信（候補なし/nullptrなら送信しない）
-    tx.send(r.bits());
+    tx.send(r.bits()); // repeat_countは省略時にSpecのdefault_repeat_countを使用
   }
 }
 ```
@@ -751,8 +763,10 @@ void loop() {
   f.address = 0x00FF;
   f.command = 0x12;
 
-  // 例：合計3回送信（repeat_count=2）
-  tx.send(f.toBits(), 2);
+  // repeat_count省略: Specのdefault_repeat_countを使用（NECは0）
+  tx.send(f.toBits());
+  // 明示的に合計3回送信したい場合
+  // tx.send(f.toBits(), 2);
 
   delay(1000);
 }

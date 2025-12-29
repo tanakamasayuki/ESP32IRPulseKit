@@ -104,7 +104,7 @@ namespace esp32irpk::hal
     begun_ = false;
   }
 
-  bool RmtTx::send(const esp32irpk::IRRawTickView &raw, uint8_t repeat_count)
+  bool RmtTx::send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count)
   {
     if (!begun_)
       return false;
@@ -116,7 +116,8 @@ namespace esp32irpk::hal
       return false;
 
     rmt_transmit_config_t tcfg = {};
-    tcfg.loop_count = static_cast<uint32_t>(repeat_count) + 1U;
+    uint32_t loops = repeat_count < 0 ? 1U : static_cast<uint32_t>(repeat_count) + 1U;
+    tcfg.loop_count = loops;
 
     esp_err_t err = rmt_transmit(reinterpret_cast<rmt_channel_handle_t>(tx_channel_),
                                  reinterpret_cast<rmt_encoder_handle_t>(tx_encoder_),
@@ -403,7 +404,7 @@ namespace esp32irpk::hal
     begun_ = false;
   }
 
-  bool RmtTx::send(const esp32irpk::IRRawTickView &raw, uint8_t repeat_count)
+  bool RmtTx::send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count)
   {
     (void)raw;
     (void)repeat_count;

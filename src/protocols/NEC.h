@@ -16,14 +16,15 @@ namespace esp32irpk::specs
       .one              = {.mark_us =  560, .space_us = 1690},
       .zero             = {.mark_us =  560, .space_us =  560},
       .trailer          = {.mark_us =  560, .space_us =    0},
-      .frame_end_gap_us = 30000,
+      .gap_threshold_us = 30000,
+      .idle_threshold_us= 42000,
       .lsb_first        = true,
       .bit_length       = 32,
       .has_repeat       = true,
       .repeat_header    = {.mark_us = 9000, .space_us = 2250},
       .repeat_gap_us    = 110000,
+      .default_repeat_count = 0,
       .bit_tol_pct      = 25,
-      .endgap_tol_pct   = 40,
   };
   // clang-format on
 

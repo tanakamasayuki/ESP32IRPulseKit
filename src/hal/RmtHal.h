@@ -25,7 +25,7 @@ namespace esp32irpk::hal
   public:
     bool begin(int gpio, bool inverted);
     void end();
-    bool send(const esp32irpk::IRRawTickView &raw, uint8_t repeat_count);
+    bool send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count);
     bool encode(const esp32irpk::IRDecodedBits &decoded, esp32irpk::IRRawTickBuffer &out_raw);
 
   private:

@@ -14,7 +14,6 @@ namespace esp32irpk::specs
       .family = IRProtocolFamily::RC5,
       .bit_length = 14,
       .bit_tol_pct = 25,
-      .endgap_tol_pct = 25,
   };
   // clang-format on
 
@@ -27,7 +26,6 @@ namespace esp32irpk::specs
       .family         = IRProtocolFamily::RC6,
       .bit_length     = 21, // start(1)+mode(3)+toggle(1)+payload(16)
       .bit_tol_pct    = 25,
-      .endgap_tol_pct = 25,
   };
   // clang-format on
 
@@ -40,7 +38,6 @@ namespace esp32irpk::specs
       .family         = IRProtocolFamily::RC6,
       .bit_length     = 36, // start(1)+mode(3)+payload(32)
       .bit_tol_pct    = 25,
-      .endgap_tol_pct = 25,
   };
   // clang-format on
 

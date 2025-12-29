@@ -76,23 +76,47 @@ namespace esp32irpk
     begun_ = false;
   }
 
-  bool IRSender::send(const esp32irpk::IRRawTickView &raw, uint8_t repeat_count)
+  namespace
+  {
+    inline uint8_t resolveRepeatCount(const std::vector<IRProtocolSpec> &specs,
+                                      IRProtocolID id,
+                                      int8_t repeat_count)
+    {
+      if (repeat_count >= 0)
+        return static_cast<uint8_t>(repeat_count);
+
+      int8_t def = 0;
+      auto it = std::find_if(specs.begin(), specs.end(),
+                             [&](const IRProtocolSpec &s)
+                             { return s.protocol_id == id; });
+      if (it != specs.end())
+        def = it->default_repeat_count;
+      if (def < 0)
+        def = 0;
+      return static_cast<uint8_t>(def);
+    }
+  } // namespace
+
+  bool IRSender::send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count)
   {
     if (!begun_)
       return false;
     if (!raw.ticks || raw.len == 0)
       return false;
-    return rmt_tx_.send(raw, repeat_count);
+    uint8_t resolved = repeat_count >= 0 ? static_cast<uint8_t>(repeat_count) : 0;
+    if (resolved > 127U)
+      resolved = 127U;
+    return rmt_tx_.send(raw, static_cast<int8_t>(resolved));
   }
 
-  bool IRSender::send(const esp32irpk::IRRawTickView *raw, uint8_t repeat_count)
+  bool IRSender::send(const esp32irpk::IRRawTickView *raw, int8_t repeat_count)
   {
     if (!raw)
       return false;
     return send(*raw, repeat_count);
   }
 
-  bool IRSender::send(const IRDecodedBits &decoded, uint8_t repeat_count)
+  bool IRSender::send(const IRDecodedBits &decoded, int8_t repeat_count)
   {
     if (!begun_)
       return false;
@@ -106,10 +130,13 @@ namespace esp32irpk
     IRRawTickView view{};
     view.ticks = out_raw.ticks;
     view.len = out_raw.len;
-    return send(view, repeat_count);
+    uint8_t resolved = resolveRepeatCount(protocols_, decoded.protocol_id, repeat_count);
+    if (resolved > 127U)
+      resolved = 127U;
+    return rmt_tx_.send(view, static_cast<int8_t>(resolved));
   }
 
-  bool IRSender::send(const IRDecodedBits *decoded, uint8_t repeat_count)
+  bool IRSender::send(const IRDecodedBits *decoded, int8_t repeat_count)
   {
     if (!decoded)
       return false;

@@ -16,9 +16,11 @@ namespace esp32irpk::specs
       .one              = {.mark_us = 1200, .space_us =  600},
       .zero             = {.mark_us =  600, .space_us =  600},
       .trailer          = {.mark_us =    0, .space_us =    0},
-      .frame_end_gap_us = 24000, // 45000 - (2400 + 600) - (900 + 600)*12
+      .gap_threshold_us = 24000, // 45000 - (2400 + 600) - (900 + 600)*12
+      .idle_threshold_us= 31200,
       .lsb_first        = true,
       .bit_length       = 12,
+      .default_repeat_count = 2,
       .bit_tol_pct      = 55,
   };
   // clang-format on
@@ -33,9 +35,11 @@ namespace esp32irpk::specs
       .one              = {.mark_us = 1200, .space_us =  600},
       .zero             = {.mark_us =  600, .space_us =  600},
       .trailer          = {.mark_us =    0, .space_us =    0},
-      .frame_end_gap_us = 19500, // 45000 - (2400 + 600) - (900 + 600)*15
+      .gap_threshold_us = 19500, // 45000 - (2400 + 600) - (900 + 600)*15
+      .idle_threshold_us= 30000,
       .lsb_first        = true,
       .bit_length       = 15,
+      .default_repeat_count = 2,
       .bit_tol_pct      = 55,
   };
   // clang-format on
@@ -50,9 +54,11 @@ namespace esp32irpk::specs
       .one              = {.mark_us = 1200, .space_us =  600},
       .zero             = {.mark_us =  600, .space_us =  600},
       .trailer          = {.mark_us =    0, .space_us =    0},
-      .frame_end_gap_us = 12000, // 45000 - (2400 + 600) - (900 + 600)*20
+      .gap_threshold_us = 12000, // 45000 - (2400 + 600) - (900 + 600)*20
+      .idle_threshold_us= 30000,
       .lsb_first        = true,
       .bit_length       = 20,
+      .default_repeat_count = 2,
       .bit_tol_pct      = 55,
   };
   // clang-format on
