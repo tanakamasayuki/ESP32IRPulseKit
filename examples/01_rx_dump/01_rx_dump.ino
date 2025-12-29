@@ -6,6 +6,79 @@
 // ja: GPIO番号はご利用環境の配線に合わせて変更してください。
 esp32irpk::IRReceiver rx(32, true); // en: common IR receiver modules output inverted / ja: よく使われる受信モジュールは出力が反転
 
+void setup()
+{
+  Serial.begin(115200);
+  // rx.setScoreThreshold(-32768); // en: show negative-score candidates / ja: 負スコア候補も表示する
+  rx.begin();
+}
+
+void loop()
+{
+  esp32irpk::IRReceiveResult r;
+  if (!rx.read(r))
+  {
+    delay(1);
+    return;
+  }
+
+  Serial.println("---- IR received ----");
+  Serial.print("raw.len(ticks)=");
+  Serial.print((unsigned)r.raw.len);
+  Serial.print(" flags=0x");
+  Serial.println((unsigned)r.flags, HEX);
+  Serial.print("raw (us):");
+  for (size_t i = 0; i < r.raw.len; ++i)
+  {
+    Serial.print(" ");
+    Serial.print((unsigned)(r.raw.ticks[i] * 10)); // ticks are 10us
+  }
+  Serial.println();
+
+  if (r.count == 0)
+  {
+    Serial.println("no decoded candidates");
+    Serial.println();
+    return;
+  }
+
+  for (uint8_t i = 0; i < r.count; ++i)
+  {
+    const esp32irpk::IRDecodeCandidate &c = r.candidates[i];
+    const esp32irpk::IRDecodedBits &b = c.decoded;
+    Serial.print("#");
+    Serial.print(i);
+    Serial.print(" pid=");
+    Serial.print((unsigned)c.protocol_id);
+    Serial.print(" protocol=");
+    Serial.print(c.name);
+    Serial.print(" score=");
+    Serial.print((int)c.score);
+    Serial.print(" len=");
+    Serial.print((unsigned)b.bit_length);
+    Serial.print(" bits=0x");
+    Serial.print((uint32_t)(b.bits >> 32), HEX);
+    Serial.print((uint32_t)(b.bits & 0xFFFFFFFFu), HEX);
+    Serial.print(" frame_type=");
+    Serial.println(b.frame_type == esp32irpk::IRFrameType::REPEAT ? "REPEAT" : "NORMAL");
+    const esp32irpk::IRScoreDetail &sd = c.score_detail;
+    Serial.print("  score_detail: header_err=");
+    Serial.print(sd.header_err_pct_sum);
+    Serial.print(" body_err=");
+    Serial.print(sd.body_err_pct_sum);
+    Serial.print(" extra_err=");
+    Serial.print(sd.extra_err_pct_sum);
+    Serial.print(" scaled=");
+    Serial.print(sd.weighted_err_scaled);
+    Serial.print(" base=");
+    Serial.print((int)sd.score_base);
+    Serial.print(" family_adj=");
+    Serial.println((int)sd.family_adjust);
+    printFrame(b);
+    Serial.println();
+  }
+}
+
 static void printFrame(const esp32irpk::IRDecodedBits &b)
 {
   using namespace esp32irpk;
@@ -176,77 +249,5 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
   }
   default:
     break;
-  }
-}
-
-void setup()
-{
-  Serial.begin(115200);
-  rx.begin();
-}
-
-void loop()
-{
-  esp32irpk::IRReceiveResult r;
-  if (!rx.read(r))
-  {
-    delay(1);
-    return;
-  }
-
-  Serial.println("---- IR received ----");
-  Serial.print("raw.len(ticks)=");
-  Serial.print((unsigned)r.raw.len);
-  Serial.print(" flags=0x");
-  Serial.println((unsigned)r.flags, HEX);
-  Serial.print("raw (us):");
-  for (size_t i = 0; i < r.raw.len; ++i)
-  {
-    Serial.print(" ");
-    Serial.print((unsigned)(r.raw.ticks[i] * 10)); // ticks are 10us
-  }
-  Serial.println();
-
-  if (r.count == 0)
-  {
-    Serial.println("no decoded candidates");
-    Serial.println();
-    return;
-  }
-
-  for (uint8_t i = 0; i < r.count; ++i)
-  {
-    const esp32irpk::IRDecodeCandidate &c = r.candidates[i];
-    const esp32irpk::IRDecodedBits &b = c.decoded;
-    Serial.print("#");
-    Serial.print(i);
-    Serial.print(" pid=");
-    Serial.print((unsigned)c.protocol_id);
-    Serial.print(" protocol=");
-    Serial.print(c.name);
-    Serial.print(" score=");
-    Serial.print((int)c.score);
-    Serial.print(" len=");
-    Serial.print((unsigned)b.bit_length);
-    Serial.print(" bits=0x");
-    Serial.print((uint32_t)(b.bits >> 32), HEX);
-    Serial.print((uint32_t)(b.bits & 0xFFFFFFFFu), HEX);
-    Serial.print(" frame_type=");
-    Serial.println(b.frame_type == esp32irpk::IRFrameType::REPEAT ? "REPEAT" : "NORMAL");
-    const esp32irpk::IRScoreDetail &sd = c.score_detail;
-    Serial.print("  score_detail: header_err=");
-    Serial.print(sd.header_err_pct_sum);
-    Serial.print(" body_err=");
-    Serial.print(sd.body_err_pct_sum);
-    Serial.print(" extra_err=");
-    Serial.print(sd.extra_err_pct_sum);
-    Serial.print(" scaled=");
-    Serial.print(sd.weighted_err_scaled);
-    Serial.print(" base=");
-    Serial.print((int)sd.score_base);
-    Serial.print(" family_adj=");
-    Serial.println((int)sd.family_adjust);
-    printFrame(b);
-    Serial.println();
   }
 }

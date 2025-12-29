@@ -667,6 +667,7 @@ namespace esp32irpk::codec
                        const IRProtocolSpec *specs,
                        size_t spec_count,
                        uint8_t max_candidates,
+                       int16_t score_threshold,
                        IRReceiveResult<MaxCandidates> &out)
   {
     out.count = 0;
@@ -774,6 +775,8 @@ namespace esp32irpk::codec
       else if (fam_adj < -32768)
         fam_adj = -32768;
       cand.score_detail.family_adjust = static_cast<int16_t>(fam_adj);
+      if (cand.score < score_threshold)
+        continue;
       detail::insertCandidate(out, max_candidates, cand);
     }
 

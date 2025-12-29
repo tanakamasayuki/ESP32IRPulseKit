@@ -51,6 +51,15 @@ namespace esp32irpk
   }
 
   template <size_t MaxCandidates>
+  bool IRReceiver<MaxCandidates>::setScoreThreshold(int16_t score)
+  {
+    if (begun_)
+      return false;
+    score_threshold_ = score;
+    return true;
+  }
+
+  template <size_t MaxCandidates>
   bool IRReceiver<MaxCandidates>::addProtocol(const IRProtocolSpec &spec)
   {
     if (begun_)
@@ -177,6 +186,7 @@ namespace esp32irpk
                                      protocols_.data(),
                                      protocols_.size(),
                                      decode_candidates_,
+                                     score_threshold_,
                                      out);
     return ok;
   }
