@@ -60,21 +60,21 @@ namespace esp32irpk
 
   struct IRPulseUs
   {
-    uint32_t mark_us = 0;
-    uint32_t space_us = 0;
+    uint32_t mark_us = 0;  // high duration in microseconds
+    uint32_t space_us = 0; // low duration in microseconds
   };
 
   struct IRRawTickView
   {
-    const uint16_t *ticks = nullptr; // 1 tick = 10us
-    size_t len = 0;
+    const uint16_t *ticks = nullptr; // pointer to tick array (1 tick = 10us)
+    size_t len = 0;                  // number of tick entries
   };
 
   struct IRRawTickBuffer
   {
     uint16_t *ticks = nullptr; // output buffer (1 tick = 10us)
-    size_t capacity = 0;
-    size_t len = 0;
+    size_t capacity = 0;       // total allocated entries
+    size_t len = 0;            // number of valid entries
   };
 
   enum class IRFrameType : uint8_t
@@ -85,10 +85,10 @@ namespace esp32irpk
 
   struct IRDecodedBits
   {
-    IRProtocolID protocol_id = IRProtocolID::UNKNOWN;
-    IRFrameType frame_type = IRFrameType::NORMAL;
-    uint16_t bit_length = 0;
-    uint64_t bits = 0;
+    IRProtocolID protocol_id = IRProtocolID::UNKNOWN; // detected protocol
+    IRFrameType frame_type = IRFrameType::NORMAL;     // NORMAL or REPEAT
+    uint16_t bit_length = 0;                          // bits length (0..64)
+    uint64_t bits = 0;                                // packed bits (LSB/MSB depends on spec)
 
     bool isRepeat() const { return frame_type == IRFrameType::REPEAT; }
   };
@@ -114,71 +114,71 @@ namespace esp32irpk
 
   struct IRRxStats
   {
-    uint32_t queue_overflow_count = 0;
-    uint32_t rmt_overflow_count = 0;
-    uint32_t raw_truncated_count = 0;
+    uint32_t queue_overflow_count = 0; // dropped entries due to queue full
+    uint32_t rmt_overflow_count = 0;   // RMT hardware overflow occurrences
+    uint32_t raw_truncated_count = 0;  // times raw data was truncated
   };
 
   struct IRScoreDetail
   {
-    uint16_t header_err_pct_sum = 0;  // header/trailer の errorPct 合計
-    uint16_t body_err_pct_sum = 0;    // ビット本体の errorPct 合計
-    uint16_t extra_err_pct_sum = 0;   // gap ずれ等の追加 errorPct 合計
-    uint16_t weighted_err_scaled = 0; // (header*8 + body + extra + 3) / 4 などのスケール後誤差
-    int16_t score_base = 0;           // family 補正前のスコア
-    int16_t family_adjust = 0;        // family 補正による加減分
+    uint16_t header_err_pct_sum = 0;  // errorPct sum for header/trailer
+    uint16_t body_err_pct_sum = 0;    // errorPct sum for bit body
+    uint16_t extra_err_pct_sum = 0;   // errorPct sum for extra penalties (gaps etc.)
+    uint16_t weighted_err_scaled = 0; // scaled error used in scoring ((header*8 + body + extra + 3) / 4)
+    int16_t score_base = 0;           // score before family adjustment
+    int16_t family_adjust = 0;        // delta applied by family-specific adjustment
   };
 
   struct IRProtocolSpec
   {
-    IRProtocolID protocol_id = IRProtocolID::UNKNOWN;
-    char name[16] = {}; // optional display name (null-terminated, max 15 chars)
-    IRProtocolScheme scheme = IRProtocolScheme::UNKNOWN;
-    IRProtocolFamily family = IRProtocolFamily::UNKNOWN;
+    IRProtocolID protocol_id = IRProtocolID::UNKNOWN;    // unique protocol id
+    char name[16] = {};                                  // optional display name (max 15 chars + null)
+    IRProtocolScheme scheme = IRProtocolScheme::UNKNOWN; // encoding scheme
+    IRProtocolFamily family = IRProtocolFamily::UNKNOWN; // protocol family for shared rules
 
-    IRPulseUs header{};
-    IRPulseUs one{};
-    IRPulseUs zero{};
-    IRPulseUs trailer{};
+    IRPulseUs header{};  // leading mark/space
+    IRPulseUs one{};     // bit-1 mark/space
+    IRPulseUs zero{};    // bit-0 mark/space
+    IRPulseUs trailer{}; // trailing mark/space
 
     uint32_t gap_threshold_us = 0;  // minimum gap to split frames; 0 disables gap-based split
     uint32_t idle_threshold_us = 0; // preferred RMT idle threshold; 0 = use receiver setting
 
-    bool lsb_first = true;
+    bool lsb_first = true; // bit order
 
-    uint16_t bit_length = 0;
-    uint16_t min_bit_length = 0; // optional: variable-length protocols
-    uint16_t max_bit_length = 0; // optional: variable-length protocols
+    uint16_t bit_length = 0;     // default bit length (or fixed length)
+    uint16_t min_bit_length = 0; // lower bound for variable-length protocols
+    uint16_t max_bit_length = 0; // upper bound for variable-length protocols
 
-    bool has_repeat = false;
-    IRPulseUs repeat_header{};
-    uint32_t repeat_gap_us = 0;
-    int8_t default_repeat_count = 0; // repeats used when send(..., repeat_count < 0)
+    bool has_repeat = false;         // protocol defines repeat frame
+    IRPulseUs repeat_header{};       // repeat frame header
+    uint32_t repeat_gap_us = 0;      // frame start-to-start gap expectation
+    int8_t default_repeat_count = 0; // default repeats when send(..., repeat_count < 0)
 
-    uint16_t bit_tol_pct = 25;
+    uint16_t bit_tol_pct = 25; // tolerance percentage for pulse matching
 
     uint8_t order = 0; // registration order (tie-breaker)
   };
 
   struct IRDecodeCandidate
   {
-    IRProtocolID protocol_id = IRProtocolID::UNKNOWN;
-    char name[16] = {};
-    uint8_t order = 0;
-    int16_t score = 0;
-    size_t consumed_len = 0; // ticks consumed for this decode
-    IRDecodedBits decoded{};
-    IRScoreDetail score_detail{};
+    IRProtocolID protocol_id = IRProtocolID::UNKNOWN; // detected protocol id
+    char name[16] = {};                               // display name copy from spec
+    uint8_t order = 0;                                // spec registration order
+    int16_t score = 0;                                // final score after adjustments
+    size_t consumed_len = 0;                          // ticks consumed for this decode
+    IRDecodedBits decoded{};                          // decoded bit payload
+    IRScoreDetail score_detail{};                     // scoring breakdown
   };
 
   template <size_t MaxCandidates = esp32irpk::kDefaultMaxDecodeCandidates>
   struct IRReceiveResult
   {
-    IRRawTickView raw{};
-    IRResultFlags flags = IRResultFlags::NONE;
+    IRRawTickView raw{};                       // raw ticks used/returned
+    IRResultFlags flags = IRResultFlags::NONE; // status flags
 
-    uint8_t count = 0; // Max 255 entries due to type width
-    IRDecodeCandidate candidates[MaxCandidates]{};
+    uint8_t count = 0;                             // candidate count (<= MaxCandidates)
+    IRDecodeCandidate candidates[MaxCandidates]{}; // sorted by score
 
     const esp32irpk::IRDecodeCandidate *candidate() const
     {
@@ -219,15 +219,15 @@ namespace esp32irpk
     void resetStats();
 
   private:
-    int gpio_;
-    bool inverted_;
-    bool begun_ = false;
-    uint8_t order_counter_ = 0;
-    uint8_t decode_candidates_ = MaxCandidates;
-    uint32_t idle_threshold_us_ = 30000;
-    IRRxStats stats_{};
-    std::vector<IRProtocolSpec> protocols_{};
-    hal::RmtRx rmt_rx_{};
+    int gpio_;                                  // assigned GPIO number
+    bool inverted_;                             // true if input signal is inverted
+    bool begun_ = false;                        // begin() was called
+    uint8_t order_counter_ = 0;                 // running order for protocol registration
+    uint8_t decode_candidates_ = MaxCandidates; // max candidates to keep
+    uint32_t idle_threshold_us_ = 30000;        // current idle threshold setting
+    IRRxStats stats_{};                         // runtime RX statistics
+    std::vector<IRProtocolSpec> protocols_{};   // registered protocol list
+    hal::RmtRx rmt_rx_{};                       // HAL receiver instance
   };
 
   class IRSender
@@ -255,14 +255,14 @@ namespace esp32irpk
     bool sendNEC(uint16_t address, uint8_t command, bool repeat = false);
 
   private:
-    int gpio_;
-    bool inverted_;
-    bool begun_ = false;
-    uint8_t order_counter_ = 0;
-    std::vector<IRProtocolSpec> protocols_{};
-    hal::RmtTx rmt_tx_{};
-    static constexpr size_t kMaxEncodedTicks = 2 * 64 + 6;
-    uint16_t encode_buf_[kMaxEncodedTicks]{};
+    int gpio_;                                             // assigned GPIO number
+    bool inverted_;                                        // true if output should be inverted
+    bool begun_ = false;                                   // begin() was called
+    uint8_t order_counter_ = 0;                            // running order for protocol registration
+    std::vector<IRProtocolSpec> protocols_{};              // registered protocol list
+    hal::RmtTx rmt_tx_{};                                  // HAL transmitter instance
+    static constexpr size_t kMaxEncodedTicks = 2 * 64 + 6; // internal buffer size for encoding
+    uint16_t encode_buf_[kMaxEncodedTicks]{};              // scratch buffer for encoded ticks
   };
 
 } // namespace esp32irpk
