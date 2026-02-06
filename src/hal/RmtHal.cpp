@@ -8,6 +8,7 @@
 #include <driver/rmt_encoder.h>
 #include <driver/rmt_rx.h>
 #include <driver/rmt_tx.h>
+#include <soc/soc_caps.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <esp_log.h>
@@ -21,12 +22,23 @@ namespace esp32irpk::hal
   namespace
   {
     constexpr const char *kTag = "ESP32IRPulseKit";
-    // RMT clock: use REF_TICK (1MHz) with divider 10 => resolution 100kHz (1 tick = 10us)
+    // RMT resolution: 100kHz (1 tick = 10us). Clock source is selected per SoC.
     constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us (RMT resolution)
     constexpr uint32_t kRmtTickUs = 10;
     constexpr size_t kMaxRxSymbols = 256;
     constexpr size_t kMaxQueuedFrames = 4;
     constexpr uint32_t kTickUs = 10; // library tick = 10us
+
+    rmt_clock_source_t selectRmtClkSrc()
+    {
+#if defined(SOC_RMT_SUPPORT_REF_TICK) && SOC_RMT_SUPPORT_REF_TICK
+      ESP_LOGV(kTag, "selectRmtClkSrc : RMT_CLK_SRC_REF_TICK");
+      return RMT_CLK_SRC_REF_TICK;
+#else
+      ESP_LOGV(kTag, "selectRmtClkSrc : RMT_CLK_SRC_DEFAULT");
+      return RMT_CLK_SRC_DEFAULT;
+#endif
+    }
 
     std::vector<rmt_symbol_word_t> toSymbols(const esp32irpk::IRRawTickView &raw, bool mark_high)
     {
@@ -60,7 +72,7 @@ namespace esp32irpk::hal
     inverted_ = inverted;
 
     rmt_tx_channel_config_t cfg = {};
-    cfg.clk_src = RMT_CLK_SRC_REF_TICK; // 1MHz base
+    cfg.clk_src = selectRmtClkSrc();
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
     cfg.mem_block_symbols = 64;
     cfg.resolution_hz = kRmtResolutionHz;
@@ -149,7 +161,7 @@ namespace esp32irpk::hal
              gpio_, inverted_ ? 1 : 0, idle_threshold_us_, kRmtTickUs);
 
     rmt_rx_channel_config_t cfg = {};
-    cfg.clk_src = RMT_CLK_SRC_REF_TICK; // 1MHz base, divider to 100kHz
+    cfg.clk_src = selectRmtClkSrc();
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
     cfg.mem_block_symbols = 64;
     cfg.resolution_hz = kRmtResolutionHz;
