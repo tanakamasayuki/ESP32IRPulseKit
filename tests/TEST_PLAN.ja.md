@@ -28,11 +28,11 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | 機能 | host | build | hardware | manual | 状態 |
 | --- | --- | --- | --- | --- | --- |
 | NEC encode/decode roundtrip | ✅ | ✅ | ⬜ | | host/build smoke追加済み |
-| NEC repeat decode | ⬜ | | ⬜ | | 追加予定 |
+| NEC repeat decode | ✅ | | ⬜ | | host smoke追加済み |
 | SONY encode/decode roundtrip | ⬜ | | ⬜ | | 追加予定 |
 | Samsung/JVC encode/decode roundtrip | ⬜ | | ⬜ | | 追加予定 |
 | AEHA可変長decode | ⬜ | | ⬜ | | encode仕様整理後に追加 |
-| 候補順位・score threshold | ⬜ | | | | 追加予定 |
+| 候補順位・score threshold | ✅ | | | | host smoke追加済み |
 | tolerance境界 | ⬜ | | | | 追加予定 |
 | examples build | | ⬜ | | | buildテストで追加 |
 | RC5/RC6 decode | ⬜ | | ⬜ | | 対応範囲の再確認が必要 |
@@ -76,5 +76,4 @@ hardwareテストでは2種類の送信を分けます。
 1. Arduino host基盤を選び、host実行テストを追加する
 2. examplesと最小sketchのbuildテストを追加する
 3. 2台構成のTX/RX実機テストを追加する
-4. NEC normal/repeatのverified fixtureを追加する
-5. 市販リモコンで収集したRAW fixtureをhost/hardwareテストへ取り込む
+4. 市販リモコンで収集したRAW fixtureをhost/hardwareテストへ取り込む

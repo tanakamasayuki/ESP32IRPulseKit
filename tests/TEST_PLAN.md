@@ -28,11 +28,11 @@ IR behavior is affected by the physical environment, so host tests assert RAW/BI
 | Feature | host | build | hardware | manual | Status |
 | --- | --- | --- | --- | --- | --- |
 | NEC encode/decode roundtrip | ✅ | ✅ | ⬜ | | Host and build smoke tests exist |
-| NEC repeat decode | ⬜ | | ⬜ | | Planned |
+| NEC repeat decode | ✅ | | ⬜ | | Host smoke test exists |
 | SONY encode/decode roundtrip | ⬜ | | ⬜ | | Planned |
 | Samsung/JVC encode/decode roundtrip | ⬜ | | ⬜ | | Planned |
 | AEHA variable-length decode | ⬜ | | ⬜ | | After encode semantics are clarified |
-| Candidate ordering and score threshold | ⬜ | | | | Planned |
+| Candidate ordering and score threshold | ✅ | | | | Host smoke test exists |
 | Tolerance boundaries | ⬜ | | | | Planned |
 | Examples build | | ⬜ | | | Planned in build tests |
 | RC5/RC6 decode | ⬜ | | ⬜ | | Supported scope needs review |
@@ -76,5 +76,4 @@ Hardware tests distinguish two send modes.
 1. Select the Arduino host runner and add host runtime tests.
 2. Add build tests for examples and minimal sketches.
 3. Add two-board TX/RX hardware tests.
-4. Add NEC normal/repeat verified fixtures.
-5. Promote captured real remote RAW fixtures into host/hardware tests.
+4. Promote captured real remote RAW fixtures into host/hardware tests.

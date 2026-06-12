@@ -34,3 +34,7 @@ expected:
 - `protocol + bits` 送信: `IRSender` と `IRReceiver` の統合経路を見る
 - `raw_ticks` 送信: 既知波形に対するdecodeを見る
 - `captured` から `verified` への昇格: 手動レビュー後に行う
+
+## verified fixture
+
+`verified/` には、人がレビューした固定RAWを置きます。encode実装から自動生成しただけのデータは `generated/` に置き、`verified/` へ移す前にプロトコル仕様と期待フィールドを確認します。
