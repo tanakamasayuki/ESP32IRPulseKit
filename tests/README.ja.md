@@ -15,6 +15,8 @@ ESP32IRPulseKit のテストは、ソフトウェアだけで完全に制御で�
 
 `tests/` ディレクトリから実行します。
 
+無指定の `pytest` は使いません。`hardware/` には実機と実ポートが必要なテストが含まれるため、必ず対象の親ディレクトリを指定します。
+
 ```sh
 # Arduino host実行テスト
 uv run --env-file .env pytest host
@@ -22,8 +24,11 @@ uv run --env-file .env pytest host
 # Arduino CLIビルドテスト
 uv run --env-file .env pytest build
 
-# 実機テストも含めて実行する場合
-uv run --env-file .env pytest
+# fixtureスキーマ・固定データ検査
+uv run pytest fixtures
+
+# ESP32実機2台のTX/RXテスト
+uv run --env-file .env pytest hardware/tx_rx
 ```
 
 ## ディレクトリ

@@ -20,8 +20,10 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | 環境 | 実行するテスト |
 | --- | --- |
 | ローカル開発 | host、hardware |
-| GitHub Actions | host、build |
+| GitHub Actions | host、build、fixtures |
 | 必要時 | manual |
+
+無指定の `pytest` は使わず、必ず `host`、`build`、`fixtures`、`hardware/tx_rx` のように対象の親ディレクトリを指定します。`hardware/` は実機とローカルSerialポートに依存するため、CI対象にはしません。
 
 ## 初期カバレッジ
 

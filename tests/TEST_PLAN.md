@@ -20,8 +20,10 @@ IR behavior is affected by the physical environment, so host tests assert RAW/BI
 | Environment | Tests |
 | --- | --- |
 | Local development | host, hardware |
-| GitHub Actions | host, build |
+| GitHub Actions | host, build, fixtures |
 | As needed | manual |
+
+Do not run bare `pytest`. Always select a parent directory such as `host`, `build`, `fixtures`, or `hardware/tx_rx`. The `hardware/` tree depends on physical boards and local serial ports, so it is not part of CI.
 
 ## Initial Coverage
 
