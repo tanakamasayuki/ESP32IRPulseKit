@@ -51,6 +51,8 @@ The standard hardware test setup uses two boards.
 - pytest: controls both serial ports and asserts expected protocol/bits/score
 - GPIO/inversion settings: injected through `build_config.toml` from `.env` keys `TEST_IR_TX_GPIO`, `TEST_IR_RX_GPIO`, `TEST_IR_TX_INVERTED`, and `TEST_IR_RX_INVERTED`
 
+The standard automated hardware target is **ESP32 classic** for now. ESP32-S3, ESP32-C3/C6, and other SoCs are checked first with `examples/` and manual runs. If a SoC-specific difference or bug appears, it can be promoted to an optional profile or manual test.
+
 Single-board loopback is auxiliary. Direct GPIO loopback can change the inversion conditions compared with a real IR receiver module, so it is not the primary pass/fail baseline.
 
 The peer board does not initially use a separate reference IR library. Baselines are kept in this order:

@@ -8,6 +8,8 @@ The standard setup uses two boards.
 - RX board: receives with `IRReceiver` and prints decoded results to Serial.
 - pytest: controls both serial ports and checks that the received protocol/bits match the transmitted command.
 
+The standard automated hardware target is ESP32 classic for now. Other SoCs such as ESP32-S3 and ESP32-C3/C6 are checked through `examples/` and manual runs, then promoted to optional profiles only when needed.
+
 Single-board loopback is auxiliary. Direct GPIO loopback can change inversion conditions compared with a real IR receiver module, so it is not the primary pass/fail baseline.
 
 The peer board does not initially use a separate reference IR library. Baseline signal data lives under `tests/fixtures/`, using both `protocol + bits` commands and fixed `raw_ticks`.

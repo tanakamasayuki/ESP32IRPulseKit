@@ -2,6 +2,8 @@
 
 準備中です。
 
+標準対象はESP32 classicです。ESP32-S3など他SoCの確認は、まず `examples/` とmanual確認で行います。
+
 想定する接続:
 
 - TX GPIO -> IR LEDドライバ
