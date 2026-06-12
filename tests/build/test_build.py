@@ -34,5 +34,5 @@ def test_rx_dump_example_builds(tmp_path):
 
 def test_tx_rx_hardware_sketches_build(tmp_path):
     repo = Path(__file__).resolve().parents[2]
-    compile_sketch(repo / "tests" / "hardware" / "tx_rx" / "tx", tmp_path, "tx_esp32")
-    compile_sketch(repo / "tests" / "hardware" / "tx_rx" / "rx", tmp_path, "rx_esp32")
+    compile_sketch(repo / "tests" / "hardware" / "tx_rx", tmp_path, "rx_esp32")
+    compile_sketch(repo / "tests" / "hardware" / "tx_rx" / "peer_tx", tmp_path, "tx_esp32")

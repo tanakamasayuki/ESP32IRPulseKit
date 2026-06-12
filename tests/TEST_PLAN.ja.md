@@ -37,9 +37,9 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | verified fixture schema | ✅ | | | | YAML検査追加済み |
 | examples build | | ⬜ | | | buildテストで追加 |
 | RC5/RC6 decode | ⬜ | | ⬜ | | 対応範囲の再確認が必要 |
-| RMT TX RAW送信 | | ✅ sketch build | ⬜ | | TXスケッチ雛形追加済み |
-| RMT RX RAW受信 | | ✅ sketch build | ⬜ | | RXスケッチ雛形追加済み |
-| TX->RX loop | | | ⬜ | | TX/RX 2台構成で追加予定 |
+| RMT TX RAW送信 | | ✅ sketch build | ⬜ | | TX peerスケッチ追加済み |
+| RMT RX RAW受信 | | ✅ sketch build | ⬜ | | RX dutスケッチ追加済み |
+| TX->RX loop | | | ✅ NEC smoke | | TX/RX 2台構成のpytest追加済み |
 | 市販リモコン受信 | | | | ⬜ | 手動fixture化候補 |
 
 ## hardware構成
@@ -72,7 +72,7 @@ IR信号データは `tests/fixtures/` に置きます。
 
 hardwareテストでは2種類の送信を分けます。
 
-- `SEND protocol bits`: `IRSender` と `IRReceiver` の統合経路を見る
+- `SEND protocol bits`: `IRSender` と `IRReceiver` の統合経路を見る。初期実装は `SEND NEC <address_hex> <command_hex>`
 - `SEND_RAW raw_ticks`: 既知波形に対するdecodeを見る
 
 ## 優先順
