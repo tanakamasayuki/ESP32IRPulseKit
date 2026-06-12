@@ -61,19 +61,6 @@ void loop()
     Serial.print((uint32_t)(b.bits & 0xFFFFFFFFu), HEX);
     Serial.print(" frame_type=");
     Serial.println(b.frame_type == esp32irpk::IRFrameType::REPEAT ? "REPEAT" : "NORMAL");
-    const esp32irpk::IRScoreDetail &sd = c.score_detail;
-    Serial.print("  score_detail: header_err=");
-    Serial.print(sd.header_err_pct_sum);
-    Serial.print(" body_err=");
-    Serial.print(sd.body_err_pct_sum);
-    Serial.print(" extra_err=");
-    Serial.print(sd.extra_err_pct_sum);
-    Serial.print(" scaled=");
-    Serial.print(sd.weighted_err_scaled);
-    Serial.print(" base=");
-    Serial.print((int)sd.score_base);
-    Serial.print(" family_adj=");
-    Serial.println((int)sd.family_adjust);
     printFrame(b);
     Serial.println();
   }
@@ -81,12 +68,11 @@ void loop()
 
 static void printFrame(const esp32irpk::IRDecodedBits &b)
 {
-  using namespace esp32irpk;
   switch (b.protocol_id)
   {
-  case IRProtocolID::NEC:
+  case esp32irpk::IRProtocolID::NEC:
   {
-    frames::NECFrame f = frames::NECFrame::fromBits(b);
+    esp32irpk::frames::NECFrame f = esp32irpk::frames::NECFrame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: NEC REPEAT");
@@ -98,9 +84,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.command, HEX);
     break;
   }
-  case IRProtocolID::AEHA:
+  case esp32irpk::IRProtocolID::AEHA:
   {
-    frames::AEHAFrame f = frames::AEHAFrame::fromBits(b);
+    esp32irpk::frames::AEHAFrame f = esp32irpk::frames::AEHAFrame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: AEHA REPEAT");
@@ -112,9 +98,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println((uint32_t)(f.data & 0xFFFFFFFFu), HEX);
     break;
   }
-  case IRProtocolID::PANASONIC40:
+  case esp32irpk::IRProtocolID::PANASONIC40:
   {
-    frames::Panasonic40Frame f = frames::Panasonic40Frame::fromBits(b);
+    esp32irpk::frames::Panasonic40Frame f = esp32irpk::frames::Panasonic40Frame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: PANASONIC40 REPEAT");
@@ -124,9 +110,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println((uint32_t)(f.data & 0xFFFFFFFFu), HEX);
     break;
   }
-  case IRProtocolID::PANASONIC48:
+  case esp32irpk::IRProtocolID::PANASONIC48:
   {
-    frames::Panasonic48Frame f = frames::Panasonic48Frame::fromBits(b);
+    esp32irpk::frames::Panasonic48Frame f = esp32irpk::frames::Panasonic48Frame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: PANASONIC48 REPEAT");
@@ -138,9 +124,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println((uint32_t)(f.data & 0xFFFFFFFFu), HEX);
     break;
   }
-  case IRProtocolID::SONY12:
+  case esp32irpk::IRProtocolID::SONY12:
   {
-    frames::Sony12Frame f = frames::Sony12Frame::fromBits(b);
+    esp32irpk::frames::Sony12Frame f = esp32irpk::frames::Sony12Frame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: SONY12 REPEAT");
@@ -150,9 +136,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.data, HEX);
     break;
   }
-  case IRProtocolID::SONY15:
+  case esp32irpk::IRProtocolID::SONY15:
   {
-    frames::Sony15Frame f = frames::Sony15Frame::fromBits(b);
+    esp32irpk::frames::Sony15Frame f = esp32irpk::frames::Sony15Frame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: SONY15 REPEAT");
@@ -162,9 +148,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.data, HEX);
     break;
   }
-  case IRProtocolID::SONY20:
+  case esp32irpk::IRProtocolID::SONY20:
   {
-    frames::Sony20Frame f = frames::Sony20Frame::fromBits(b);
+    esp32irpk::frames::Sony20Frame f = esp32irpk::frames::Sony20Frame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: SONY20 REPEAT");
@@ -174,9 +160,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.data, HEX);
     break;
   }
-  case IRProtocolID::SAMSUNG32:
+  case esp32irpk::IRProtocolID::SAMSUNG32:
   {
-    frames::Samsung32Frame f = frames::Samsung32Frame::fromBits(b);
+    esp32irpk::frames::Samsung32Frame f = esp32irpk::frames::Samsung32Frame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: SAMSUNG32 REPEAT");
@@ -188,9 +174,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.command, HEX);
     break;
   }
-  case IRProtocolID::SAMSUNG36:
+  case esp32irpk::IRProtocolID::SAMSUNG36:
   {
-    frames::Samsung36Frame f = frames::Samsung36Frame::fromBits(b);
+    esp32irpk::frames::Samsung36Frame f = esp32irpk::frames::Samsung36Frame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: SAMSUNG36 REPEAT");
@@ -202,9 +188,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.command, HEX);
     break;
   }
-  case IRProtocolID::JVC24:
+  case esp32irpk::IRProtocolID::JVC24:
   {
-    frames::JVC24Frame f = frames::JVC24Frame::fromBits(b);
+    esp32irpk::frames::JVC24Frame f = esp32irpk::frames::JVC24Frame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: JVC24 REPEAT");
@@ -214,9 +200,9 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.data, HEX);
     break;
   }
-  case IRProtocolID::JVC32:
+  case esp32irpk::IRProtocolID::JVC32:
   {
-    frames::JVC32Frame f = frames::JVC32Frame::fromBits(b);
+    esp32irpk::frames::JVC32Frame f = esp32irpk::frames::JVC32Frame::fromBits(b);
     if (f.is_repeat)
     {
       Serial.println("  frame: JVC32 REPEAT");
@@ -226,23 +212,23 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.data, HEX);
     break;
   }
-  case IRProtocolID::RC5:
+  case esp32irpk::IRProtocolID::RC5:
   {
-    frames::RC5Frame f = frames::RC5Frame::fromBits(b);
+    esp32irpk::frames::RC5Frame f = esp32irpk::frames::RC5Frame::fromBits(b);
     Serial.print("  frame: RC5 data=0x");
     Serial.println(f.data, HEX);
     break;
   }
-  case IRProtocolID::RC6_M0_16:
+  case esp32irpk::IRProtocolID::RC6_M0_16:
   {
-    frames::RC6M0Frame f = frames::RC6M0Frame::fromBits(b);
+    esp32irpk::frames::RC6M0Frame f = esp32irpk::frames::RC6M0Frame::fromBits(b);
     Serial.print("  frame: RC6_M0_16 data=0x");
     Serial.println(f.data, HEX);
     break;
   }
-  case IRProtocolID::RC6_M6_32:
+  case esp32irpk::IRProtocolID::RC6_M6_32:
   {
-    frames::RC6M6Frame f = frames::RC6M6Frame::fromBits(b);
+    esp32irpk::frames::RC6M6Frame f = esp32irpk::frames::RC6M6Frame::fromBits(b);
     Serial.print("  frame: RC6_M6_32 data=0x");
     Serial.println((uint32_t)(f.data & 0xFFFFFFFFu), HEX);
     break;

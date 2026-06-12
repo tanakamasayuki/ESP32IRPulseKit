@@ -150,31 +150,6 @@ namespace esp32irpk
     return codec::encodeBitsToRaw(decoded, protocols_.data(), protocols_.size(), out_raw);
   }
 
-  bool IRSender::sendNEC(uint16_t address, uint8_t command, bool repeat)
-  {
-    if (!begun_)
-      return false;
-
-    IRDecodedBits bits{};
-    bits.protocol_id = IRProtocolID::NEC;
-    bits.frame_type = repeat ? IRFrameType::REPEAT : IRFrameType::NORMAL;
-    if (repeat)
-    {
-      bits.bit_length = 0;
-      bits.bits = 0xFFFFFFFFFFFFFFFFULL;
-    }
-    else
-    {
-      bits.bit_length = 32;
-      uint64_t v = 0;
-      v |= static_cast<uint64_t>(address);
-      v |= (static_cast<uint64_t>(command) << 16);
-      v |= (static_cast<uint64_t>(static_cast<uint8_t>(~command)) << 24);
-      bits.bits = v;
-    }
-    return send(bits, 0);
-  }
-
   // ---- Receiver template instantiation (inline in codec/Receiver.inl) ----
 
 } // namespace esp32irpk

@@ -87,7 +87,10 @@ void handleSendNec(const String &line)
     return;
   }
 
-  bool ok = tx.sendNEC(static_cast<uint16_t>(address), static_cast<uint8_t>(command));
+  esp32irpk::frames::NECFrame frame{};
+  frame.address = static_cast<uint16_t>(address);
+  frame.command = static_cast<uint8_t>(command);
+  bool ok = tx.send(frame.toBits(), 0);
   if (!ok)
   {
     Serial.println("TX_ERROR send_failed");

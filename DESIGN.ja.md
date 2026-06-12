@@ -58,7 +58,7 @@ decodeは登録済みprotocolすべてに対して行います。
 
 scoreは公開API上の相対評価値です。絶対値の厳密な意味は固定しません。
 
-`IRScoreDetail` はテストと診断用です。通常利用では `score` と `decoded` を見るだけでよいです。
+scoreの内訳は公開APIにしません。通常利用では `score` と `decoded` を見ます。詳細診断が必要な場合は、将来 `ESP_LOGD` / `ESP_LOGV` のdecode traceとして出力します。
 
 ## 6. Protocol IDの考え方
 

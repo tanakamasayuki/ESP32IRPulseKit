@@ -146,15 +146,6 @@ enum class IRResultFlags : uint8_t {
   RMT_OVERFLOW = 1 << 2,
 };
 
-struct IRScoreDetail {
-  uint16_t header_err_pct_sum = 0;
-  uint16_t body_err_pct_sum = 0;
-  uint16_t extra_err_pct_sum = 0;
-  uint16_t weighted_err_scaled = 0;
-  int16_t score_base = 0;
-  int16_t family_adjust = 0;
-};
-
 struct IRDecodeCandidate {
   IRProtocolID protocol_id = IRProtocolID::UNKNOWN;
   char name[16] = {};
@@ -162,7 +153,6 @@ struct IRDecodeCandidate {
   int16_t score = 0;
   size_t consumed_len = 0;
   IRDecodedBits decoded{};
-  IRScoreDetail score_detail{};
 };
 
 template <size_t MaxCandidates = esp32irpk::kDefaultMaxDecodeCandidates>
@@ -311,8 +301,6 @@ public:
   bool send(const IRDecodedBits* decoded, int8_t repeat_count = -1);
 
   bool encode(const IRDecodedBits& decoded, IRRawTickBuffer& out_raw);
-
-  bool sendNEC(uint16_t address, uint8_t command, bool repeat = false);
 };
 
 }
@@ -346,10 +334,6 @@ public:
 - `out_raw.ticks` と `out_raw.capacity` は呼び出し側が用意します。
 - 成功時は `out_raw.len` に生成tick数を設定します。
 - 失敗時は `false` を返します。
-
-### 6.4 sendNEC
-
-`sendNEC(address, command, repeat)` はNEC用の簡易APIです。汎用処理では `frames::NECFrame::toBits()` と `send(decoded)` の利用を推奨します。
 
 ## 7. Frame型
 

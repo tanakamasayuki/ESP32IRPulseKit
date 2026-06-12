@@ -119,16 +119,6 @@ namespace esp32irpk
     uint32_t raw_truncated_count = 0;  // times raw data was truncated
   };
 
-  struct IRScoreDetail
-  {
-    uint16_t header_err_pct_sum = 0;  // errorPct sum for header/trailer
-    uint16_t body_err_pct_sum = 0;    // errorPct sum for bit body
-    uint16_t extra_err_pct_sum = 0;   // errorPct sum for extra penalties (gaps etc.)
-    uint16_t weighted_err_scaled = 0; // scaled error used in scoring ((header*8 + body + extra + 3) / 4)
-    int16_t score_base = 0;           // score before family adjustment
-    int16_t family_adjust = 0;        // delta applied by family-specific adjustment
-  };
-
   struct IRProtocolSpec
   {
     IRProtocolID protocol_id = IRProtocolID::UNKNOWN;    // unique protocol id
@@ -168,7 +158,6 @@ namespace esp32irpk
     int16_t score = 0;                                // final score after adjustments
     size_t consumed_len = 0;                          // ticks consumed for this decode
     IRDecodedBits decoded{};                          // decoded bit payload
-    IRScoreDetail score_detail{};                     // scoring breakdown
   };
 
   template <size_t MaxCandidates = esp32irpk::kDefaultMaxDecodeCandidates>
@@ -253,8 +242,6 @@ namespace esp32irpk
     bool send(const IRDecodedBits *decoded, int8_t repeat_count = -1); // nullptr -> false
 
     bool encode(const IRDecodedBits &decoded, IRRawTickBuffer &out_raw);
-
-    bool sendNEC(uint16_t address, uint8_t command, bool repeat = false);
 
   private:
     int gpio_;                                             // assigned GPIO number
