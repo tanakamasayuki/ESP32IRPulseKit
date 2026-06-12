@@ -1,0 +1,80 @@
+# TX/RX Two-Board Test
+
+> Japanese: [README.ja.md](README.ja.md)
+
+The standard automated target is ESP32 classic. Other SoCs such as ESP32-S3 are checked first with `examples/` and manual runs.
+
+This directory uses the pytest-embedded peer layout.
+
+- `tx_rx.ino`: RX board, exposed as `dut` in pytest
+- `peer_tx/peer_tx.ino`: TX board, exposed as `peers["tx"]`
+
+Expected wiring:
+
+- TX GPIO -> IR LED driver
+- RX GPIO <- IR receiver module
+- TX/RX boards connected to the PC over USB
+
+Configure ports and GPIOs in `.env`.
+
+```sh
+TEST_SERIAL_PORT_TX_ESP32=/dev/ttyUSB0
+TEST_SERIAL_PORT_RX_ESP32=/dev/ttyUSB1
+TEST_IR_TX_GPIO=4
+TEST_IR_TX_INVERTED=0
+TEST_IR_RX_GPIO=32
+TEST_IR_RX_INVERTED=1
+```
+
+GPIO settings are environment-specific and are not hard-coded in sketches. `build_config.toml` maps `.env` `TEST_IR_*` keys to compile-time defines.
+
+| `.env` | sketch define | Meaning |
+| --- | --- | --- |
+| `TEST_IR_TX_GPIO` | `IR_TX_GPIO` | TX board IR LED output GPIO |
+| `TEST_IR_TX_INVERTED` | `IR_TX_INVERTED` | TX output inversion, usually `0` |
+| `TEST_IR_RX_GPIO` | `IR_RX_GPIO` | RX board IR receiver module input GPIO |
+| `TEST_IR_RX_INVERTED` | `IR_RX_INVERTED` | RX input inversion, commonly `1` for receiver modules |
+
+## Serial Protocol
+
+TX/RX print ready lines after boot.
+
+```text
+TX_READY gpio=<gpio> inverted=<0|1>
+RX_READY gpio=<gpio> inverted=<0|1>
+```
+
+Common command:
+
+| Command | Response |
+| --- | --- |
+| `PING` | `PONG` |
+
+TX command:
+
+| Command | Success response |
+| --- | --- |
+| `SEND NEC <address_hex> <command_hex>` | `TX_OK NEC <address_hex> <command_hex>` |
+
+RX output:
+
+| Output | Meaning |
+| --- | --- |
+| `RX_RAW len=<n>` | RAW received with no decode candidate |
+| `RX_DECODE protocol=<name> score=<score> len=<bits> bits=0x<hex> type=<NORMAL|REPEAT>` | Best decode candidate |
+
+## pytest Flow
+
+1. Put the RX board in receive mode.
+2. Send a command such as `SEND NEC 00ff 34` to the TX board.
+3. Read the RX board Serial decode output.
+4. Assert protocol, bits, and score.
+
+Run example:
+
+```sh
+cd tests
+uv run --env-file .env pytest hardware/tx_rx
+```
+
+Fixed RAW send is planned as `SEND_RAW`. `SEND protocol bits` checks the integrated sender/receiver path, while `SEND_RAW raw_ticks` is for decode behavior against known waveforms.

@@ -1,5 +1,7 @@
 # Arduino host 実行テスト
 
+> English: [README.md](README.md)
+
 Arduino host 環境で実行するロジックテストをここに置きます。
 
 目的は、Arduino API前提の環境に寄せたまま、RMT実機に依存しない処理をassertすることです。

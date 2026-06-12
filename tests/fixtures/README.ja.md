@@ -1,5 +1,7 @@
 # 信号fixture
 
+> English: [README.md](README.md)
+
 テストで使うIR信号データをここに置きます。
 
 ## 種類

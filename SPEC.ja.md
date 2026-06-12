@@ -1,5 +1,7 @@
 # ESP32IRPulseKit 外部仕様
 
+> English: [SPEC.md](SPEC.md)
+
 ESP32IRPulseKit は、ESP32 Arduino Core 3.x / ESP-IDF 5.x の新RMTドライバを使うIRリモコン送受信ライブラリです。
 
 本仕様書は利用者から見えるAPI契約を定義します。実装方針、スコアリングの考え方、ログ方針などは [DESIGN.ja.md](DESIGN.ja.md) を参照してください。

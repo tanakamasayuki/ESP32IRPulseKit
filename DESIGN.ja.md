@@ -1,5 +1,7 @@
 # ESP32IRPulseKit 設計メモ
 
+> English: [DESIGN.md](DESIGN.md)
+
 この文書は実装者向けの設計メモです。外部API契約は [SPEC.ja.md](SPEC.ja.md) に置きます。
 
 ## 1. 設計方針

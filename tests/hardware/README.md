@@ -1,5 +1,7 @@
 # Hardware Automated Tests
 
+> Japanese: [README.ja.md](README.ja.md)
+
 ESP32 hardware tests will live here.
 
 The standard setup uses two boards.

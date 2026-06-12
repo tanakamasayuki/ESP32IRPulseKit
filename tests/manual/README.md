@@ -1,5 +1,7 @@
 # Manual Tests
 
+> Japanese: [README.ja.md](README.ja.md)
+
 Manual tests are limited to checks whose environment cannot be fully controlled in software.
 
 Examples:

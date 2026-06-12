@@ -1,5 +1,7 @@
 # TX/RX 2台構成テスト
 
+> English: [README.md](README.md)
+
 標準対象はESP32 classicです。ESP32-S3など他SoCの確認は、まず `examples/` とmanual確認で行います。
 
 このディレクトリはpytest-embeddedのpeer構成です。

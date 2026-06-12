@@ -1,5 +1,7 @@
 # ビルドテスト
 
+> English: [README.md](README.md)
+
 Arduino CLIでESP32向けにコンパイルできることを確認するテストをここに置きます。
 
 対象:
