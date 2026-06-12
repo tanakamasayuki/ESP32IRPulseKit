@@ -359,7 +359,18 @@ struct NECFrame {
 
 Frame型はdecode/encode本体ではありません。decode/encodeは `IRProtocolSpec` と codec が担当します。
 
-## 8. 戻り値と安全性
+## 8. BITS helper
+
+よく使うFrame生成は `esp32irpk::bits` に小さなhelperを置くことがあります。helperは `IRDecodedBits` を返します。
+
+```cpp
+esp32irpk::IRDecodedBits bits = esp32irpk::bits::nec(0x00ff, 0x34);
+tx.send(bits);
+```
+
+helperは送信APIではありません。送信は常に `IRSender::send()` が担当します。
+
+## 9. 戻り値と安全性
 
 - 例外は使いません。
 - 成否は `bool` で返します。
@@ -368,7 +379,7 @@ Frame型はdecode/encode本体ではありません。decode/encodeは `IRProtoc
 - APIはISRから呼び出してはいけません。
 - 同一インスタンスへの複数スレッド同時呼び出しは未定義です。
 
-## 9. 最小利用例
+## 10. 最小利用例
 
 ```cpp
 #include <ESP32IRPulseKit.h>

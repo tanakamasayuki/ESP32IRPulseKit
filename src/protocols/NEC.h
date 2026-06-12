@@ -79,3 +79,23 @@ namespace esp32irpk::frames
   };
 
 } // namespace esp32irpk::frames
+
+namespace esp32irpk::bits
+{
+
+  inline esp32irpk::IRDecodedBits nec(uint16_t address, uint8_t command)
+  {
+    esp32irpk::frames::NECFrame frame{};
+    frame.address = address;
+    frame.command = command;
+    return frame.toBits();
+  }
+
+  inline esp32irpk::IRDecodedBits necRepeat()
+  {
+    esp32irpk::frames::NECFrame frame{};
+    frame.is_repeat = true;
+    return frame.toBits();
+  }
+
+} // namespace esp32irpk::bits

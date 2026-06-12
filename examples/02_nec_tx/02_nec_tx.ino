@@ -17,11 +17,16 @@ void setup()
 
 void loop()
 {
-  esp32irpk::frames::NECFrame frame{};
-  frame.address = 0x00ff;
-  frame.command = 0x34;
+  esp32irpk::IRDecodedBits bits = esp32irpk::bits::nec(0x00ff, 0x34);
 
-  if (tx.send(frame.toBits()))
+  // en: The lower-level Frame route is also valid:
+  // ja: 低レベルのFrame経由でも同じ信号を作れます:
+  // esp32irpk::frames::NECFrame frame{};
+  // frame.address = 0x00ff;
+  // frame.command = 0x34;
+  // esp32irpk::IRDecodedBits bits = frame.toBits();
+
+  if (tx.send(bits))
   {
     Serial.println("NEC sent");
   }

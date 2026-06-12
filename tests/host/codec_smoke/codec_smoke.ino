@@ -31,9 +31,12 @@ void testNecEncodeDecodeRoundtrip()
   frame.command = 0x34;
 
   esp32irpk::IRDecodedBits bits = frame.toBits();
+  esp32irpk::IRDecodedBits helper_bits = esp32irpk::bits::nec(0x00ff, 0x34);
   EXPECT_EQ("nec/protocol", esp32irpk::IRProtocolID::NEC, bits.protocol_id);
   EXPECT_EQ("nec/length", 32, bits.bit_length);
   EXPECT_EQ("nec/bits", 0xcb3400ffULL, bits.bits);
+  EXPECT_EQ("nec/helper-bits", bits.bits, helper_bits.bits);
+  EXPECT_EQ("nec/helper-length", bits.bit_length, helper_bits.bit_length);
 
   uint16_t ticks[96]{};
   esp32irpk::IRRawTickBuffer raw{};
@@ -145,6 +148,10 @@ void testMsbFirstVariableLengthDecode()
 
 void testNecRepeatDecode()
 {
+  esp32irpk::IRDecodedBits repeat_bits = esp32irpk::bits::necRepeat();
+  EXPECT_TRUE("nec-repeat/helper-frame-type", repeat_bits.isRepeat());
+  EXPECT_EQ("nec-repeat/helper-length", 0, repeat_bits.bit_length);
+
   esp32irpk::IRRawTickView view{};
   view.ticks = test_fixtures::nec_repeat_raw_ticks;
   view.len = test_fixtures::nec_repeat_raw_len;
