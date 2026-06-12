@@ -37,8 +37,8 @@ IR behavior is affected by the physical environment, so host tests assert RAW/BI
 | Verified fixture schema | ✅ | | | | YAML checks added |
 | Examples build | | ⬜ | | | Planned in build tests |
 | RC5/RC6 decode | ⬜ | | ⬜ | | Supported scope needs review |
-| RMT TX RAW send | | | ⬜ | | Planned with two boards |
-| RMT RX RAW receive | | | ⬜ | | Planned with two boards |
+| RMT TX RAW send | | ✅ sketch build | ⬜ | | TX sketch skeleton added |
+| RMT RX RAW receive | | ✅ sketch build | ⬜ | | RX sketch skeleton added |
 | TX->RX loop | | | ⬜ | | Planned with TX/RX ESP32 boards |
 | Real remote receive | | | | ⬜ | Candidate for fixture promotion |
 
@@ -49,6 +49,7 @@ The standard hardware test setup uses two boards.
 - TX board: sends known `protocol + bits` commands or `raw_ticks`
 - RX board: receives with `IRReceiver` and prints decoded results to Serial
 - pytest: controls both serial ports and asserts expected protocol/bits/score
+- GPIO/inversion settings: injected through `build_config.toml` from `.env` keys `TEST_IR_TX_GPIO`, `TEST_IR_RX_GPIO`, `TEST_IR_TX_INVERTED`, and `TEST_IR_RX_INVERTED`
 
 Single-board loopback is auxiliary. Direct GPIO loopback can change the inversion conditions compared with a real IR receiver module, so it is not the primary pass/fail baseline.
 

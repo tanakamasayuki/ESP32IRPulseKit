@@ -13,3 +13,5 @@ IR LEDと受信モジュールを近距離で向かい合わせ、外乱を減�
 1台loopbackは補助扱いです。GPIO直結では実IR受信モジュール経由と反転条件が変わりやすいため、標準の合否基準にはしません。
 
 相手側に別の基準IRライブラリは最初は使いません。基準データは `tests/fixtures/` に置き、`protocol + bits` と `raw_ticks` を使い分けます。
+
+GPIO番号や反転設定は環境依存のため `.env` で管理します。2台構成では `TEST_IR_TX_GPIO`、`TEST_IR_RX_GPIO`、`TEST_IR_TX_INVERTED`、`TEST_IR_RX_INVERTED` を使います。

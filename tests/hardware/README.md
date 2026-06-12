@@ -11,3 +11,5 @@ The standard setup uses two boards.
 Single-board loopback is auxiliary. Direct GPIO loopback can change inversion conditions compared with a real IR receiver module, so it is not the primary pass/fail baseline.
 
 The peer board does not initially use a separate reference IR library. Baseline signal data lives under `tests/fixtures/`, using both `protocol + bits` commands and fixed `raw_ticks`.
+
+GPIO numbers and inversion settings are environment-specific and are configured through `.env`. The two-board setup uses `TEST_IR_TX_GPIO`, `TEST_IR_RX_GPIO`, `TEST_IR_TX_INVERTED`, and `TEST_IR_RX_INVERTED`.

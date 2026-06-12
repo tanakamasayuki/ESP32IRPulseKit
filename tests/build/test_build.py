@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 
-def compile_sketch(sketch: Path, tmp_path: Path):
+def compile_sketch(sketch: Path, tmp_path: Path, profile: str = "esp32"):
     if shutil.which("arduino-cli") is None:
         pytest.skip("arduino-cli is not installed")
 
@@ -15,7 +15,7 @@ def compile_sketch(sketch: Path, tmp_path: Path):
         "arduino-cli",
         "compile",
         "--profile",
-        "esp32",
+        profile,
         "--build-path",
         str(build_path),
         str(sketch),
@@ -30,3 +30,9 @@ def test_codec_smoke_builds(tmp_path):
 def test_rx_dump_example_builds(tmp_path):
     repo = Path(__file__).resolve().parents[2]
     compile_sketch(repo / "examples" / "01_rx_dump", tmp_path)
+
+
+def test_tx_rx_hardware_sketches_build(tmp_path):
+    repo = Path(__file__).resolve().parents[2]
+    compile_sketch(repo / "tests" / "hardware" / "tx_rx" / "tx", tmp_path, "tx_esp32")
+    compile_sketch(repo / "tests" / "hardware" / "tx_rx" / "rx", tmp_path, "rx_esp32")

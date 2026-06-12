@@ -37,8 +37,8 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | verified fixture schema | ✅ | | | | YAML検査追加済み |
 | examples build | | ⬜ | | | buildテストで追加 |
 | RC5/RC6 decode | ⬜ | | ⬜ | | 対応範囲の再確認が必要 |
-| RMT TX RAW送信 | | | ⬜ | | 2台構成で追加予定 |
-| RMT RX RAW受信 | | | ⬜ | | 2台構成で追加予定 |
+| RMT TX RAW送信 | | ✅ sketch build | ⬜ | | TXスケッチ雛形追加済み |
+| RMT RX RAW受信 | | ✅ sketch build | ⬜ | | RXスケッチ雛形追加済み |
 | TX->RX loop | | | ⬜ | | TX/RX 2台構成で追加予定 |
 | 市販リモコン受信 | | | | ⬜ | 手動fixture化候補 |
 
@@ -49,6 +49,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 - TXボード: 既知の `protocol + bits` または `raw_ticks` を送信する
 - RXボード: `IRReceiver` で受信し、Serialへdecode結果を出力する
 - pytest: TX/RX両方のSerialを制御し、期待protocol/bits/scoreをassertする
+- GPIO/反転設定: `.env` の `TEST_IR_TX_GPIO`、`TEST_IR_RX_GPIO`、`TEST_IR_TX_INVERTED`、`TEST_IR_RX_INVERTED` から `build_config.toml` 経由で注入する
 
 1台loopbackは補助扱いにします。GPIO直結では実IR受信モジュールと反転条件が変わりやすく、標準の合否基準にはしません。
 
