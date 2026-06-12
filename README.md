@@ -4,7 +4,7 @@
 
 ESP32 Arduino Core 3.x IR remote send/receive library built on the ESP-IDF 5.x RMT driver.
 
-This repository is pre-release. The external specification is in [SPEC.ja.md](SPEC.ja.md), and the test strategy is in [tests/TEST_PLAN.ja.md](tests/TEST_PLAN.ja.md).
+This repository is pre-release. The external specification is in [SPEC.ja.md](SPEC.ja.md), implementation notes are in [DESIGN.ja.md](DESIGN.ja.md), and the test strategy is in [tests/TEST_PLAN.ja.md](tests/TEST_PLAN.ja.md).
 
 ## Current Direction
 

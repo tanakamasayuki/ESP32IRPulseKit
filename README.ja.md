@@ -2,7 +2,7 @@
 
 ESP32 Arduino Core 3.x / ESP-IDF 5.x の新RMTドライバを使うIRリモコン送受信ライブラリです。
 
-現在はリリース前の開発版です。外部仕様は [SPEC.ja.md](SPEC.ja.md)、テスト方針は [tests/TEST_PLAN.ja.md](tests/TEST_PLAN.ja.md) を参照してください。
+現在はリリース前の開発版です。外部仕様は [SPEC.ja.md](SPEC.ja.md)、設計メモは [DESIGN.ja.md](DESIGN.ja.md)、テスト方針は [tests/TEST_PLAN.ja.md](tests/TEST_PLAN.ja.md) を参照してください。
 
 ## 現在の開発方針
 
