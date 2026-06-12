@@ -16,8 +16,11 @@ ESP32IRPulseKit のテストは、ソフトウェアだけで完全に制御で�
 `tests/` ディレクトリから実行します。
 
 無指定の `pytest` は使いません。`hardware/` には実機と実ポートが必要なテストが含まれるため、必ず対象の親ディレクトリを指定します。
+最初に `.env.example` を `.env` へコピーし、ローカル環境のSerialポートとGPIOに合わせて編集します。
 
 ```sh
+cp .env.example .env
+
 # Arduino host実行テスト
 uv run --env-file .env pytest host
 
@@ -39,9 +42,9 @@ uv run --env-file .env pytest hardware/tx_rx
 - `manual/`: 市販リモコン、外乱光、距離/角度など、環境を完全制御しにくい検証を置きます。
 - `fixtures/`: host/hardware/manualで共有するIR信号データを置きます。
 
-## シリアルポート設定
+## 環境設定
 
-実機テストを追加する段階で `.env.example` の値をローカル環境に合わせます。
+`.env.example` はテンプレートです。直接 `--env-file` に指定せず、`.env` へコピーしてローカル環境に合わせます。
 
 ```sh
 cp .env.example .env

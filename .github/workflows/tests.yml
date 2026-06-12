@@ -31,7 +31,7 @@ jobs:
 
       - name: Run host tests
         working-directory: tests
-        run: uv run --env-file .env.example pytest host
+        run: uv run pytest host
 
   build:
     runs-on: ubuntu-latest
@@ -53,7 +53,7 @@ jobs:
 
       - name: Run build tests
         working-directory: tests
-        run: uv run --env-file .env.example pytest build
+        run: uv run pytest build
 
   fixtures:
     runs-on: ubuntu-latest

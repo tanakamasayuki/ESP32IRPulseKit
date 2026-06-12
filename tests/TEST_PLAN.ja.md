@@ -33,7 +33,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | NEC repeat decode | ✅ | | ⬜ | | host smoke追加済み |
 | SONY encode/decode roundtrip | ⬜ | | ⬜ | | 追加予定 |
 | Samsung/JVC encode/decode roundtrip | ⬜ | | ⬜ | | 追加予定 |
-| AEHA可変長decode | ⬜ | | ⬜ | | encode仕様整理後に追加 |
+| AEHA可変長encode/decode | ✅ | | ⬜ | | host smoke追加済み |
 | 候補順位・score threshold | ✅ | | | | host smoke追加済み |
 | tolerance境界 | ⬜ | | | | 追加予定 |
 | verified fixture schema | ✅ | | | | YAML検査追加済み |

@@ -259,7 +259,7 @@ namespace esp32irpk::codec
         else
         {
           if (bit_is_one)
-            bits |= (1ULL << (spec.bit_length - 1 - i));
+            bits |= (1ULL << (bit_count - 1 - i));
         }
 
         body_err += bit_err;

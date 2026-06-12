@@ -217,7 +217,7 @@ struct IRProtocolSpec {
 - `gap_threshold_us` は decode 時のフレーム分割専用。これ以上の space があればそこで区切る。0 は「分割しない」扱い。
 - `idle_threshold_us` は RMT の無信号判定閾値の推奨値。未指定（0）の場合は受信インスタンスの設定値/既定値を用いる。
 - `repeat_gap_us` はフレーム開始から次フレーム開始までの周期を表し、ペイロードが短いほど実 gap が長くなるプロトコルで利用する（期待 gap = `repeat_gap_us - フレーム長` などの計算に使用）。
-- `default_repeat_count` は送信時の既定再送回数。`send(..., repeat_count=-1)` で参照され、SONY系は3、その他は0を想定する。
+- `default_repeat_count` は送信時の既定再送回数。`send(..., repeat_count=-1)` で参照される。値は「初回送信後に追加で送る回数」を表し、SONY系は2（合計3フレーム）、その他は0を想定する。
 
 ### 3.4 指定初期化の例（参考）
 ```cpp
@@ -446,7 +446,8 @@ public:
 - `IRRawTickBuffer` は呼び出し側がバッファと capacity を用意し、`encode()`/`send()` が `len` を設定する（`len <= capacity` になるよう実装する）。
 - `send(const IRRawTickView*)` は `raw == nullptr` の場合は送信せず `false` を返す（参照版と同様、送信失敗時も `false` を返す）。
 - `send(const IRDecodedBits*)` は `decoded == nullptr` の場合は送信せず `false` を返す（参照版と同様、送信失敗時も `false` を返す）。
-- `repeat_count < 0` の場合は Spec の `default_repeat_count` を用いる（例：SONY系は3、その他は0を想定）。`repeat_count >= 0` なら呼び出し値を優先する。
+- `encode()` / `send(const IRDecodedBits&)` は固定長protocolでは `decoded.bit_length == spec.bit_length` を要求し、可変長protocolでは `min_bit_length..max_bit_length` の範囲を許容する。
+- `repeat_count < 0` の場合は Spec の `default_repeat_count` を用いる（例：SONY系は2で合計3フレーム、その他は0を想定）。`repeat_count >= 0` なら呼び出し値を優先する。
 
 ---
 
@@ -468,7 +469,7 @@ public:
 - 成否は bool 戻り値で表現
 - begin前/後制約を破る呼び出しは false を返す
 - read(false)時のoutは未定義
-- send失敗理由：Spec未登録、bit_length不一致、repeat未対応、RMT TX失敗など
+- send失敗理由：Spec未登録、bit_length範囲外、repeat未対応、RMT TX失敗など
 
 ---
 

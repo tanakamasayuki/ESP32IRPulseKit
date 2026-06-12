@@ -80,6 +80,69 @@ void testNecRejectsUndersizedBuffer()
   EXPECT_EQ("nec/small-buffer-len", 0, raw.len);
 }
 
+void testVariableLengthEncodeDecode()
+{
+  esp32irpk::IRDecodedBits bits{};
+  bits.protocol_id = esp32irpk::IRProtocolID::AEHA;
+  bits.bit_length = 48;
+  bits.bits = 0x123456789abcULL;
+
+  uint16_t ticks[120]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = ticks;
+  raw.capacity = sizeof(ticks) / sizeof(ticks[0]);
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::AEHA};
+  EXPECT_TRUE("variable/encode-48", esp32irpk::codec::encodeBitsToRaw(bits, specs, 1, raw));
+  EXPECT_EQ("variable/raw-len", 99, raw.len);
+
+  esp32irpk::IRRawTickView view{};
+  view.ticks = raw.ticks;
+  view.len = raw.len;
+
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("variable/decode-48", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("variable/candidates", 1, result.count);
+  EXPECT_EQ("variable/length", bits.bit_length, result.candidates[0].decoded.bit_length);
+  EXPECT_EQ("variable/bits", bits.bits, result.candidates[0].decoded.bits);
+}
+
+void testMsbFirstVariableLengthDecode()
+{
+  esp32irpk::IRProtocolSpec spec{};
+  spec.protocol_id = esp32irpk::IRProtocolID::USER1;
+  spec.name[0] = 'M';
+  spec.scheme = esp32irpk::IRProtocolScheme::SPACE_ENC;
+  spec.family = esp32irpk::IRProtocolFamily::UNKNOWN;
+  spec.header = {.mark_us = 1000, .space_us = 500};
+  spec.one = {.mark_us = 100, .space_us = 300};
+  spec.zero = {.mark_us = 100, .space_us = 100};
+  spec.trailer = {.mark_us = 100, .space_us = 0};
+  spec.lsb_first = false;
+  spec.bit_length = 8;
+  spec.min_bit_length = 4;
+  spec.max_bit_length = 8;
+  spec.bit_tol_pct = 25;
+
+  const uint16_t raw_ticks[] = {
+      100, 50,
+      10, 30,
+      10, 10,
+      10, 30,
+      10, 10,
+      10};
+
+  esp32irpk::IRRawTickView view{};
+  view.ticks = raw_ticks;
+  view.len = sizeof(raw_ticks) / sizeof(raw_ticks[0]);
+
+  const esp32irpk::IRProtocolSpec specs[] = {spec};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("msb-variable/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("msb-variable/length", 4, result.candidates[0].decoded.bit_length);
+  EXPECT_EQ("msb-variable/bits", 0x0aULL, result.candidates[0].decoded.bits);
+}
+
 void testNecRepeatDecode()
 {
   esp32irpk::IRRawTickView view{};
@@ -156,6 +219,8 @@ void setup()
 
   testNecEncodeDecodeRoundtrip();
   testNecRejectsUndersizedBuffer();
+  testVariableLengthEncodeDecode();
+  testMsbFirstVariableLengthDecode();
   testNecRepeatDecode();
   testNecFixtureDecode();
   testScoreThresholdFiltersCandidate();

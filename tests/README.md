@@ -16,8 +16,10 @@ ESP32IRPulseKit tests are grouped by whether the test inputs and environment can
 Run from the `tests/` directory.
 
 Do not run bare `pytest`. The `hardware/` tree contains tests that require physical boards and local serial ports, so always select a parent directory explicitly.
+First copy `.env.example` to `.env`, then edit `.env` for your local serial ports and GPIOs.
 
 ```sh
+cp .env.example .env
 uv run --env-file .env pytest host
 uv run --env-file .env pytest build
 uv run pytest fixtures

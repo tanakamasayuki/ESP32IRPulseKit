@@ -35,6 +35,15 @@ namespace esp32irpk::codec
       out.ticks[out.len++] = usToTicks(us);
       return true;
     }
+
+    bool isValidBitLength(const IRProtocolSpec &spec, uint16_t bit_length)
+    {
+      uint16_t min_bits = spec.min_bit_length ? spec.min_bit_length : spec.bit_length;
+      uint16_t max_bits = spec.max_bit_length ? spec.max_bit_length : spec.bit_length;
+      if (min_bits == 0 || max_bits == 0 || min_bits > max_bits)
+        return false;
+      return bit_length >= min_bits && bit_length <= max_bits;
+    }
   } // namespace
 
   bool encodeBitsToRaw(const IRDecodedBits &decoded,
@@ -65,7 +74,7 @@ namespace esp32irpk::codec
       return true;
     }
 
-    if (decoded.bit_length == 0 || decoded.bit_length != spec->bit_length)
+    if (decoded.bit_length == 0 || decoded.bit_length > 64 || !isValidBitLength(*spec, decoded.bit_length))
       return false;
 
     if (!appendPulse(out_raw, spec->header.mark_us) ||

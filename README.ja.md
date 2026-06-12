@@ -18,16 +18,19 @@ ESP32 Arduino Core 3.x / ESP-IDF 5.x の新RMTドライバを使うIRリモコ�
 
 ```sh
 cd tests
-uv run pytest host
+cp .env.example .env
+# Edit .env for your local serial ports and GPIOs.
+uv run --env-file .env pytest host
+uv run --env-file .env pytest build
+uv run pytest fixtures
 ```
 
-`host/` はArduino host実行テスト、`build/` はArduino CLIビルドテスト、`hardware/` はESP32実機テストです。詳細は [tests/README.ja.md](tests/README.ja.md) を参照してください。
+無指定の `pytest` は使わず、`host`、`build`、`fixtures`、`hardware/tx_rx` のように対象を指定します。`host/` はArduino host実行テスト、`build/` はArduino CLIビルドテスト、`hardware/` はESP32実機テストです。詳細は [tests/README.ja.md](tests/README.ja.md) を参照してください。
 
 ## 開発メモ
 
 リリース前のため、APIや内部構造は破壊的変更を許容します。特に次の点は優先的に整理します。
 
 - Arduino/RMT非依存のcodec層とESP32 HAL層の境界
-- 可変長protocolのencode/decode対称性
 - 対応済みprotocolと定義のみのprotocolの明示
 - 自動テスト可能な実機TX/RX loopの整備
