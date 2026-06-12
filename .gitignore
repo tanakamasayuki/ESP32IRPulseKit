@@ -1,14 +1,5 @@
-# Python cache
+.pytest_cache/
+.pytest-results/
+.venv/
 __pycache__/
-
-# Generated bundle and helper downloads
-tools/cache/
-
-# User settings
-.vscode/
-arduino_secrets.h
-*.bat
-#*.txt
-#sketch.yaml
-temp
-libs/
+*.py[cod]

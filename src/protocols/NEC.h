@@ -69,7 +69,7 @@ namespace esp32irpk::frames
       uint64_t bits = 0;
       bits |= static_cast<uint64_t>(address);
       bits |= (static_cast<uint64_t>(command) << 16);
-      bits |= (static_cast<uint64_t>(~command) << 24);
+      bits |= (static_cast<uint64_t>(static_cast<uint8_t>(~command)) << 24);
 
       out.frame_type = esp32irpk::IRFrameType::NORMAL;
       out.bit_length = 32;

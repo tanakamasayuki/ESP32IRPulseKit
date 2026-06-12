@@ -169,7 +169,7 @@ namespace esp32irpk
       uint64_t v = 0;
       v |= static_cast<uint64_t>(address);
       v |= (static_cast<uint64_t>(command) << 16);
-      v |= (static_cast<uint64_t>(~command) << 24);
+      v |= (static_cast<uint64_t>(static_cast<uint8_t>(~command)) << 24);
       bits.bits = v;
     }
     return send(bits, 0);
