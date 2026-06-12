@@ -8,6 +8,7 @@ dependencies = [
     "pytest-embedded-serial>=2.0",
     "pytest-embedded-arduino-cli>=1.1",
     "pytest-html>=4.1.1",
+    "PyYAML>=6.0.2",
 ]
 
 [tool.pytest.ini_options]

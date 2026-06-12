@@ -34,6 +34,7 @@ IR behavior is affected by the physical environment, so host tests assert RAW/BI
 | AEHA variable-length decode | ⬜ | | ⬜ | | After encode semantics are clarified |
 | Candidate ordering and score threshold | ✅ | | | | Host smoke test exists |
 | Tolerance boundaries | ⬜ | | | | Planned |
+| Verified fixture schema | ✅ | | | | YAML checks added |
 | Examples build | | ⬜ | | | Planned in build tests |
 | RC5/RC6 decode | ⬜ | | ⬜ | | Supported scope needs review |
 | RMT TX RAW send | | | ⬜ | | Planned with two boards |

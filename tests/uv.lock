@@ -21,6 +21,7 @@ dependencies = [
     { name = "pytest-embedded-arduino-cli" },
     { name = "pytest-embedded-serial" },
     { name = "pytest-html" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -30,6 +31,7 @@ requires-dist = [
     { name = "pytest-embedded-arduino-cli", specifier = ">=1.1" },
     { name = "pytest-embedded-serial", specifier = ">=2.0" },
     { name = "pytest-html", specifier = ">=4.1.1" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
 ]
 
 [[package]]

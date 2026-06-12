@@ -38,3 +38,5 @@ expected:
 ## verified fixture
 
 `verified/` には、人がレビューした固定RAWを置きます。encode実装から自動生成しただけのデータは `generated/` に置き、`verified/` へ移す前にプロトコル仕様と期待フィールドを確認します。
+
+`test_verified_fixtures.py` は、YAMLの基本schemaと代表プロトコルの期待値を検査します。fixtureを追加したら、可能な範囲でプロトコル固有の検査も追加します。

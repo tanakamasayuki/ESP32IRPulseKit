@@ -34,6 +34,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | AEHA可変長decode | ⬜ | | ⬜ | | encode仕様整理後に追加 |
 | 候補順位・score threshold | ✅ | | | | host smoke追加済み |
 | tolerance境界 | ⬜ | | | | 追加予定 |
+| verified fixture schema | ✅ | | | | YAML検査追加済み |
 | examples build | | ⬜ | | | buildテストで追加 |
 | RC5/RC6 decode | ⬜ | | ⬜ | | 対応範囲の再確認が必要 |
 | RMT TX RAW送信 | | | ⬜ | | 2台構成で追加予定 |

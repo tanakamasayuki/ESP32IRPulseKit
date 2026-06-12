@@ -15,3 +15,5 @@ RAW data should be stored as `raw_ticks` where `1 tick = 10us`, matching the lib
 ## Verified Fixtures
 
 `verified/` contains fixed RAW data reviewed by a human. Data that is only generated from the current encoder belongs in `generated/` until its protocol timing and expected fields are reviewed.
+
+`test_verified_fixtures.py` checks the YAML schema and protocol-specific expectations for representative fixtures. Add protocol-specific checks when promoting new fixtures.
