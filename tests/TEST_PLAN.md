@@ -27,7 +27,7 @@ IR behavior is affected by the physical environment, so host tests assert RAW/BI
 
 | Feature | host | build | hardware | manual | Status |
 | --- | --- | --- | --- | --- | --- |
-| NEC encode/decode roundtrip | ⬜ | ✅ | ⬜ | | Build smoke exists; host runtime test planned |
+| NEC encode/decode roundtrip | ✅ | ✅ | ⬜ | | Host and build smoke tests exist |
 | NEC repeat decode | ⬜ | | ⬜ | | Planned |
 | SONY encode/decode roundtrip | ⬜ | | ⬜ | | Planned |
 | Samsung/JVC encode/decode roundtrip | ⬜ | | ⬜ | | Planned |

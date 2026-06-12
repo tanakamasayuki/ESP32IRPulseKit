@@ -27,7 +27,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 
 | 機能 | host | build | hardware | manual | 状態 |
 | --- | --- | --- | --- | --- | --- |
-| NEC encode/decode roundtrip | ⬜ | ✅ | ⬜ | | build smokeあり、host実行は追加予定 |
+| NEC encode/decode roundtrip | ✅ | ✅ | ⬜ | | host/build smoke追加済み |
 | NEC repeat decode | ⬜ | | ⬜ | | 追加予定 |
 | SONY encode/decode roundtrip | ⬜ | | ⬜ | | 追加予定 |
 | Samsung/JVC encode/decode roundtrip | ⬜ | | ⬜ | | 追加予定 |

@@ -12,6 +12,7 @@ dependencies = [
 
 [tool.pytest.ini_options]
 addopts = "--save-state"
+pythonpath = ["."]
 filterwarnings = [
     "ignore:record_xml_attribute is an experimental feature:pytest.PytestExperimentalApiWarning",
 ]

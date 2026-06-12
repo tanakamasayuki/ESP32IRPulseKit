@@ -7,7 +7,7 @@ ESP32IRPulseKit tests are grouped by whether the test inputs and environment can
 ## Requirements
 
 - `uv`
-- Host tests: Arduino host runtime environment
+- Host tests: Arduino CLI and `lang-ship:host`
 - Build tests: Arduino CLI and ESP32 Arduino Core
 - Hardware tests: Arduino CLI, ESP32 Arduino Core, target ESP32 boards
 
@@ -16,8 +16,8 @@ ESP32IRPulseKit tests are grouped by whether the test inputs and environment can
 Run from the `tests/` directory.
 
 ```sh
-uv run pytest host
-uv run pytest build
+uv run --env-file .env pytest host
+uv run --env-file .env pytest build
 ```
 
 ## Layout

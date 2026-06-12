@@ -18,4 +18,9 @@ Scope:
 
 RMT TX/RX, GPIO inversion, idle threshold, and real IR transmission are covered by `tests/hardware/`.
 
-The Arduino host runner is not selected yet. Runtime tests will be added here after that choice is made.
+The host profile uses `lang-ship:host`. Each test has a `sketch.yaml` with a `host` profile and, when useful, an `esp32` profile for hardware execution through pytest-embedded + Arduino CLI.
+
+```sh
+uv run --env-file .env pytest host
+uv run --env-file .env pytest host --profile=esp32
+```

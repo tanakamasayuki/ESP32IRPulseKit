@@ -7,7 +7,7 @@ ESP32IRPulseKit のテストは、ソフトウェアだけで完全に制御で�
 ## 必要なもの
 
 - `uv`
-- hostテスト: Arduino host実行環境
+- hostテスト: Arduino CLI、`lang-ship:host`
 - buildテスト: Arduino CLI、ESP32 Arduino Core
 - hardwareテスト: Arduino CLI、ESP32 Arduino Core、対象ボード
 
@@ -17,10 +17,10 @@ ESP32IRPulseKit のテストは、ソフトウェアだけで完全に制御で�
 
 ```sh
 # Arduino host実行テスト
-uv run pytest host
+uv run --env-file .env pytest host
 
 # Arduino CLIビルドテスト
-uv run pytest build
+uv run --env-file .env pytest build
 
 # 実機テストも含めて実行する場合
 uv run --env-file .env pytest

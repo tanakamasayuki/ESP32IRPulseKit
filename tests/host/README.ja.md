@@ -16,4 +16,9 @@ Arduino host 環境で実行するロジックテストをここに置きます�
 
 RMT TX/RX、GPIO反転、idle threshold、実IR送受信は `tests/hardware/` で検証します。
 
-Arduino host基盤は未確定です。選定後、このディレクトリに実行テストを追加します。
+hostプロファイルは `lang-ship:host` を使います。各テストは `sketch.yaml` に `host` と必要に応じて `esp32` プロファイルを持ち、pytest-embedded + Arduino CLIで実行します。
+
+```sh
+uv run --env-file .env pytest host
+uv run --env-file .env pytest host --profile=esp32
+```

@@ -9,6 +9,7 @@ def compile_sketch(sketch: Path, tmp_path: Path):
     if shutil.which("arduino-cli") is None:
         pytest.skip("arduino-cli is not installed")
 
+    repo = Path(__file__).resolve().parents[2]
     build_path = tmp_path / sketch.name
     cmd = [
         "arduino-cli",
@@ -19,7 +20,7 @@ def compile_sketch(sketch: Path, tmp_path: Path):
         str(build_path),
         str(sketch),
     ]
-    subprocess.run(cmd, check=True, cwd=sketch.parents[2])
+    subprocess.run(cmd, check=True, cwd=repo)
 
 
 def test_codec_smoke_builds(tmp_path):
