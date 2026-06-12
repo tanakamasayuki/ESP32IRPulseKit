@@ -127,6 +127,7 @@ struct IRProtocolSpec {
 
 - `gap_threshold_us`: decode時のフレーム分割に使うgap下限です。`0` はgap分割なしです。
 - `idle_threshold_us`: RMT idle thresholdの推奨値です。`0` の場合はreceiver設定値を使います。
+- `name`: 表示用の固定長コピー文字列です。最大15文字 + 終端NULです。`addProtocol()` は `IRProtocolSpec` を値としてコピーするため、外部文字列の寿命管理に依存しません。
 - 固定長protocolでは `bit_length` を使います。
 - 可変長protocolでは `min_bit_length..max_bit_length` を使います。`0` の場合は `bit_length` を下限/上限として扱います。
 - `default_repeat_count` は `repeat_count < 0` の送信で使う既定の追加送信回数です。`0` は1回だけ送信、`2` は合計3回送信です。
