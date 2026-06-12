@@ -1,10 +1,14 @@
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 import yaml
 
 
 FIXTURE_DIR = Path(__file__).with_name("verified")
+CPP_HEADER = Path(__file__).resolve().parents[1] / "host" / "codec_smoke" / "verified_fixtures.h"
+CPP_EXPORTER = Path(__file__).with_name("export_cpp_fixtures.py")
 
 
 def load_fixture(name: str):
@@ -64,3 +68,8 @@ def test_nec_repeat_fixture_matches_reviewed_timing():
     assert data["bit_length"] == 0
     assert data["bits"] == 0xFFFFFFFFFFFFFFFF
     assert data["raw_ticks"] == [900, 225, 56]
+
+
+def test_cpp_fixture_header_is_current():
+    generated = subprocess.check_output([sys.executable, str(CPP_EXPORTER)], text=True)
+    assert CPP_HEADER.read_text(encoding="utf-8") == generated

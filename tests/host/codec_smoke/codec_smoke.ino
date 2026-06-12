@@ -1,22 +1,11 @@
 #include <ESP32IRPulseKit.h>
 #include <codec/Encoder.h>
+#include "verified_fixtures.h"
 
 namespace
 {
 int g_total = 0;
 int g_passed = 0;
-
-const uint16_t kNecFixtureTicks[] = {
-    900, 450,
-    56, 169, 56, 169, 56, 169, 56, 169,
-    56, 169, 56, 169, 56, 169, 56, 169,
-    56, 56, 56, 56, 56, 56, 56, 56,
-    56, 56, 56, 56, 56, 56, 56, 56,
-    56, 56, 56, 56, 56, 169, 56, 56,
-    56, 169, 56, 169, 56, 56, 56, 56,
-    56, 169, 56, 169, 56, 56, 56, 169,
-    56, 56, 56, 56, 56, 169, 56, 169,
-    56};
 
 #define EXPECT_TRUE(name, cond)                                                     \
   do                                                                                \
@@ -93,10 +82,9 @@ void testNecRejectsUndersizedBuffer()
 
 void testNecRepeatDecode()
 {
-  const uint16_t repeat_ticks[] = {900, 225, 56};
   esp32irpk::IRRawTickView view{};
-  view.ticks = repeat_ticks;
-  view.len = sizeof(repeat_ticks) / sizeof(repeat_ticks[0]);
+  view.ticks = test_fixtures::nec_repeat_raw_ticks;
+  view.len = test_fixtures::nec_repeat_raw_len;
 
   const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::NEC};
   esp32irpk::IRReceiveResult<4> result{};
@@ -104,20 +92,21 @@ void testNecRepeatDecode()
   EXPECT_EQ("nec-repeat/candidates", 1, result.count);
   EXPECT_EQ("nec-repeat/protocol", esp32irpk::IRProtocolID::NEC, result.candidates[0].protocol_id);
   EXPECT_TRUE("nec-repeat/frame-type", result.candidates[0].decoded.isRepeat());
-  EXPECT_EQ("nec-repeat/length", 0, result.candidates[0].decoded.bit_length);
+  EXPECT_EQ("nec-repeat/length", test_fixtures::nec_repeat_bit_length, result.candidates[0].decoded.bit_length);
 }
 
 void testNecFixtureDecode()
 {
   esp32irpk::IRRawTickView view{};
-  view.ticks = kNecFixtureTicks;
-  view.len = sizeof(kNecFixtureTicks) / sizeof(kNecFixtureTicks[0]);
+  view.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  view.len = test_fixtures::nec_normal_00ff_34_raw_len;
 
   const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::NEC};
   esp32irpk::IRReceiveResult<4> result{};
   EXPECT_TRUE("nec-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
   EXPECT_EQ("nec-fixture/candidates", 1, result.count);
-  EXPECT_EQ("nec-fixture/bits", 0xcb3400ffULL, result.candidates[0].decoded.bits);
+  EXPECT_EQ("nec-fixture/bits", test_fixtures::nec_normal_00ff_34_bits, result.candidates[0].decoded.bits);
+  EXPECT_EQ("nec-fixture/length", test_fixtures::nec_normal_00ff_34_bit_length, result.candidates[0].decoded.bit_length);
 
   esp32irpk::frames::NECFrame frame =
       esp32irpk::frames::NECFrame::fromBits(result.candidates[0].decoded);
@@ -128,8 +117,8 @@ void testNecFixtureDecode()
 void testScoreThresholdFiltersCandidate()
 {
   esp32irpk::IRRawTickView view{};
-  view.ticks = kNecFixtureTicks;
-  view.len = sizeof(kNecFixtureTicks) / sizeof(kNecFixtureTicks[0]);
+  view.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  view.len = test_fixtures::nec_normal_00ff_34_raw_len;
 
   const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::NEC};
   esp32irpk::IRReceiveResult<4> result{};
@@ -149,8 +138,8 @@ void testCandidateOrderBreaksScoreTies()
   const esp32irpk::IRProtocolSpec specs[] = {first, second};
 
   esp32irpk::IRRawTickView view{};
-  view.ticks = kNecFixtureTicks;
-  view.len = sizeof(kNecFixtureTicks) / sizeof(kNecFixtureTicks[0]);
+  view.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  view.len = test_fixtures::nec_normal_00ff_34_raw_len;
 
   esp32irpk::IRReceiveResult<4> result{};
   EXPECT_TRUE("candidate-order/decode", esp32irpk::codec::decodeRawToBits(view, specs, 2, 4, 0, result));
