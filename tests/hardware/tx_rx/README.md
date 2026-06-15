@@ -2,7 +2,7 @@
 
 > Japanese: [README.ja.md](README.ja.md)
 
-The standard automated target is ESP32 classic. Other SoCs such as ESP32-S3 are checked first with `examples/` and manual runs.
+The standard automated target is a two-board ESP32-S3 setup. Other SoCs such as ESP32 classic are checked first with `examples/` and manual runs.
 
 This directory uses the pytest-embedded peer layout.
 
@@ -18,8 +18,8 @@ Expected wiring:
 Configure ports and GPIOs in `.env`.
 
 ```sh
-TEST_SERIAL_PORT_TX_ESP32=/dev/ttyUSB0
-TEST_SERIAL_PORT_RX_ESP32=/dev/ttyUSB1
+TEST_SERIAL_PORT_TX_ESP32S3=/dev/ttyUSB0
+TEST_SERIAL_PORT_RX_ESP32S3=/dev/ttyUSB1
 TEST_IR_TX_GPIO=4
 TEST_IR_TX_INVERTED=0
 TEST_IR_RX_GPIO=32

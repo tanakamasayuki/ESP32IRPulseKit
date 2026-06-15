@@ -2,7 +2,7 @@
 
 > English: [README.md](README.md)
 
-標準対象はESP32 classicです。ESP32-S3など他SoCの確認は、まず `examples/` とmanual確認で行います。
+標準対象はESP32-S3 2台構成です。ESP32 classicなど他SoCの確認は、まず `examples/` とmanual確認で行います。
 
 このディレクトリはpytest-embeddedのpeer構成です。
 
@@ -18,8 +18,8 @@
 `.env` では次のポートとGPIOを設定します。
 
 ```sh
-TEST_SERIAL_PORT_TX_ESP32=/dev/ttyUSB0
-TEST_SERIAL_PORT_RX_ESP32=/dev/ttyUSB1
+TEST_SERIAL_PORT_TX_ESP32S3=/dev/ttyUSB0
+TEST_SERIAL_PORT_RX_ESP32S3=/dev/ttyUSB1
 TEST_IR_TX_GPIO=4
 TEST_IR_TX_INVERTED=0
 TEST_IR_RX_GPIO=32

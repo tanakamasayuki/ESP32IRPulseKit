@@ -53,7 +53,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 - pytest: TX/RX両方のSerialを制御し、期待protocol/bits/scoreをassertする
 - GPIO/反転設定: `.env` の `TEST_IR_TX_GPIO`、`TEST_IR_RX_GPIO`、`TEST_IR_TX_INVERTED`、`TEST_IR_RX_INVERTED` から `build_config.toml` 経由で注入する
 
-標準の自動hardware対象は当面 **ESP32 classic** のみとします。ESP32-S3、ESP32-C3/C6など他SoCは、まず `examples/` とmanual確認で動作を見ます。特定SoCで差分や不具合が見つかった場合に、optional profileまたはmanual testとして昇格します。
+標準の自動hardware対象は当面 **ESP32-S3 2台構成** とします。ESP32 classic、ESP32-C3/C6など他SoCは、まず `examples/` とmanual確認で動作を見ます。特定SoCで差分や不具合が見つかった場合に、optional profileまたはmanual testとして昇格します。
 
 1台loopbackは補助扱いにします。GPIO直結では実IR受信モジュールと反転条件が変わりやすく、標準の合否基準にはしません。
 
