@@ -25,6 +25,8 @@ namespace esp32irpk::hal
     // RMT resolution: 100kHz (1 tick = 10us). Clock source is selected per SoC.
     constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us (RMT resolution)
     constexpr uint32_t kRmtTickUs = 10;
+    constexpr uint32_t kDefaultCarrierFrequencyHz = 38000;
+    constexpr float kDefaultCarrierDuty = 0.33f;
     constexpr size_t kMaxRxSymbols = 256;
     constexpr size_t kMaxQueuedFrames = 4;
     constexpr uint32_t kTickUs = 10; // library tick = 10us
@@ -81,6 +83,18 @@ namespace esp32irpk::hal
 
     if (rmt_new_tx_channel(&cfg, reinterpret_cast<rmt_channel_handle_t *>(&tx_channel_)) != ESP_OK)
       return false;
+
+    rmt_carrier_config_t carrier_cfg = {};
+    carrier_cfg.frequency_hz = kDefaultCarrierFrequencyHz;
+    carrier_cfg.duty_cycle = kDefaultCarrierDuty;
+    carrier_cfg.flags.polarity_active_low = false;
+    carrier_cfg.flags.always_on = false;
+    if (rmt_apply_carrier(reinterpret_cast<rmt_channel_handle_t>(tx_channel_), &carrier_cfg) != ESP_OK)
+    {
+      rmt_del_channel(reinterpret_cast<rmt_channel_handle_t>(tx_channel_));
+      tx_channel_ = nullptr;
+      return false;
+    }
 
     rmt_copy_encoder_config_t enc_cfg = {};
     if (rmt_new_copy_encoder(&enc_cfg, reinterpret_cast<rmt_encoder_handle_t *>(&tx_encoder_)) != ESP_OK)
