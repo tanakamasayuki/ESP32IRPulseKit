@@ -82,7 +82,16 @@ scoreの内訳は公開APIにしません。通常利用では `score` と `deco
 
 SONY系は合計3フレームが必要な機器があるため、`default_repeat_count = 2` とします。
 
-## 8. ログ方針
+## 8. 送信carrier
+
+RMT TXは通常のIR受信モジュールで受信できるよう、38kHz carrier変調を有効にします。
+
+- RAW/BITSのtick列はmark/spaceの包絡線を表す
+- HALはmark区間にcarrierを重畳してGPIOへ出力する
+- 現時点では公開APIでcarrier周波数を変更しない
+- 送受信hardware smokeはcarrier設定漏れを検出できる必要がある
+
+## 9. ログ方針
 
 ESP32実機ではESP-IDFの `ESP_LOGx` 系を使います。
 
@@ -94,13 +103,13 @@ ESP32実機ではESP-IDFの `ESP_LOGx` 系を使います。
 
 通常運用では `D` までを実用ログ、`V` は問題解析時のみ使います。
 
-## 9. コメント規約
+## 10. コメント規約
 
 - ライブラリ実装内のコメントは英語
 - examplesやテストREADMEは必要に応じて日本語/英語を分ける
 - サンプルコードでは `using namespace` を避け、`esp32irpk::` を明示する
 
-## 10. テスト方針
+## 11. テスト方針
 
 テスト全体の方針は [tests/TEST_PLAN.ja.md](tests/TEST_PLAN.ja.md) に置きます。
 

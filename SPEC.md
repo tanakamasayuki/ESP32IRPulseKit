@@ -317,6 +317,7 @@ public:
 - Returns `false` when `raw.ticks == nullptr` or `raw.len == 0`.
 - Pointer overloads return `false` for `nullptr`.
 - For RAW send, `repeat_count < 0` is treated as `0`.
+- RMT TX output is modulated with a 38kHz carrier for IR receiver modules. There is no public carrier-frequency configuration API yet.
 
 ### 6.2 BITS Send
 

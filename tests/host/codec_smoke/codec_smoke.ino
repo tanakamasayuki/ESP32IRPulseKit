@@ -165,6 +165,43 @@ void testNecRepeatDecode()
   EXPECT_EQ("nec-repeat/length", test_fixtures::nec_repeat_bit_length, result.candidates[0].decoded.bit_length);
 }
 
+void testNecRepeatEncode()
+{
+  esp32irpk::IRDecodedBits repeat_bits = esp32irpk::bits::necRepeat();
+  uint16_t ticks[8]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = ticks;
+  raw.capacity = sizeof(ticks) / sizeof(ticks[0]);
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::NEC};
+  EXPECT_TRUE("nec-repeat/encode", esp32irpk::codec::encodeBitsToRaw(repeat_bits, specs, 1, raw));
+  EXPECT_EQ("nec-repeat/raw-len", test_fixtures::nec_repeat_raw_len, raw.len);
+  for (size_t i = 0; i < test_fixtures::nec_repeat_raw_len; ++i)
+  {
+    EXPECT_EQ("nec-repeat/raw-tick", test_fixtures::nec_repeat_raw_ticks[i], raw.ticks[i]);
+  }
+}
+
+void testSenderEncodeLifecycle()
+{
+  esp32irpk::IRSender tx(4);
+  esp32irpk::IRDecodedBits bits = esp32irpk::bits::nec(0x00ff, 0x34);
+  uint16_t ticks[96]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = ticks;
+  raw.capacity = sizeof(ticks) / sizeof(ticks[0]);
+
+  EXPECT_TRUE("sender-encode/before-begin", !tx.encode(bits, raw));
+  EXPECT_TRUE("sender-encode/null-decoded", !tx.send(static_cast<const esp32irpk::IRDecodedBits *>(nullptr)));
+  EXPECT_TRUE("sender-encode/null-raw", !tx.send(static_cast<const esp32irpk::IRRawTickView *>(nullptr)));
+  EXPECT_TRUE("sender-encode/begin", tx.begin());
+  EXPECT_TRUE("sender-encode/after-begin", tx.encode(bits, raw));
+  EXPECT_EQ("sender-encode/raw-len", 67, raw.len);
+  EXPECT_TRUE("sender-encode/set-pin-after-begin", !tx.setPin(5));
+  EXPECT_TRUE("sender-encode/second-begin", !tx.begin());
+  tx.end();
+}
+
 void testNecFixtureDecode()
 {
   esp32irpk::IRRawTickView view{};
@@ -229,6 +266,8 @@ void setup()
   testVariableLengthEncodeDecode();
   testMsbFirstVariableLengthDecode();
   testNecRepeatDecode();
+  testNecRepeatEncode();
+  testSenderEncodeLifecycle();
   testNecFixtureDecode();
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();

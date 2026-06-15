@@ -317,6 +317,7 @@ public:
 - `raw.ticks == nullptr` または `raw.len == 0` は `false` を返します。
 - pointer overloadは `nullptr` を渡すと `false` を返します。
 - RAW送信では `repeat_count < 0` は `0` と同じです。
+- RMT TX出力はIR受信モジュール向けに38kHz carrierで変調します。carrier周波数の公開設定APIは現時点では持ちません。
 
 ### 6.2 BITS送信
 

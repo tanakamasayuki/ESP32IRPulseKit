@@ -82,7 +82,16 @@ Examples:
 
 Some Sony devices require 3 total frames, so Sony defaults use `default_repeat_count = 2`.
 
-## 8. Logging Policy
+## 8. TX Carrier
+
+RMT TX enables 38kHz carrier modulation so common IR receiver modules can receive the signal.
+
+- RAW/BITS tick arrays represent the mark/space envelope
+- The HAL overlays the carrier during mark periods before driving GPIO
+- Carrier frequency is not configurable through the public API yet
+- Hardware TX/RX smoke tests must catch missing carrier configuration
+
+## 9. Logging Policy
 
 On ESP32 hardware, use ESP-IDF `ESP_LOGx`.
 
@@ -94,13 +103,13 @@ On ESP32 hardware, use ESP-IDF `ESP_LOGx`.
 
 `D` is the practical upper level for normal diagnostics. `V` is for issue investigation.
 
-## 9. Comment Policy
+## 10. Comment Policy
 
 - Library implementation comments are English
 - Examples and test READMEs can be split into Japanese and English files
 - Sample code avoids `using namespace` and writes `esp32irpk::` explicitly
 
-## 10. Test Strategy
+## 11. Test Strategy
 
 The full test strategy is in [tests/TEST_PLAN.md](tests/TEST_PLAN.md).
 
