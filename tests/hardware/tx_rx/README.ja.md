@@ -18,8 +18,8 @@
 `.env` では次のポートとGPIOを設定します。
 
 ```sh
-TEST_SERIAL_PORT_TX_ESP32S3=/dev/ttyUSB0
 TEST_SERIAL_PORT_RX_ESP32S3=/dev/ttyUSB1
+TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3=/dev/ttyUSB0
 TEST_IR_TX_GPIO=4
 TEST_IR_TX_INVERTED=0
 TEST_IR_RX_GPIO=32
@@ -55,6 +55,10 @@ TXコマンド:
 | コマンド | 成功応答 |
 | --- | --- |
 | `SEND NEC <address_hex> <command_hex>` | `TX_OK NEC <address_hex> <command_hex>` |
+| `LOOP NEC <address_hex> <command_hex> [interval_ms]` | `TX_LOOP NEC <address_hex> <command_hex>` |
+| `STOP` | `TX_STOPPED` |
+
+`LOOP NEC` は配線確認用です。TXは `TX_LOOP_SENT` を出しながら継続送信します。受信モジュールのLEDやRX側Serialの `RX_RAW` / `RX_DECODE` を見て、IR LED、受信モジュール、向き、距離、GPIO設定を切り分けます。`interval_ms` は10進数で、未指定時は `250` です。
 
 RX出力:
 
@@ -75,6 +79,18 @@ RX出力:
 ```sh
 cd tests
 uv run --env-file .env pytest hardware/tx_rx
+```
+
+自動assertの前に原始的に確認する場合は、TX側Serialへ次を送ります。
+
+```text
+LOOP NEC 00ff 34 250
+```
+
+止める場合:
+
+```text
+STOP
 ```
 
 固定RAWを送る場合は `SEND_RAW` を使う想定です。`SEND protocol bits` は送受信統合経路、`SEND_RAW raw_ticks` は既知波形に対するdecode寄りの検証として分けます。
