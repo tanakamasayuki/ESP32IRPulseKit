@@ -157,13 +157,6 @@ namespace esp32irpk::hal
     return err == ESP_OK;
   }
 
-  bool RmtTx::encode(const esp32irpk::IRDecodedBits &decoded, esp32irpk::IRRawTickBuffer &out_raw)
-  {
-    (void)decoded;
-    (void)out_raw;
-    return false;
-  }
-
   bool RmtRx::begin(int gpio, bool inverted, uint32_t idle_threshold_us)
   {
     if (begun_)
@@ -434,15 +427,6 @@ namespace esp32irpk::hal
   {
     (void)raw;
     (void)repeat_count;
-    if (!begun_)
-      return false;
-    return false;
-  }
-
-  bool RmtTx::encode(const esp32irpk::IRDecodedBits &decoded, esp32irpk::IRRawTickBuffer &out_raw)
-  {
-    (void)decoded;
-    (void)out_raw;
     if (!begun_)
       return false;
     return false;

@@ -19,14 +19,13 @@ namespace esp32irpk
 namespace esp32irpk::hal
 {
 
-  // Stub HAL for RMT TX/RX. Actual implementation should map to ESP-IDF RMT driver.
+  // Internal RMT TX/RX wrapper. Public encoding/decoding stays in codec/.
   class RmtTx
   {
   public:
     bool begin(int gpio, bool inverted);
     void end();
     bool send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count);
-    bool encode(const esp32irpk::IRDecodedBits &decoded, esp32irpk::IRRawTickBuffer &out_raw);
 
   private:
     int gpio_ = -1;

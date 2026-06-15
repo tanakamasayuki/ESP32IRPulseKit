@@ -290,6 +290,30 @@ void testDecodeCandidateLimitZero()
   EXPECT_EQ("candidate-limit-zero/count", 0, result.count);
 }
 
+void testDecodeConsumesConcatenatedFramePrefix()
+{
+  uint16_t ticks[96]{};
+  size_t pos = 0;
+  for (size_t i = 0; i < test_fixtures::nec_normal_00ff_34_raw_len; ++i)
+  {
+    ticks[pos++] = test_fixtures::nec_normal_00ff_34_raw_ticks[i];
+  }
+  ticks[pos++] = 3000; // 30ms gap in ticks
+  ticks[pos++] = 900;  // next NEC header mark fragment
+  ticks[pos++] = 450;  // next NEC header space fragment
+
+  esp32irpk::IRRawTickView view{};
+  view.ticks = ticks;
+  view.len = pos;
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::NEC};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("concat/decode-first", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("concat/consumed-len", test_fixtures::nec_normal_00ff_34_raw_len + 1, result.candidates[0].consumed_len);
+  EXPECT_EQ("concat/raw-len", result.candidates[0].consumed_len, result.raw.len);
+  EXPECT_EQ("concat/bits", test_fixtures::nec_normal_00ff_34_bits, result.candidates[0].decoded.bits);
+}
+
 void testFrameConversions()
 {
   esp32irpk::frames::Sony12Frame sony12{};
@@ -355,6 +379,7 @@ void setup()
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();
   testDecodeCandidateLimitZero();
+  testDecodeConsumesConcatenatedFramePrefix();
   testFrameConversions();
 
   Serial.print("TEST done ");
