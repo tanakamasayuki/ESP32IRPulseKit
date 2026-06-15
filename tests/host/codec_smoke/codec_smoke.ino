@@ -254,6 +254,88 @@ void testCandidateOrderBreaksScoreTies()
   EXPECT_EQ("candidate-order/first", esp32irpk::IRProtocolID::USER2, result.candidates[0].protocol_id);
   EXPECT_EQ("candidate-order/second", esp32irpk::IRProtocolID::USER1, result.candidates[1].protocol_id);
 }
+
+void testReceiverDecodeLifecycle()
+{
+  esp32irpk::IRRawTickView view{};
+  view.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  view.len = test_fixtures::nec_normal_00ff_34_raw_len;
+
+  esp32irpk::IRReceiver<2> rx(4);
+  esp32irpk::IRReceiveResult<2> result{};
+  EXPECT_TRUE("receiver-decode/no-protocol", !rx.decode(view, result));
+
+  EXPECT_TRUE("receiver-decode/add-nec", rx.addProtocol(esp32irpk::specs::NEC));
+  EXPECT_TRUE("receiver-decode/works-before-begin", rx.decode(view, result));
+  EXPECT_EQ("receiver-decode/count", 1, result.count);
+  EXPECT_EQ("receiver-decode/name-0", 'N', result.candidates[0].name[0]);
+  EXPECT_EQ("receiver-decode/name-1", 'E', result.candidates[0].name[1]);
+  EXPECT_EQ("receiver-decode/name-2", 'C', result.candidates[0].name[2]);
+  EXPECT_EQ("receiver-decode/name-nul", '\0', result.candidates[0].name[3]);
+
+  EXPECT_TRUE("receiver-decode/clear", rx.clearProtocols());
+  EXPECT_TRUE("receiver-decode/after-clear", !rx.decode(view, result));
+}
+
+void testDecodeCandidateLimitZero()
+{
+  esp32irpk::IRRawTickView view{};
+  view.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  view.len = test_fixtures::nec_normal_00ff_34_raw_len;
+
+  esp32irpk::IRReceiveResult<4> result{};
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::NEC};
+  EXPECT_TRUE("candidate-limit-zero/reject",
+              !esp32irpk::codec::decodeRawToBits(view, specs, 1, 0, 0, result));
+  EXPECT_EQ("candidate-limit-zero/count", 0, result.count);
+}
+
+void testFrameConversions()
+{
+  esp32irpk::frames::Sony12Frame sony12{};
+  sony12.data = 0x1abc;
+  esp32irpk::IRDecodedBits sony12_bits = sony12.toBits();
+  EXPECT_EQ("frame/sony12-protocol", esp32irpk::IRProtocolID::SONY12, sony12_bits.protocol_id);
+  EXPECT_EQ("frame/sony12-length", 12, sony12_bits.bit_length);
+  EXPECT_EQ("frame/sony12-mask", 0x0abcULL, sony12_bits.bits);
+  EXPECT_EQ("frame/sony12-from", 0x0abcu, esp32irpk::frames::Sony12Frame::fromBits(sony12_bits).data);
+
+  esp32irpk::frames::Sony15Frame sony15{};
+  sony15.data = 0xffff;
+  esp32irpk::IRDecodedBits sony15_bits = sony15.toBits();
+  EXPECT_EQ("frame/sony15-length", 15, sony15_bits.bit_length);
+  EXPECT_EQ("frame/sony15-mask", 0x7fffULL, sony15_bits.bits);
+
+  esp32irpk::frames::Sony20Frame sony20{};
+  sony20.data = 0x1fffff;
+  esp32irpk::IRDecodedBits sony20_bits = sony20.toBits();
+  EXPECT_EQ("frame/sony20-length", 20, sony20_bits.bit_length);
+  EXPECT_EQ("frame/sony20-mask", 0x0fffffULL, sony20_bits.bits);
+
+  esp32irpk::frames::Samsung36Frame samsung36{};
+  samsung36.address = 0xabcd;
+  samsung36.command = 0x1abcde;
+  esp32irpk::IRDecodedBits samsung36_bits = samsung36.toBits();
+  EXPECT_EQ("frame/samsung36-length", 36, samsung36_bits.bit_length);
+  EXPECT_EQ("frame/samsung36-bits", 0xabcdeabcdULL, samsung36_bits.bits);
+  esp32irpk::frames::Samsung36Frame samsung36_roundtrip =
+      esp32irpk::frames::Samsung36Frame::fromBits(samsung36_bits);
+  EXPECT_EQ("frame/samsung36-address", 0xabcdu, samsung36_roundtrip.address);
+  EXPECT_EQ("frame/samsung36-command", 0xabcdeu, samsung36_roundtrip.command);
+
+  esp32irpk::frames::JVC24Frame jvc24{};
+  jvc24.data = 0x1abcdef;
+  esp32irpk::IRDecodedBits jvc24_bits = jvc24.toBits();
+  EXPECT_EQ("frame/jvc24-length", 24, jvc24_bits.bit_length);
+  EXPECT_EQ("frame/jvc24-mask", 0xabcdefULL, jvc24_bits.bits);
+
+  esp32irpk::frames::Panasonic48Frame panasonic48{};
+  panasonic48.data = 0x123456789abcULL;
+  esp32irpk::IRDecodedBits panasonic48_bits = panasonic48.toBits();
+  EXPECT_EQ("frame/panasonic48-protocol", esp32irpk::IRProtocolID::PANASONIC48, panasonic48_bits.protocol_id);
+  EXPECT_EQ("frame/panasonic48-length", 48, panasonic48_bits.bit_length);
+  EXPECT_EQ("frame/panasonic48-bits", 0x123456789abcULL, panasonic48_bits.bits);
+}
 } // namespace
 
 void setup()
@@ -271,6 +353,9 @@ void setup()
   testNecFixtureDecode();
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();
+  testReceiverDecodeLifecycle();
+  testDecodeCandidateLimitZero();
+  testFrameConversions();
 
   Serial.print("TEST done ");
   Serial.print(g_passed);
