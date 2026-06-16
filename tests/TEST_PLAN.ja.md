@@ -29,18 +29,22 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 
 | 機能 | host | build | hardware | manual | 状態 |
 | --- | --- | --- | --- | --- | --- |
-| NEC encode/decode roundtrip | ✅ | ✅ | ⬜ | | host/build smoke追加済み |
-| NEC repeat decode | ✅ | | ⬜ | | host smoke追加済み |
-| SONY encode/decode roundtrip | ⬜ | | ⬜ | | 追加予定 |
-| Samsung/JVC encode/decode roundtrip | ⬜ | | ⬜ | | 追加予定 |
-| AEHA可変長encode/decode | ✅ | | ⬜ | | host smoke追加済み |
+| NEC encode/decode roundtrip | ✅ | ✅ | ✅ NEC smoke | | host/build/2台smoke追加済み |
+| NEC repeat encode/decode | ✅ | | ⬜ | | host smoke追加済み |
+| SONY decode | ✅ | | ⬜ | | Sony12 fixture host test。SONY15/20は未対応 |
+| Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test。SAMSUNG36は未対応 |
+| JVC decode | ✅ | | ⬜ | | JVC24 fixture host test。JVC32は未対応 |
+| Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test。PANASONIC40は未対応 |
+| AEHA可変長encode/decode | ✅ | | ⬜ | | host smoke + MSB-first可変長test |
+| RC5/RC6 decode | ✅ | | ⬜ | | RC5・RC6_M0・RC6_M6 fixture host test |
 | 候補順位・score threshold | ✅ | | | | host smoke追加済み |
+| encode拒否・不正入力 | ✅ | | | | バッファ不足・未知ID・bit長不一致 |
+| RAWのみモード(候補0) | ✅ | | | | host smoke追加済み |
 | tolerance境界 | ⬜ | | | | 追加予定 |
 | verified fixture schema | ✅ | | | | YAML検査追加済み |
 | examples build | | ⬜ | | | buildテストで追加 |
-| RC5/RC6 decode | ⬜ | | ⬜ | | 対応範囲の再確認が必要 |
-| RMT TX RAW送信 | | ✅ sketch build | ⬜ | | TX peerスケッチ追加済み |
-| RMT RX RAW受信 | | ✅ sketch build | ⬜ | | RX dutスケッチ追加済み |
+| RMT TX RAW送信 | | ✅ sketch build | ✅ NEC smoke | | TX peerスケッチ + 2台smoke |
+| RMT RX RAW受信 | | ✅ sketch build | ✅ NEC smoke | | RX dutスケッチ + 2台smoke |
 | TX->RX loop | | | ✅ NEC smoke | | TX/RX 2台構成のpytest追加済み |
 | 市販リモコン受信 | | | | ⬜ | 手動fixture化候補 |
 
