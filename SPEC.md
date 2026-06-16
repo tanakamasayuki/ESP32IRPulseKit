@@ -221,11 +221,36 @@ The following settings are valid only before `begin()`. They return `false` afte
 - `setIdleThresholdUs()`
 - `setScoreThreshold()`
 
-Default registration at `begin()`:
+### 4.1 Protocol Selection
 
-- `IRReceiver`: if the decode candidate count is at least 1 and no protocols are registered, built-in protocols are registered.
-- `IRReceiver`: if the decode candidate count is 0, RAW-only mode is used and built-in protocols are not registered.
-- `IRSender`: if no protocols are registered, built-in protocols are registered.
+`addProtocol()` registers a protocol spec. It is valid only before `begin()`.
+
+- The spec is copied by value.
+- If a spec with the same `protocol_id` is already registered, `addProtocol()` replaces it; otherwise the spec is appended.
+- To customize or override a built-in protocol, register a modified copy of an `esp32irpk::specs::*` spec. The built-in with the same `protocol_id` is replaced.
+
+`clearProtocols()` removes all registered protocols.
+
+### 4.2 Default Registration
+
+Default registration at `begin()` differs between sender and receiver:
+
+- `IRSender`: every built-in protocol whose `protocol_id` is not already registered is added (top-up). A sender therefore always has the full built-in set available; registering a spec customizes or overrides one entry, but does not restrict the set.
+- `IRReceiver`: if the decode candidate count is at least 1 and no protocols are registered, all built-in protocols are registered. If at least one protocol is registered, only the registered protocols are used, which lets you restrict the decode candidate set.
+- `IRReceiver`: if the decode candidate count is 0, RAW-only mode is used and no protocols are registered.
+
+Specs added with `addProtocol()` keep their relative registration order; built-ins added by top-up at `begin()` are ordered after them. This order is the tie-breaker described in section 2.4.
+
+### 4.3 Decode Candidate Count
+
+`setDecodeCandidates(n)` sets how many decode candidates `IRReceiver` keeps per `read()`. It is valid only before `begin()`.
+
+- Range is `0..MaxCandidates` (the `IRReceiver` template parameter). It returns `false` after `begin()`, or when `n > MaxCandidates`.
+- The default is `MaxCandidates`.
+- `n >= 1`: `read()` decodes and keeps up to `n` best-scoring candidates, sorted as described in section 2.4.
+- `n == 0`: RAW-only mode. `read()` returns RAW with `DECODE_SKIPPED`, no decode runs, and no built-in protocols are registered at `begin()` (see section 4.2). RAW-only is selected only this way; it is not implied by leaving protocols unregistered.
+
+### 4.4 Idle Threshold
 
 The default `setIdleThresholdUs()` value is `30000us`. When decode is enabled, the receiver uses the larger of the receiver setting and the maximum non-zero `idle_threshold_us` among registered protocols.
 

@@ -221,11 +221,36 @@ esp32irpk::specs::RC6_M6_32
 - `setIdleThresholdUs()`
 - `setScoreThreshold()`
 
-`begin()` 時の自動登録:
+### 4.1 Protocol選択
 
-- `IRReceiver`: decode候補数が1以上で、protocol未登録の場合に内蔵protocolを登録します。
-- `IRReceiver`: decode候補数が0の場合はRAW-only扱いで、内蔵protocolを登録しません。
-- `IRSender`: protocol未登録の場合に内蔵protocolを登録します。
+`addProtocol()` はprotocol specを登録します。`begin()` 前のみ有効です。
+
+- specは値としてコピーされます。
+- 同じ `protocol_id` のspecが既に登録されている場合、`addProtocol()` はそれを置換します。なければ追加します。
+- 内蔵protocolをカスタマイズ／上書きするには、`esp32irpk::specs::*` のコピーを書き換えて登録します。同じ `protocol_id` の内蔵protocolが置換されます。
+
+`clearProtocols()` は登録済みprotocolをすべて削除します。
+
+### 4.2 自動登録
+
+`begin()` 時の自動登録は、senderとreceiverで挙動が異なります:
+
+- `IRSender`: 未登録の `protocol_id` を持つ内蔵protocolがすべて追加されます（top-up）。そのためsenderは常に内蔵protocol一式を備え、specの登録は1件のカスタマイズ／上書きであって、対象集合を絞る操作ではありません。
+- `IRReceiver`: decode候補数が1以上で、protocolが1つも登録されていない場合に内蔵protocolをすべて登録します。1つでも登録されている場合は、登録済みのものだけを使います（decode候補集合を絞れます）。
+- `IRReceiver`: decode候補数が0の場合はRAW-only扱いで、protocolを登録しません。
+
+`addProtocol()` で登録したspecは登録順の相対順序を保持し、`begin()` のtop-upで追加された内蔵protocolはその後ろに並びます。この順序は2.4節のタイブレークに使われます。
+
+### 4.3 Decode候補数
+
+`setDecodeCandidates(n)` は `IRReceiver` が `read()` ごとに保持するdecode候補数を設定します。`begin()` 前のみ有効です。
+
+- 範囲は `0..MaxCandidates`（`IRReceiver` のテンプレート引数）。`begin()` 後、または `n > MaxCandidates` の場合は `false` を返します。
+- 既定値は `MaxCandidates` です。
+- `n >= 1`: `read()` はデコードし、スコア上位 `n` 件までを2.4節の順序で保持します。
+- `n == 0`: RAW-only扱い。`read()` は RAW を返して `DECODE_SKIPPED` を立て、デコードは行わず、`begin()` で内蔵protocolも登録しません（4.2節参照）。RAW-onlyはこの方法でのみ選択され、protocolを未登録にしただけでは選ばれません。
+
+### 4.4 Idle閾値
 
 `setIdleThresholdUs()` の未指定値は `30000us` です。decode有効時は、登録済みprotocolの `idle_threshold_us` の最大値とreceiver設定値の大きい方を使います。
 
