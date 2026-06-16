@@ -35,12 +35,6 @@ void testNecEncodeDecodeRoundtrip()
   EXPECT_EQ("nec/protocol", esp32irpk::IRProtocolID::NEC, bits.protocol_id);
   EXPECT_EQ("nec/length", 32, bits.bit_length);
   EXPECT_EQ("nec/bits", 0xcb3400ffULL, bits.bits);
-  EXPECT_EQ("nec/default-carrier", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::NEC.carrier_hz);
-  EXPECT_EQ("sony/default-carrier", 40000, esp32irpk::specs::SONY12.carrier_hz);
-  EXPECT_EQ("rc5/default-carrier", 36000, esp32irpk::specs::RC5.carrier_hz);
-  EXPECT_EQ("aeha/default-carrier", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::AEHA.carrier_hz);
-  EXPECT_EQ("samsung/default-carrier", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::SAMSUNG32.carrier_hz);
-  EXPECT_EQ("jvc/default-carrier", 37900, esp32irpk::specs::JVC24.carrier_hz);
   EXPECT_EQ("nec/helper-bits", bits.bits, helper_bits.bits);
   EXPECT_EQ("nec/helper-length", bits.bit_length, helper_bits.bit_length);
 
@@ -69,6 +63,24 @@ void testNecEncodeDecodeRoundtrip()
       esp32irpk::frames::NECFrame::fromBits(result.candidates[0].decoded);
   EXPECT_EQ("nec/frame-address", frame.address, decoded_frame.address);
   EXPECT_EQ("nec/frame-command", frame.command, decoded_frame.command);
+}
+
+void testProtocolCarrierPreferences()
+{
+  EXPECT_EQ("carrier/nec", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::NEC.carrier_hz);
+  EXPECT_EQ("carrier/aeha", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::AEHA.carrier_hz);
+  EXPECT_EQ("carrier/panasonic40", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::PANASONIC40.carrier_hz);
+  EXPECT_EQ("carrier/panasonic48", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::PANASONIC48.carrier_hz);
+  EXPECT_EQ("carrier/samsung32", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::SAMSUNG32.carrier_hz);
+  EXPECT_EQ("carrier/samsung36", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::SAMSUNG36.carrier_hz);
+  EXPECT_EQ("carrier/jvc24", 37900, esp32irpk::specs::JVC24.carrier_hz);
+  EXPECT_EQ("carrier/jvc32", 37900, esp32irpk::specs::JVC32.carrier_hz);
+  EXPECT_EQ("carrier/sony12", 40000, esp32irpk::specs::SONY12.carrier_hz);
+  EXPECT_EQ("carrier/sony15", 40000, esp32irpk::specs::SONY15.carrier_hz);
+  EXPECT_EQ("carrier/sony20", 40000, esp32irpk::specs::SONY20.carrier_hz);
+  EXPECT_EQ("carrier/rc5", 36000, esp32irpk::specs::RC5.carrier_hz);
+  EXPECT_EQ("carrier/rc6-m0", 36000, esp32irpk::specs::RC6_M0_16.carrier_hz);
+  EXPECT_EQ("carrier/rc6-m6", 36000, esp32irpk::specs::RC6_M6_32.carrier_hz);
 }
 
 void testNecRejectsUndersizedBuffer()
@@ -620,6 +632,7 @@ void setup()
   delay(5000);
 
   testNecEncodeDecodeRoundtrip();
+  testProtocolCarrierPreferences();
   testNecRejectsUndersizedBuffer();
   testVariableLengthEncodeDecode();
   testEncodeRejectsInvalidInputs();

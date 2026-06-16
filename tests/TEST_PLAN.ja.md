@@ -37,12 +37,13 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test。PANASONIC40は未対応 |
 | AEHA可変長encode/decode | ✅ | | ⬜ | | host smoke + MSB-first可変長test |
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5・RC6_M0・RC6_M6 fixture host test |
+| protocol carrier推奨値 | ✅ | ✅ | ✅ NEC smoke | | 標準protocol値とsender override範囲をhostで確認 |
 | 候補順位・score threshold | ✅ | | | | host smoke追加済み |
 | encode拒否・不正入力 | ✅ | | | | バッファ不足・未知ID・bit長不一致 |
 | RAWのみモード(候補0) | ✅ | | | | host smoke追加済み |
 | tolerance境界 | ⬜ | | | | 追加予定 |
 | verified fixture schema | ✅ | | | | YAML検査追加済み |
-| examples build | | ⬜ | | | buildテストで追加 |
+| examples build | | ✅ | | | buildテスト追加済み |
 | RMT TX RAW送信 | | ✅ sketch build | ✅ NEC smoke | | TX peerスケッチ + 2台smoke |
 | RMT RX RAW受信 | | ✅ sketch build | ✅ NEC smoke | | RX dutスケッチ + 2台smoke |
 | TX->RX loop | | | ✅ NEC smoke | | TX/RX 2台構成のpytest追加済み |

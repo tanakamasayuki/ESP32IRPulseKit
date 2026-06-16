@@ -37,12 +37,13 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test; PANASONIC40 pending |
 | AEHA variable-length encode/decode | ✅ | | ⬜ | | Host smoke + MSB-first variable test |
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5, RC6_M0, RC6_M6 fixture host tests |
+| Protocol carrier preferences | ✅ | ✅ | ✅ NEC smoke | | Built-in values and sender override range checked in host |
 | Candidate ordering and score threshold | ✅ | | | | Host smoke test exists |
 | Encode rejection / invalid inputs | ✅ | | | | Undersized buffer, unknown id, bad length |
 | RAW-only mode (0 candidates) | ✅ | | | | Host smoke test exists |
 | Tolerance boundaries | ⬜ | | | | Planned |
 | Verified fixture schema | ✅ | | | | YAML checks added |
-| Examples build | | ⬜ | | | Planned in build tests |
+| Examples build | | ✅ | | | Build tests exist |
 | RMT TX RAW send | | ✅ sketch build | ✅ NEC smoke | | TX peer sketch + two-board smoke |
 | RMT RX RAW receive | | ✅ sketch build | ✅ NEC smoke | | RX dut sketch + two-board smoke |
 | TX->RX loop | | | ✅ NEC smoke | | Two-board pytest exists |
