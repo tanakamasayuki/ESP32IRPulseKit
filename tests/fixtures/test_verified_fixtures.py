@@ -79,6 +79,24 @@ def jvc24_raw_ticks(data: int) -> list[int]:
     return raw
 
 
+def rc5_raw_ticks(data: int) -> list[int]:
+    ticks: list[int] = []
+    level = True
+    current_ticks = 0
+    for bit_index in range(13, -1, -1):
+        bit = (data >> bit_index) & 0x1
+        halves = [True, False] if bit else [False, True]
+        for half in halves:
+            if half == level:
+                current_ticks += 89
+            else:
+                ticks.append(current_ticks)
+                current_ticks = 89
+                level = half
+    ticks.append(current_ticks)
+    return ticks
+
+
 @pytest.mark.parametrize(
     "path",
     sorted(FIXTURE_DIR.glob("*.yaml")),
@@ -173,6 +191,17 @@ def test_jvc24_fixture_matches_reviewed_fields():
     assert data["bit_length"] == 24
     assert data["bits"] == frame_data
     assert data["raw_ticks"] == jvc24_raw_ticks(frame_data)
+
+
+def test_rc5_fixture_matches_reviewed_fields():
+    data = load_fixture("rc5_3fff.yaml")
+    frame_data = data["fields"]["data"]
+
+    assert data["protocol"] == "RC5"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 14
+    assert data["bits"] == frame_data
+    assert data["raw_ticks"] == rc5_raw_ticks(frame_data)
 
 
 def test_cpp_fixture_header_is_current():

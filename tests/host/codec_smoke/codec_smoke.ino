@@ -359,6 +359,25 @@ void testJvc24FixtureDecode()
   EXPECT_EQ("jvc24-fixture/data", 0x00c0deu, frame.data);
 }
 
+void testRc5FixtureDecode()
+{
+  esp32irpk::IRRawTickView view{};
+  view.ticks = test_fixtures::rc5_3fff_raw_ticks;
+  view.len = test_fixtures::rc5_3fff_raw_len;
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::RC5};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("rc5-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("rc5-fixture/candidates", 1, result.count);
+  EXPECT_EQ("rc5-fixture/protocol", esp32irpk::IRProtocolID::RC5, result.candidates[0].protocol_id);
+  EXPECT_EQ("rc5-fixture/bits", test_fixtures::rc5_3fff_bits, result.candidates[0].decoded.bits);
+  EXPECT_EQ("rc5-fixture/length", test_fixtures::rc5_3fff_bit_length, result.candidates[0].decoded.bit_length);
+
+  esp32irpk::frames::RC5Frame frame =
+      esp32irpk::frames::RC5Frame::fromBits(result.candidates[0].decoded);
+  EXPECT_EQ("rc5-fixture/data", 0x3fffu, frame.data);
+}
+
 void testScoreThresholdFiltersCandidate()
 {
   esp32irpk::IRRawTickView view{};
@@ -541,6 +560,7 @@ void setup()
   testAeha48FixtureDecode();
   testPanasonic48FixtureDecode();
   testJvc24FixtureDecode();
+  testRc5FixtureDecode();
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();

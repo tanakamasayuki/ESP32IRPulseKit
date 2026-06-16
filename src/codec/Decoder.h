@@ -412,7 +412,7 @@ namespace esp32irpk::codec
     {
       if (unit_us == 0)
         return false;
-      uint32_t units = (duration_us + unit_us - 1U) / unit_us; // ceil to avoid losing halves
+      uint32_t units = (duration_us + (unit_us / 2U)) / unit_us;
       if (units == 0)
         return false;
       uint32_t expected = units * unit_us;

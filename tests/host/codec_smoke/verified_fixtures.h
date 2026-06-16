@@ -66,6 +66,15 @@ inline constexpr uint16_t panasonic48_40040100bcbd_raw_ticks[] = {
 };
 inline constexpr size_t panasonic48_40040100bcbd_raw_len = sizeof(panasonic48_40040100bcbd_raw_ticks) / sizeof(panasonic48_40040100bcbd_raw_ticks[0]);
 
+inline constexpr uint64_t rc5_3fff_bits = 0x3fffULL;
+inline constexpr size_t rc5_3fff_bit_length = 14;
+inline constexpr uint16_t rc5_3fff_raw_ticks[] = {
+    89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89,
+    89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89,
+    89, 89, 89, 89
+};
+inline constexpr size_t rc5_3fff_raw_len = sizeof(rc5_3fff_raw_ticks) / sizeof(rc5_3fff_raw_ticks[0]);
+
 inline constexpr uint64_t samsung32_e0e0_40bf_bits = 0x40bfe0e0ULL;
 inline constexpr size_t samsung32_e0e0_40bf_bit_length = 32;
 inline constexpr uint16_t samsung32_e0e0_40bf_raw_ticks[] = {

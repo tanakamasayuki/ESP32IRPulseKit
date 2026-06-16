@@ -1,0 +1,38 @@
+name: rc5_3fff
+source: reviewed
+protocol: RC5
+frame_type: NORMAL
+bit_length: 14
+bits: 0x3fff
+tick_us: 10
+fields:
+  data: 0x3fff
+raw_ticks:
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
+  - 89
