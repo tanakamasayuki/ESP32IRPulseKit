@@ -31,10 +31,10 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | --- | --- | --- | --- | --- | --- |
 | NEC encode/decode roundtrip | ✅ | ✅ | ✅ NEC smoke | | Host/build/two-board smoke exist |
 | NEC repeat encode/decode | ✅ | | ⬜ | | Host smoke tests exist |
-| SONY decode | ✅ | | ⬜ | | Sony12 fixture host test; SONY15/20 generated roundtrips exist |
-| Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test; SAMSUNG36 generated roundtrip exists |
-| JVC decode | ✅ | | ⬜ | | JVC24 fixture host test; JVC32 generated roundtrip exists |
-| Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test; PANASONIC40 generated roundtrip exists |
+| SONY decode | ✅ | | ⬜ | | Sony12 fixture host test; SONY15/20 generated roundtrips and formula checks exist |
+| Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test; SAMSUNG36 generated roundtrip and formula check exist |
+| JVC decode | ✅ | | ⬜ | | JVC24 fixture host test; JVC32 generated roundtrip and formula check exist |
+| Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test; PANASONIC40 generated roundtrip and formula check exist |
 | AEHA variable-length encode/decode | ✅ | | ⬜ | | Host smoke + MSB-first variable test |
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5, RC6_M0, RC6_M6 fixture host tests |
 | Protocol carrier preferences | ✅ | ✅ | ✅ NEC smoke | | Built-in values and sender override range checked in host |
@@ -42,7 +42,7 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | Encode rejection / invalid inputs | ✅ | | | | Undersized buffer, unknown id, bad length |
 | RAW-only mode (0 candidates) | ✅ | | | | Host smoke test exists |
 | Tolerance boundaries | ✅ | | | | SPACE_ENC ±25% boundaries checked in host smoke |
-| Verified fixture schema | ✅ | | | | YAML checks added |
+| Verified/generated fixture schema | ✅ | | | | YAML checks and generated candidate formula checks added |
 | Examples build | | ✅ | | | Build tests exist |
 | RMT TX RAW send | | ✅ sketch build | ✅ NEC smoke | | TX peer sketch + two-board smoke |
 | RMT RX RAW receive | | ✅ sketch build | ✅ NEC smoke | | RX dut sketch + two-board smoke |

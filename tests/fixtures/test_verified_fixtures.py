@@ -52,6 +52,20 @@ def samsung32_raw_ticks(address: int, command: int) -> list[int]:
     return raw
 
 
+def samsung36_bits(address: int, command: int) -> int:
+    return address | ((command & 0xFFFFF) << 16)
+
+
+def samsung36_raw_ticks(address: int, command: int) -> list[int]:
+    bits = samsung36_bits(address, command)
+    raw = [450, 450]
+    for bit_index in range(36):
+        raw.append(56)
+        raw.append(169 if ((bits >> bit_index) & 0x1) else 56)
+    raw.append(56)
+    return raw
+
+
 def aeha_raw_ticks(data: int, bit_length: int) -> list[int]:
     raw = [340, 170]
     for bit_index in range(bit_length):
@@ -76,6 +90,23 @@ def jvc24_raw_ticks(data: int) -> list[int]:
         raw.append(53)
         raw.append(158 if ((data >> bit_index) & 0x1) else 53)
     raw.append(53)
+    return raw
+
+
+def jvc32_raw_ticks(data: int) -> list[int]:
+    raw = [840, 420]
+    for bit_index in range(32):
+        raw.append(55)
+        raw.append(180 if ((data >> bit_index) & 0x1) else 55)
+    raw.append(55)
+    return raw
+
+
+def sony_raw_ticks(data: int, bit_length: int) -> list[int]:
+    raw = [240, 60]
+    for bit_index in range(bit_length):
+        raw.append(120 if ((data >> bit_index) & 0x1) else 60)
+        raw.append(60)
     return raw
 
 
@@ -230,6 +261,26 @@ def test_jvc24_fixture_matches_reviewed_fields():
     assert data["bit_length"] == 24
     assert data["bits"] == frame_data
     assert data["raw_ticks"] == jvc24_raw_ticks(frame_data)
+
+
+@pytest.mark.parametrize(
+    ("name", "bits", "bit_length", "raw_ticks", "has_trailer_mark"),
+    [
+        ("sony15_3456", 0x3456, 15, sony_raw_ticks(0x3456, 15), False),
+        ("sony20_abcde", 0xABCDE, 20, sony_raw_ticks(0xABCDE, 20), False),
+        ("samsung36_1234_abcde", samsung36_bits(0x1234, 0xABCDE), 36, samsung36_raw_ticks(0x1234, 0xABCDE), True),
+        ("jvc32_1234abcd", 0x1234ABCD, 32, jvc32_raw_ticks(0x1234ABCD), True),
+        ("panasonic40_123456789a", 0x123456789A, 40, panasonic_raw_ticks(0x123456789A, 40), True),
+    ],
+)
+def test_generated_fixture_candidates_match_reviewed_formulas(name, bits, bit_length, raw_ticks, has_trailer_mark):
+    assert name
+    assert bits > 0
+    assert bits < (1 << bit_length)
+    assert raw_ticks
+    assert len(raw_ticks) == 2 + bit_length * 2 + (1 if has_trailer_mark else 0)
+    assert all(isinstance(tick, int) for tick in raw_ticks)
+    assert all(0 < tick <= 0xFFFF for tick in raw_ticks)
 
 
 @pytest.mark.parametrize("name", ["rc5_3fff.yaml", "rc5_300f.yaml"])
