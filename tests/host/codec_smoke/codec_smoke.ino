@@ -205,6 +205,63 @@ void testMsbFirstVariableLengthDecode()
   EXPECT_EQ("msb-variable/bits", 0x0aULL, result.candidates[0].decoded.bits);
 }
 
+void testToleranceBoundaries()
+{
+  esp32irpk::IRProtocolSpec spec{};
+  spec.protocol_id = esp32irpk::IRProtocolID::USER2;
+  spec.name[0] = 'T';
+  spec.scheme = esp32irpk::IRProtocolScheme::SPACE_ENC;
+  spec.family = esp32irpk::IRProtocolFamily::UNKNOWN;
+  spec.header = {.mark_us = 1000, .space_us = 1000};
+  spec.one = {.mark_us = 1000, .space_us = 2000};
+  spec.zero = {.mark_us = 1000, .space_us = 1000};
+  spec.trailer = {.mark_us = 1000, .space_us = 0};
+  spec.lsb_first = true;
+  spec.bit_length = 1;
+  spec.bit_tol_pct = 25;
+
+  const esp32irpk::IRProtocolSpec specs[] = {spec};
+
+  const uint16_t upper_boundary_ticks[] = {
+      125, 125,
+      125, 250,
+      125};
+  esp32irpk::IRRawTickView upper_view{};
+  upper_view.ticks = upper_boundary_ticks;
+  upper_view.len = sizeof(upper_boundary_ticks) / sizeof(upper_boundary_ticks[0]);
+
+  esp32irpk::IRReceiveResult<4> upper_result{};
+  EXPECT_TRUE("tolerance/upper-boundary-decode",
+              esp32irpk::codec::decodeRawToBits(upper_view, specs, 1, 4, 0, upper_result));
+  EXPECT_EQ("tolerance/upper-boundary-bits", 1ULL, upper_result.candidates[0].decoded.bits);
+
+  const uint16_t lower_boundary_ticks[] = {
+      75, 75,
+      75, 150,
+      75};
+  esp32irpk::IRRawTickView lower_view{};
+  lower_view.ticks = lower_boundary_ticks;
+  lower_view.len = sizeof(lower_boundary_ticks) / sizeof(lower_boundary_ticks[0]);
+
+  esp32irpk::IRReceiveResult<4> lower_result{};
+  EXPECT_TRUE("tolerance/lower-boundary-decode",
+              esp32irpk::codec::decodeRawToBits(lower_view, specs, 1, 4, 0, lower_result));
+  EXPECT_EQ("tolerance/lower-boundary-bits", 1ULL, lower_result.candidates[0].decoded.bits);
+
+  const uint16_t outside_ticks[] = {
+      126, 125,
+      125, 250,
+      125};
+  esp32irpk::IRRawTickView outside_view{};
+  outside_view.ticks = outside_ticks;
+  outside_view.len = sizeof(outside_ticks) / sizeof(outside_ticks[0]);
+
+  esp32irpk::IRReceiveResult<4> outside_result{};
+  EXPECT_TRUE("tolerance/outside-reject",
+              !esp32irpk::codec::decodeRawToBits(outside_view, specs, 1, 4, 0, outside_result));
+  EXPECT_EQ("tolerance/outside-count", 0, outside_result.count);
+}
+
 void testNecRepeatDecode()
 {
   esp32irpk::IRDecodedBits repeat_bits = esp32irpk::bits::necRepeat();
@@ -637,6 +694,7 @@ void setup()
   testVariableLengthEncodeDecode();
   testEncodeRejectsInvalidInputs();
   testMsbFirstVariableLengthDecode();
+  testToleranceBoundaries();
   testNecRepeatDecode();
   testNecRepeatEncode();
   testSenderEncodeLifecycle();

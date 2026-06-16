@@ -41,7 +41,7 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | Candidate ordering and score threshold | ✅ | | | | Host smoke test exists |
 | Encode rejection / invalid inputs | ✅ | | | | Undersized buffer, unknown id, bad length |
 | RAW-only mode (0 candidates) | ✅ | | | | Host smoke test exists |
-| Tolerance boundaries | ⬜ | | | | Planned |
+| Tolerance boundaries | ✅ | | | | SPACE_ENC ±25% boundaries checked in host smoke |
 | Verified fixture schema | ✅ | | | | YAML checks added |
 | Examples build | | ✅ | | | Build tests exist |
 | RMT TX RAW send | | ✅ sketch build | ✅ NEC smoke | | TX peer sketch + two-board smoke |

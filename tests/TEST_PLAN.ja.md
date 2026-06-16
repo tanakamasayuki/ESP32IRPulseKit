@@ -41,7 +41,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | 候補順位・score threshold | ✅ | | | | host smoke追加済み |
 | encode拒否・不正入力 | ✅ | | | | バッファ不足・未知ID・bit長不一致 |
 | RAWのみモード(候補0) | ✅ | | | | host smoke追加済み |
-| tolerance境界 | ⬜ | | | | 追加予定 |
+| tolerance境界 | ✅ | | | | SPACE_ENCの±25%境界をhost smokeで確認 |
 | verified fixture schema | ✅ | | | | YAML検査追加済み |
 | examples build | | ✅ | | | buildテスト追加済み |
 | RMT TX RAW送信 | | ✅ sketch build | ✅ NEC smoke | | TX peerスケッチ + 2台smoke |
