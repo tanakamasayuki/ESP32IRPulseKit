@@ -90,6 +90,7 @@ RMT TX enables carrier modulation so common IR receiver modules can receive the 
 - The HAL overlays the carrier during mark periods before driving GPIO
 - The library default is 38kHz
 - `IRProtocolSpec::carrier_hz` is the protocol preferred value. `0` uses the default
+- Built-in protocols keep `0` when their preferred carrier has not been verified; 38kHz is not stamped on every protocol
 - `IRSender::setCarrierHz()` is a sender-level explicit override and takes precedence over protocol preferences
 - `clearCarrierHz()` removes the explicit override
 - Duty cycle is not public API; the implementation uses an internal fixed duty

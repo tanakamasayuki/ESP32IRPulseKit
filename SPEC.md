@@ -131,6 +131,7 @@ struct IRProtocolSpec {
 - `gap_threshold_us`: minimum gap used to split frames while decoding. `0` disables gap splitting.
 - `idle_threshold_us`: preferred RMT idle threshold. `0` uses the receiver setting.
 - `carrier_hz`: preferred carrier frequency for sending. `0` uses the library default.
+- Built-in protocols keep `0` when their preferred carrier has not been verified. The library does not stamp every protocol with 38kHz.
 - `name`: fixed-size copied display name, maximum 15 characters plus the terminating NUL. `addProtocol()` copies `IRProtocolSpec` by value, so the name does not depend on external string lifetime.
 - Fixed-length protocols use `bit_length`.
 - Variable-length protocols use `min_bit_length..max_bit_length`. A `0` bound falls back to `bit_length`.
@@ -360,6 +361,7 @@ public:
 - `repeat_count < 0` uses `spec.default_repeat_count`.
 - `repeat_count >= 0` uses the provided value.
 - Carrier is resolved in this order: explicit `setCarrierHz()` override, `spec.carrier_hz`, then the library default `38000`.
+- Built-in examples: NEC uses 38kHz, Sony SIRC uses 40kHz, and RC5/RC6 use 36kHz.
 
 ### 6.3 Carrier Configuration
 

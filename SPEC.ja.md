@@ -131,6 +131,7 @@ struct IRProtocolSpec {
 - `gap_threshold_us`: decode時のフレーム分割に使うgap下限です。`0` はgap分割なしです。
 - `idle_threshold_us`: RMT idle thresholdの推奨値です。`0` の場合はreceiver設定値を使います。
 - `carrier_hz`: 送信時の推奨carrier周波数です。`0` の場合はライブラリ既定値を使います。
+- 標準protocolでも推奨carrierを確認していないものは `0` のままにします。すべてのprotocolに38kHzを明示することはしません。
 - `name`: 表示用の固定長コピー文字列です。最大15文字 + 終端NULです。`addProtocol()` は `IRProtocolSpec` を値としてコピーするため、外部文字列の寿命管理に依存しません。
 - 固定長protocolでは `bit_length` を使います。
 - 可変長protocolでは `min_bit_length..max_bit_length` を使います。`0` の場合は `bit_length` を下限/上限として扱います。
@@ -360,6 +361,7 @@ public:
 - `repeat_count < 0` の場合は `spec.default_repeat_count` を使います。
 - `repeat_count >= 0` の場合は呼び出し値を使います。
 - carrierは `setCarrierHz()` の明示固定値、`spec.carrier_hz`、ライブラリ既定値 `38000` の順で解決します。
+- 標準protocolの例: NECは38kHz、Sony SIRCは40kHz、RC5/RC6は36kHzです。
 
 ### 6.3 carrier設定
 

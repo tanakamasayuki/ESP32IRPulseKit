@@ -36,6 +36,9 @@ void testNecEncodeDecodeRoundtrip()
   EXPECT_EQ("nec/length", 32, bits.bit_length);
   EXPECT_EQ("nec/bits", 0xcb3400ffULL, bits.bits);
   EXPECT_EQ("nec/default-carrier", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::NEC.carrier_hz);
+  EXPECT_EQ("sony/default-carrier", 40000, esp32irpk::specs::SONY12.carrier_hz);
+  EXPECT_EQ("rc5/default-carrier", 36000, esp32irpk::specs::RC5.carrier_hz);
+  EXPECT_EQ("aeha/fallback-carrier", 0, esp32irpk::specs::AEHA.carrier_hz);
   EXPECT_EQ("nec/helper-bits", bits.bits, helper_bits.bits);
   EXPECT_EQ("nec/helper-length", bits.bit_length, helper_bits.bit_length);
 
