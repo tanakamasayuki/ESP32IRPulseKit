@@ -180,13 +180,17 @@ namespace esp32irpk::codec
         trailer_syms++;
       if (spec.trailer.space_us)
         trailer_syms++;
-      if (raw.len < header_syms + trailer_syms + static_cast<size_t>(min_bits) * 2)
+      size_t min_syms = header_syms + trailer_syms + static_cast<size_t>(min_bits) * 2;
+      if (trailer_syms == 0 && min_syms > 0)
+        min_syms -= 1;
+      if (raw.len < min_syms)
         return false;
 
       size_t bit_syms = raw.len - header_syms - trailer_syms;
-      if (bit_syms % 2 != 0)
+      bool allow_clipped_last_space = trailer_syms == 0 && (bit_syms % 2 != 0);
+      if ((bit_syms % 2 != 0) && !allow_clipped_last_space)
         return false;
-      size_t bit_count_sz = bit_syms / 2;
+      size_t bit_count_sz = (bit_syms + 1) / 2;
       if (bit_count_sz < min_bits || bit_count_sz > max_bits)
         return false;
       uint16_t bit_count = static_cast<uint16_t>(bit_count_sz);

@@ -41,3 +41,10 @@ def test_link_smoke_hardware_sketches_build(tmp_path):
     repo = Path(__file__).resolve().parents[2]
     compile_sketch(repo / "tests" / "hardware" / "link_smoke", tmp_path, "rx_esp32s3")
     compile_sketch(repo / "tests" / "hardware" / "link_smoke" / "peer_tx", tmp_path, "tx_esp32s3")
+
+
+def test_compat_matrix_self_hardware_sketches_build(tmp_path):
+    repo = Path(__file__).resolve().parents[2]
+    compat = repo / "tests" / "hardware" / "compat_matrix" / "esp32irpk_self"
+    compile_sketch(compat, tmp_path, "rx_esp32s3")
+    compile_sketch(compat / "peer_tx", tmp_path, "tx_esp32s3")

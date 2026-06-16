@@ -320,6 +320,31 @@ void testGeneratedProtocolRoundtrips()
                               panasonic40.toBits());
 }
 
+void testSpaceEncodedDecodeAllowsClippedFinalSpace()
+{
+  esp32irpk::frames::Sony12Frame sony12{};
+  sony12.data = 0x0a90;
+  esp32irpk::IRDecodedBits bits = sony12.toBits();
+
+  uint16_t ticks[32]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = ticks;
+  raw.capacity = sizeof(ticks) / sizeof(ticks[0]);
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::SONY12};
+  EXPECT_TRUE("clipped-final-space/encode", esp32irpk::codec::encodeBitsToRaw(bits, specs, 1, raw));
+  EXPECT_EQ("clipped-final-space/raw-len", 26, raw.len);
+
+  esp32irpk::IRRawTickView view{};
+  view.ticks = raw.ticks;
+  view.len = raw.len - 1;
+
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("clipped-final-space/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("clipped-final-space/count", 1, result.count);
+  EXPECT_EQ("clipped-final-space/bits", bits.bits, result.candidates[0].decoded.bits);
+}
+
 void testNecRepeatDecode()
 {
   esp32irpk::IRDecodedBits repeat_bits = esp32irpk::bits::necRepeat();
@@ -754,6 +779,7 @@ void setup()
   testMsbFirstVariableLengthDecode();
   testToleranceBoundaries();
   testGeneratedProtocolRoundtrips();
+  testSpaceEncodedDecodeAllowsClippedFinalSpace();
   testNecRepeatDecode();
   testNecRepeatEncode();
   testSenderEncodeLifecycle();
