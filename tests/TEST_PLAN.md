@@ -19,9 +19,9 @@ IR behavior is affected by the physical environment, so host tests assert RAW/BI
 
 | Environment | Tests |
 | --- | --- |
-| Local development | host, hardware |
+| Local development | host, hardware/link_smoke, hardware/protocol_matrix |
 | GitHub Actions | host, build, fixtures |
-| As needed | manual |
+| As needed | hardware/compat_matrix, manual |
 
 Do not run bare `pytest`. Always select a parent directory such as `host`, `build`, `fixtures`, or `hardware/link_smoke`. The `hardware/` tree depends on physical boards and local serial ports, so it is not part of CI.
 
@@ -47,6 +47,7 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | RMT TX RAW send | | ✅ sketch build | ✅ NEC smoke | | TX peer sketch + two-board smoke |
 | RMT RX RAW receive | | ✅ sketch build | ✅ NEC smoke | | RX dut sketch + two-board smoke |
 | TX->RX loop | | | ✅ NEC smoke | | Two-board pytest exists |
+| Protocol matrix | | ✅ sketch build | ✅ | | ESP32IRPulseKit TX -> ESP32IRPulseKit RX checks NEC/SONY12/SAMSUNG32/JVC24 |
 | Real remote receive | | | | ⬜ | Candidate for fixture promotion |
 
 ## Hardware Setup
@@ -57,6 +58,12 @@ The standard hardware test setup uses two boards.
 - RX board: receives with `IRReceiver` and prints decoded results to Serial
 - pytest: controls both serial ports and asserts expected protocol/bits/score
 - GPIO/inversion settings: injected through `build_config.toml` from `.env` keys `TEST_IR_TX_GPIO`, `TEST_IR_RX_GPIO`, `TEST_IR_TX_INVERTED`, and `TEST_IR_RX_INVERTED`
+
+`hardware/link_smoke/` is the stable release-gate smoke test. It checks representative paths quickly and is part of normal release verification.
+
+`hardware/protocol_matrix/` is the multi-protocol ESP32IRPulseKit TX -> ESP32IRPulseKit RX hardware check. It is broader than `link_smoke` and is part of normal release verification.
+
+`hardware/compat_matrix/` is optional compatibility and investigation coverage. Each test directory keeps the primary sketch as RX and `peer_tx/` as TX. Keeping the peer name fixed as `tx` lets external-library variants reuse `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`. The matrix records score, raw_len, and decode results as observations so physical setup and external-library timer variation can be evaluated.
 
 The standard automated hardware target is a **two-board ESP32-S3 setup** for now. ESP32 classic, ESP32-C3/C6, and other SoCs are checked first with `examples/` and manual runs. If a SoC-specific difference or bug appears, it can be promoted to an optional profile or manual test.
 

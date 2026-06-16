@@ -19,9 +19,9 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 
 | 環境 | 実行するテスト |
 | --- | --- |
-| ローカル開発 | host、hardware |
+| ローカル開発 | host、hardware/link_smoke、hardware/protocol_matrix |
 | GitHub Actions | host、build、fixtures |
-| 必要時 | manual |
+| 必要時 | hardware/compat_matrix、manual |
 
 無指定の `pytest` は使わず、必ず `host`、`build`、`fixtures`、`hardware/link_smoke` のように対象の親ディレクトリを指定します。`hardware/` は実機とローカルSerialポートに依存するため、CI対象にはしません。
 
@@ -47,6 +47,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | RMT TX RAW送信 | | ✅ sketch build | ✅ NEC smoke | | TX peerスケッチ + 2台smoke |
 | RMT RX RAW受信 | | ✅ sketch build | ✅ NEC smoke | | RX dutスケッチ + 2台smoke |
 | TX->RX loop | | | ✅ NEC smoke | | TX/RX 2台構成のpytest追加済み |
+| protocol matrix | | ✅ sketch build | ✅ | | ESP32IRPulseKit TX -> ESP32IRPulseKit RXでNEC/SONY12/SAMSUNG32/JVC24を確認 |
 | 市販リモコン受信 | | | | ⬜ | 手動fixture化候補 |
 
 ## hardware構成
@@ -57,6 +58,12 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 - RXボード: `IRReceiver` で受信し、Serialへdecode結果を出力する
 - pytest: TX/RX両方のSerialを制御し、期待protocol/bits/scoreをassertする
 - GPIO/反転設定: `.env` の `TEST_IR_TX_GPIO`、`TEST_IR_RX_GPIO`、`TEST_IR_TX_INVERTED`、`TEST_IR_RX_INVERTED` から `build_config.toml` 経由で注入する
+
+`hardware/link_smoke/` はリリース判定用の安定smokeです。短時間で代表経路を確認し、通常のリリース前確認で実行します。
+
+`hardware/protocol_matrix/` は自前TX -> 自前RXの複数protocol実機確認です。`link_smoke` より広くprotocol差分を見ます。通常のリリース前確認で実行します。
+
+`hardware/compat_matrix/` は任意の互換性・差分調査用です。親sketchをRX、`peer_tx/` をTXに固定します。peer名を `tx` に固定することで、外部ライブラリ比較を増やしても `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3` を使い回します。`compat_matrix` ではscore、raw_len、decode結果を観測ログとして残し、物理条件や外部ライブラリのtimerばらつきを評価します。
 
 標準の自動hardware対象は当面 **ESP32-S3 2台構成** とします。ESP32 classic、ESP32-C3/C6など他SoCは、まず `examples/` とmanual確認で動作を見ます。特定SoCで差分や不具合が見つかった場合に、optional profileまたはmanual testとして昇格します。
 

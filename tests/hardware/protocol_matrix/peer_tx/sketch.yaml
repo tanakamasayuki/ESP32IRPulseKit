@@ -1,5 +1,5 @@
 profiles:
-  rx_esp32s3:
+  tx_esp32s3:
     fqbn: esp32:esp32:esp32s3
     platforms:
       - platform: esp32:esp32 (3.3.10)
@@ -7,5 +7,4 @@ profiles:
     libraries:
       - dir: ../../../../
 
-default_profile: rx_esp32s3
-
+default_profile: tx_esp32s3

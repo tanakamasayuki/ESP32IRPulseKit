@@ -2,7 +2,17 @@
 
 > Japanese: [README.ja.md](README.ja.md)
 
-ESP32 hardware tests will live here.
+ESP32 hardware tests live here.
+
+## Directories
+
+| Path | Purpose | Release gate |
+| --- | --- | --- |
+| `link_smoke/` | Stable smoke test that proves the library's two-board IR link works | Required |
+| `protocol_matrix/` | Multi-protocol hardware matrix for ESP32IRPulseKit TX -> ESP32IRPulseKit RX | Release-gate candidate |
+| `compat_matrix/` | Investigation for protocol differences, bit order, raw timing variation, and external library comparisons | Optional |
+
+`protocol_matrix/` and `compat_matrix/` keep the primary sketch as RX and `peer_tx/` as TX. Keeping the peer name fixed as `tx` lets all variants reuse `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`.
 
 The standard setup uses two boards.
 
@@ -14,6 +24,6 @@ The standard automated hardware target is a two-board ESP32-S3 setup for now. Ot
 
 Single-board loopback is auxiliary. Direct GPIO loopback can change inversion conditions compared with a real IR receiver module, so it is not the primary pass/fail baseline.
 
-The peer board does not initially use a separate reference IR library. Baseline signal data lives under `tests/fixtures/`, using both `protocol + bits` commands and fixed `raw_ticks`.
+`link_smoke/` does not use a separate reference IR library. Baseline signal data lives under `tests/fixtures/`, using both `protocol + bits` commands and fixed `raw_ticks`.
 
 GPIO numbers and inversion settings are environment-specific and are configured through `.env`. The two-board setup uses `TEST_IR_TX_GPIO`, `TEST_IR_RX_GPIO`, `TEST_IR_TX_INVERTED`, and `TEST_IR_RX_INVERTED`.

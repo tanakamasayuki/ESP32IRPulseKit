@@ -76,7 +76,7 @@ def read_expected_decode(rx, case: Case):
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c.protocol)
-def test_esp32irpk_self_tx_rx_matrix(dut, peers, case):
+def test_protocol_matrix_tx_rx(dut, peers, case, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
 
@@ -84,6 +84,14 @@ def test_esp32irpk_self_tx_rx_matrix(dut, peers, case):
     tx.expect_exact(f"TX_OK {case.protocol} {case.bits:x}", timeout=5)
 
     observed = read_expected_decode(rx, case)
+    record_property("protocol", case.protocol)
+    record_property("bits", f"0x{case.bits:x}")
+    record_property("score", observed["score"])
+    record_property("raw_len", observed["raw_len"])
+    print(
+        f"PROTOCOL_MATRIX_OBSERVED protocol={case.protocol} "
+        f"bits=0x{case.bits:x} score={observed['score']} raw_len={observed['raw_len']}"
+    )
     # Keep this assertion loose: the matrix is for compatibility investigation,
     # and physical alignment affects score. A negative score would be suspicious
     # for self-generated ideal frames.
