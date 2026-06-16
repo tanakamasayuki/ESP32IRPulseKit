@@ -18,6 +18,7 @@ namespace esp32irpk::specs
       .trailer          = {.mark_us =  560, .space_us =    0},
       .gap_threshold_us = 30000,
       .idle_threshold_us= 42000,
+      .carrier_hz       = kDefaultCarrierHz,
       .lsb_first        = true,
       .bit_length       = 32,
       .has_repeat       = true,

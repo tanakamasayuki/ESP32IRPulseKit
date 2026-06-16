@@ -18,6 +18,7 @@ namespace esp32irpk::specs
       .trailer          = {.mark_us =    0, .space_us =    0},
       .gap_threshold_us = 24000, // 45000 - (2400 + 600) - (900 + 600)*12
       .idle_threshold_us= 31200,
+      .carrier_hz       = kDefaultCarrierHz,
       .lsb_first        = true,
       .bit_length       = 12,
       .default_repeat_count = 2,
@@ -37,6 +38,7 @@ namespace esp32irpk::specs
       .trailer          = {.mark_us =    0, .space_us =    0},
       .gap_threshold_us = 19500, // 45000 - (2400 + 600) - (900 + 600)*15
       .idle_threshold_us= 30000,
+      .carrier_hz       = kDefaultCarrierHz,
       .lsb_first        = true,
       .bit_length       = 15,
       .default_repeat_count = 2,
@@ -56,6 +58,7 @@ namespace esp32irpk::specs
       .trailer          = {.mark_us =    0, .space_us =    0},
       .gap_threshold_us = 12000, // 45000 - (2400 + 600) - (900 + 600)*20
       .idle_threshold_us= 30000,
+      .carrier_hz       = kDefaultCarrierHz,
       .lsb_first        = true,
       .bit_length       = 20,
       .default_repeat_count = 2,

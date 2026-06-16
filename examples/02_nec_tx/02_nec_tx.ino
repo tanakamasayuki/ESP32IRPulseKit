@@ -9,6 +9,7 @@ esp32irpk::IRSender tx(4);
 void setup()
 {
   Serial.begin(115200);
+  // tx.setCarrierHz(38000); // en: Optional fixed carrier. ja: 必要ならcarrierを明示固定できます。
   if (!tx.begin())
   {
     Serial.println("TX begin failed");

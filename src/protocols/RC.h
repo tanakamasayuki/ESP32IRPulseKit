@@ -8,13 +8,14 @@ namespace esp32irpk::specs
   // RC-5: bi-phase (Manchester) 14bit
   // clang-format off
   inline constexpr IRProtocolSpec RC5 = {
-      .protocol_id = IRProtocolID::RC5,
-      .name = "RC5",
-      .scheme = IRProtocolScheme::BIPHASE,
-      .family = IRProtocolFamily::RC5,
-      .lsb_first = false,
-      .bit_length = 14,
-      .bit_tol_pct = 25,
+      .protocol_id    = IRProtocolID::RC5,
+      .name           = "RC5",
+      .scheme         = IRProtocolScheme::BIPHASE,
+      .family         = IRProtocolFamily::RC5,
+      .carrier_hz     = kDefaultCarrierHz,
+      .lsb_first      = false,
+      .bit_length     = 14,
+      .bit_tol_pct    = 25,
   };
   // clang-format on
 
@@ -25,6 +26,7 @@ namespace esp32irpk::specs
       .name           = "RC6_M0_16",
       .scheme         = IRProtocolScheme::BIPHASE,
       .family         = IRProtocolFamily::RC6,
+      .carrier_hz     = kDefaultCarrierHz,
       .lsb_first      = false,
       .bit_length     = 21, // start(1)+mode(3)+toggle(1)+payload(16)
       .bit_tol_pct    = 25,
@@ -38,6 +40,7 @@ namespace esp32irpk::specs
       .name           = "RC6_M6_32",
       .scheme         = IRProtocolScheme::BIPHASE,
       .family         = IRProtocolFamily::RC6,
+      .carrier_hz     = kDefaultCarrierHz,
       .lsb_first      = false,
       .bit_length     = 36, // start(1)+mode(3)+payload(32)
       .bit_tol_pct    = 25,
