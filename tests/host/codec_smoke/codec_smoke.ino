@@ -301,6 +301,26 @@ void testSamsung32FixtureDecode()
   EXPECT_EQ("samsung32-fixture/command", 0x40bfu, frame.command);
 }
 
+void testAeha48FixtureDecode()
+{
+  esp32irpk::IRRawTickView view{};
+  view.ticks = test_fixtures::aeha48_123456789abc_raw_ticks;
+  view.len = test_fixtures::aeha48_123456789abc_raw_len;
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::AEHA};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("aeha48-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("aeha48-fixture/candidates", 1, result.count);
+  EXPECT_EQ("aeha48-fixture/protocol", esp32irpk::IRProtocolID::AEHA, result.candidates[0].protocol_id);
+  EXPECT_EQ("aeha48-fixture/bits", test_fixtures::aeha48_123456789abc_bits, result.candidates[0].decoded.bits);
+  EXPECT_EQ("aeha48-fixture/length", test_fixtures::aeha48_123456789abc_bit_length, result.candidates[0].decoded.bit_length);
+
+  esp32irpk::frames::AEHAFrame frame =
+      esp32irpk::frames::AEHAFrame::fromBits(result.candidates[0].decoded);
+  EXPECT_EQ("aeha48-fixture/data", 0x123456789abcULL, frame.data);
+  EXPECT_EQ("aeha48-fixture/frame-length", 48, frame.bit_length);
+}
+
 void testScoreThresholdFiltersCandidate()
 {
   esp32irpk::IRRawTickView view{};
@@ -480,6 +500,7 @@ void setup()
   testNecFixtureDecode();
   testSony12FixtureDecode();
   testSamsung32FixtureDecode();
+  testAeha48FixtureDecode();
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();

@@ -52,6 +52,15 @@ def samsung32_raw_ticks(address: int, command: int) -> list[int]:
     return raw
 
 
+def aeha_raw_ticks(data: int, bit_length: int) -> list[int]:
+    raw = [340, 170]
+    for bit_index in range(bit_length):
+        raw.append(43)
+        raw.append(128 if ((data >> bit_index) & 0x1) else 43)
+    raw.append(43)
+    return raw
+
+
 @pytest.mark.parametrize(
     "path",
     sorted(FIXTURE_DIR.glob("*.yaml")),
@@ -113,6 +122,17 @@ def test_samsung32_fixture_matches_reviewed_fields():
     assert data["bit_length"] == 32
     assert data["bits"] == samsung32_bits(address, command)
     assert data["raw_ticks"] == samsung32_raw_ticks(address, command)
+
+
+def test_aeha48_fixture_matches_reviewed_fields():
+    data = load_fixture("aeha48_123456789abc.yaml")
+    frame_data = data["fields"]["data"]
+
+    assert data["protocol"] == "AEHA"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 48
+    assert data["bits"] == frame_data
+    assert data["raw_ticks"] == aeha_raw_ticks(frame_data, data["bit_length"])
 
 
 def test_cpp_fixture_header_is_current():

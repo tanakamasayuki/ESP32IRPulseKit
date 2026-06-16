@@ -6,6 +6,21 @@
 
 namespace test_fixtures
 {
+inline constexpr uint64_t aeha48_123456789abc_bits = 0x123456789abcULL;
+inline constexpr size_t aeha48_123456789abc_bit_length = 48;
+inline constexpr uint16_t aeha48_123456789abc_raw_ticks[] = {
+    340, 170, 43, 43, 43, 43, 43, 128, 43, 128, 43, 128,
+    43, 128, 43, 43, 43, 128, 43, 43, 43, 128, 43, 43,
+    43, 128, 43, 128, 43, 43, 43, 43, 43, 128, 43, 43,
+    43, 43, 43, 43, 43, 128, 43, 128, 43, 128, 43, 128,
+    43, 43, 43, 43, 43, 128, 43, 128, 43, 43, 43, 128,
+    43, 43, 43, 128, 43, 43, 43, 43, 43, 43, 43, 128,
+    43, 43, 43, 128, 43, 128, 43, 43, 43, 43, 43, 43,
+    43, 128, 43, 43, 43, 43, 43, 128, 43, 43, 43, 43,
+    43, 43, 43
+};
+inline constexpr size_t aeha48_123456789abc_raw_len = sizeof(aeha48_123456789abc_raw_ticks) / sizeof(aeha48_123456789abc_raw_ticks[0]);
+
 inline constexpr uint64_t nec_normal_00ff_34_bits = 0xcb3400ffULL;
 inline constexpr size_t nec_normal_00ff_34_bit_length = 32;
 inline constexpr uint16_t nec_normal_00ff_34_raw_ticks[] = {
