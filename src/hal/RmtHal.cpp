@@ -84,15 +84,11 @@ namespace esp32irpk::hal
     if (rmt_new_tx_channel(&cfg, reinterpret_cast<rmt_channel_handle_t *>(&tx_channel_)) != ESP_OK)
       return false;
 
-    rmt_carrier_config_t carrier_cfg = {};
-    carrier_cfg.frequency_hz = kDefaultCarrierFrequencyHz;
-    carrier_cfg.duty_cycle = kDefaultCarrierDuty;
-    carrier_cfg.flags.polarity_active_low = false;
-    carrier_cfg.flags.always_on = false;
-    if (rmt_apply_carrier(reinterpret_cast<rmt_channel_handle_t>(tx_channel_), &carrier_cfg) != ESP_OK)
+    if (!applyCarrierHz(kDefaultCarrierFrequencyHz))
     {
       rmt_del_channel(reinterpret_cast<rmt_channel_handle_t>(tx_channel_));
       tx_channel_ = nullptr;
+      carrier_hz_ = 0;
       return false;
     }
 
@@ -101,6 +97,7 @@ namespace esp32irpk::hal
     {
       rmt_del_channel(reinterpret_cast<rmt_channel_handle_t>(tx_channel_));
       tx_channel_ = nullptr;
+      carrier_hz_ = 0;
       return false;
     }
 
@@ -127,14 +124,37 @@ namespace esp32irpk::hal
       rmt_del_encoder(reinterpret_cast<rmt_encoder_handle_t>(tx_encoder_));
       tx_encoder_ = nullptr;
     }
+    sending_ = false;
+    carrier_hz_ = 0;
     begun_ = false;
   }
 
-  bool RmtTx::send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count)
+  bool RmtTx::applyCarrierHz(uint32_t carrier_hz)
+  {
+    if (!tx_channel_)
+      return false;
+    if (carrier_hz == carrier_hz_)
+      return true;
+
+    rmt_carrier_config_t carrier_cfg = {};
+    carrier_cfg.frequency_hz = carrier_hz;
+    carrier_cfg.duty_cycle = kDefaultCarrierDuty;
+    carrier_cfg.flags.polarity_active_low = false;
+    carrier_cfg.flags.always_on = false;
+    if (rmt_apply_carrier(reinterpret_cast<rmt_channel_handle_t>(tx_channel_), &carrier_cfg) != ESP_OK)
+      return false;
+
+    carrier_hz_ = carrier_hz;
+    return true;
+  }
+
+  bool RmtTx::send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count, uint32_t carrier_hz)
   {
     if (!begun_)
       return false;
     if (!raw.ticks || raw.len == 0)
+      return false;
+    if (!applyCarrierHz(carrier_hz))
       return false;
 
     auto syms = toSymbols(raw, /*mark_high=*/true);
@@ -145,15 +165,20 @@ namespace esp32irpk::hal
     uint32_t loops = repeat_count < 0 ? 1U : static_cast<uint32_t>(repeat_count) + 1U;
     tcfg.loop_count = loops;
 
+    sending_ = true;
     esp_err_t err = rmt_transmit(reinterpret_cast<rmt_channel_handle_t>(tx_channel_),
                                  reinterpret_cast<rmt_encoder_handle_t>(tx_encoder_),
                                  syms.data(),
                                  syms.size() * sizeof(rmt_symbol_word_t),
                                  &tcfg);
     if (err != ESP_OK)
+    {
+      sending_ = false;
       return false;
+    }
 
     err = rmt_tx_wait_all_done(reinterpret_cast<rmt_channel_handle_t>(tx_channel_), -1);
+    sending_ = false;
     return err == ESP_OK;
   }
 
@@ -414,19 +439,31 @@ namespace esp32irpk::hal
   {
     gpio_ = gpio;
     inverted_ = inverted;
+    carrier_hz_ = 38000;
     begun_ = true;
     return true;
   }
 
   void RmtTx::end()
   {
+    sending_ = false;
+    carrier_hz_ = 0;
     begun_ = false;
   }
 
-  bool RmtTx::send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count)
+  bool RmtTx::applyCarrierHz(uint32_t carrier_hz)
+  {
+    if (!begun_)
+      return false;
+    carrier_hz_ = carrier_hz;
+    return true;
+  }
+
+  bool RmtTx::send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count, uint32_t carrier_hz)
   {
     (void)raw;
     (void)repeat_count;
+    (void)carrier_hz;
     if (!begun_)
       return false;
     return false;

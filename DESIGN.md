@@ -84,11 +84,16 @@ Some Sony devices require 3 total frames, so Sony defaults use `default_repeat_c
 
 ## 8. TX Carrier
 
-RMT TX enables 38kHz carrier modulation so common IR receiver modules can receive the signal.
+RMT TX enables carrier modulation so common IR receiver modules can receive the signal.
 
 - RAW/BITS tick arrays represent the mark/space envelope
 - The HAL overlays the carrier during mark periods before driving GPIO
-- Carrier frequency is not configurable through the public API yet
+- The library default is 38kHz
+- `IRProtocolSpec::carrier_hz` is the protocol preferred value. `0` uses the default
+- `IRSender::setCarrierHz()` is a sender-level explicit override and takes precedence over protocol preferences
+- `clearCarrierHz()` removes the explicit override
+- Duty cycle is not public API; the implementation uses an internal fixed duty
+- Carrier changes after begin apply from the next send. Changes while sending are rejected
 - Hardware TX/RX smoke tests must catch missing carrier configuration
 
 ## 9. Logging Policy

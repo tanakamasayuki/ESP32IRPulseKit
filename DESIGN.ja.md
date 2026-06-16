@@ -84,11 +84,16 @@ SONY系は合計3フレームが必要な機器があるため、`default_repeat
 
 ## 8. 送信carrier
 
-RMT TXは通常のIR受信モジュールで受信できるよう、38kHz carrier変調を有効にします。
+RMT TXは通常のIR受信モジュールで受信できるよう、carrier変調を有効にします。
 
 - RAW/BITSのtick列はmark/spaceの包絡線を表す
 - HALはmark区間にcarrierを重畳してGPIOへ出力する
-- 現時点では公開APIでcarrier周波数を変更しない
+- ライブラリ既定値は38kHz
+- `IRProtocolSpec::carrier_hz` はprotocol推奨値を表す。`0` は既定値を使う
+- `IRSender::setCarrierHz()` はsender単位の明示固定で、protocol推奨値より優先する
+- `clearCarrierHz()` は明示固定を解除する
+- duty比は公開APIにせず、内部固定値を使う
+- begin後のcarrier変更は次回送信から反映する。送信中変更は拒否する
 - 送受信hardware smokeはcarrier設定漏れを検出できる必要がある
 
 ## 9. ログ方針

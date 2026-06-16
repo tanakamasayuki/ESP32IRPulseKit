@@ -28,6 +28,47 @@ namespace esp32irpk
     return true;
   }
 
+  namespace
+  {
+    constexpr uint32_t kMinCarrierHz = 20000;
+    constexpr uint32_t kMaxCarrierHz = 60000;
+
+    bool isValidCarrierHz(uint32_t hz)
+    {
+      return hz >= kMinCarrierHz && hz <= kMaxCarrierHz;
+    }
+  } // namespace
+
+  bool IRSender::setCarrierHz(uint32_t hz)
+  {
+    if (hz == 0)
+      return clearCarrierHz();
+    if (!isValidCarrierHz(hz))
+      return false;
+    if (begun_ && rmt_tx_.isSending())
+      return false;
+
+    if (begun_ && !rmt_tx_.applyCarrierHz(hz))
+      return false;
+
+    carrier_override_ = true;
+    carrier_hz_ = hz;
+    return true;
+  }
+
+  bool IRSender::clearCarrierHz()
+  {
+    if (begun_ && rmt_tx_.isSending())
+      return false;
+
+    if (begun_ && !rmt_tx_.applyCarrierHz(kDefaultCarrierHz))
+      return false;
+
+    carrier_override_ = false;
+    carrier_hz_ = kDefaultCarrierHz;
+    return true;
+  }
+
   bool IRSender::addProtocol(const IRProtocolSpec &spec)
   {
     if (begun_)
@@ -95,6 +136,22 @@ namespace esp32irpk
         def = 0;
       return static_cast<uint8_t>(def);
     }
+
+    inline uint32_t resolveCarrierHz(const std::vector<IRProtocolSpec> &specs,
+                                     IRProtocolID id,
+                                     bool carrier_override,
+                                     uint32_t carrier_hz)
+    {
+      if (carrier_override)
+        return carrier_hz;
+
+      auto it = std::find_if(specs.begin(), specs.end(),
+                             [&](const IRProtocolSpec &s)
+                             { return s.protocol_id == id; });
+      if (it != specs.end() && it->carrier_hz != 0)
+        return it->carrier_hz;
+      return kDefaultCarrierHz;
+    }
   } // namespace
 
   bool IRSender::send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count)
@@ -106,7 +163,7 @@ namespace esp32irpk
     uint8_t resolved = repeat_count >= 0 ? static_cast<uint8_t>(repeat_count) : 0;
     if (resolved > 127U)
       resolved = 127U;
-    return rmt_tx_.send(raw, static_cast<int8_t>(resolved));
+    return rmt_tx_.send(raw, static_cast<int8_t>(resolved), carrier_hz_);
   }
 
   bool IRSender::send(const esp32irpk::IRRawTickView *raw, int8_t repeat_count)
@@ -133,7 +190,8 @@ namespace esp32irpk
     uint8_t resolved = resolveRepeatCount(protocols_, decoded.protocol_id, repeat_count);
     if (resolved > 127U)
       resolved = 127U;
-    return rmt_tx_.send(view, static_cast<int8_t>(resolved));
+    uint32_t carrier = resolveCarrierHz(protocols_, decoded.protocol_id, carrier_override_, carrier_hz_);
+    return rmt_tx_.send(view, static_cast<int8_t>(resolved), carrier);
   }
 
   bool IRSender::send(const IRDecodedBits *decoded, int8_t repeat_count)

@@ -25,12 +25,16 @@ namespace esp32irpk::hal
   public:
     bool begin(int gpio, bool inverted);
     void end();
-    bool send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count);
+    bool applyCarrierHz(uint32_t carrier_hz);
+    bool send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count, uint32_t carrier_hz);
+    bool isSending() const { return sending_; }
 
   private:
     int gpio_ = -1;
     bool inverted_ = false;
     bool begun_ = false;
+    bool sending_ = false;
+    uint32_t carrier_hz_ = 0;
     void *tx_channel_ = nullptr;
     void *tx_encoder_ = nullptr;
   };

@@ -12,6 +12,7 @@ namespace esp32irpk
 {
 
   inline constexpr size_t kDefaultMaxDecodeCandidates = 4;
+  inline constexpr uint32_t kDefaultCarrierHz = 38000;
 
   enum class IRProtocolScheme : uint8_t
   {
@@ -133,6 +134,7 @@ namespace esp32irpk
 
     uint32_t gap_threshold_us = 0;  // minimum gap to split frames; 0 disables gap-based split
     uint32_t idle_threshold_us = 0; // preferred RMT idle threshold; 0 = use receiver setting
+    uint32_t carrier_hz = 0;        // preferred TX carrier; 0 = library default
 
     bool lsb_first = true; // bit order
 
@@ -229,6 +231,8 @@ namespace esp32irpk
 
     bool setPin(int gpio);
     bool setInverted(bool inverted);
+    bool setCarrierHz(uint32_t hz);
+    bool clearCarrierHz();
 
     bool addProtocol(const IRProtocolSpec &spec);
     bool clearProtocols();
@@ -247,6 +251,8 @@ namespace esp32irpk
     int gpio_;                                             // assigned GPIO number
     bool inverted_;                                        // true if output should be inverted
     bool begun_ = false;                                   // begin() was called
+    bool carrier_override_ = false;                        // true when carrier_hz_ is explicitly set
+    uint32_t carrier_hz_ = kDefaultCarrierHz;               // explicit/default carrier frequency
     uint8_t order_counter_ = 0;                            // running order for protocol registration
     std::vector<IRProtocolSpec> protocols_{};              // registered protocol list
     hal::RmtTx rmt_tx_{};                                  // HAL transmitter instance

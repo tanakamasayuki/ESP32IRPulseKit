@@ -108,6 +108,7 @@ struct IRProtocolSpec {
 
   uint32_t gap_threshold_us = 0;
   uint32_t idle_threshold_us = 0;
+  uint32_t carrier_hz = 0;
 
   bool lsb_first = true;
 
@@ -129,6 +130,7 @@ struct IRProtocolSpec {
 
 - `gap_threshold_us`: minimum gap used to split frames while decoding. `0` disables gap splitting.
 - `idle_threshold_us`: preferred RMT idle threshold. `0` uses the receiver setting.
+- `carrier_hz`: preferred carrier frequency for sending. `0` uses the library default.
 - `name`: fixed-size copied display name, maximum 15 characters plus the terminating NUL. `addProtocol()` copies `IRProtocolSpec` by value, so the name does not depend on external string lifetime.
 - Fixed-length protocols use `bit_length`.
 - Variable-length protocols use `min_bit_length..max_bit_length`. A `0` bound falls back to `bit_length`.
@@ -316,6 +318,8 @@ public:
 
   bool setPin(int gpio);
   bool setInverted(bool inverted);
+  bool setCarrierHz(uint32_t hz);
+  bool clearCarrierHz();
 
   bool addProtocol(const IRProtocolSpec& spec);
   bool clearProtocols();
@@ -342,7 +346,7 @@ public:
 - Returns `false` when `raw.ticks == nullptr` or `raw.len == 0`.
 - Pointer overloads return `false` for `nullptr`.
 - For RAW send, `repeat_count < 0` is treated as `0`.
-- RMT TX output is modulated with a 38kHz carrier for IR receiver modules. There is no public carrier-frequency configuration API yet.
+- Carrier uses the explicit `setCarrierHz()` override when set, otherwise the library default `38000`.
 
 ### 6.2 BITS Send
 
@@ -355,8 +359,25 @@ public:
 - Repeat frames can only be sent when `spec.has_repeat == true`.
 - `repeat_count < 0` uses `spec.default_repeat_count`.
 - `repeat_count >= 0` uses the provided value.
+- Carrier is resolved in this order: explicit `setCarrierHz()` override, `spec.carrier_hz`, then the library default `38000`.
 
-### 6.3 encode
+### 6.3 Carrier Configuration
+
+`setCarrierHz(hz)` explicitly fixes the sender carrier frequency.
+
+- `hz == 0` is equivalent to `clearCarrierHz()`.
+- Allowed range is `20000..60000` Hz. Values outside that range return `false`.
+- Can be called before or after `begin()`.
+- Changes after `begin()` apply from the next send. When possible, the RMT TX channel is updated immediately.
+- Returns `false` when called while sending.
+
+`clearCarrierHz()` removes the sender-level override.
+
+- RAW send returns to the library default `38000`.
+- BITS send uses protocol `carrier_hz` again.
+- Carrier duty cycle is not public API. The implementation uses an internal fixed duty.
+
+### 6.4 encode
 
 `encode(decoded, out_raw)` converts BITS to RAW without sending.
 

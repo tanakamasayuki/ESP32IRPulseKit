@@ -108,6 +108,7 @@ struct IRProtocolSpec {
 
   uint32_t gap_threshold_us = 0;
   uint32_t idle_threshold_us = 0;
+  uint32_t carrier_hz = 0;
 
   bool lsb_first = true;
 
@@ -129,6 +130,7 @@ struct IRProtocolSpec {
 
 - `gap_threshold_us`: decode時のフレーム分割に使うgap下限です。`0` はgap分割なしです。
 - `idle_threshold_us`: RMT idle thresholdの推奨値です。`0` の場合はreceiver設定値を使います。
+- `carrier_hz`: 送信時の推奨carrier周波数です。`0` の場合はライブラリ既定値を使います。
 - `name`: 表示用の固定長コピー文字列です。最大15文字 + 終端NULです。`addProtocol()` は `IRProtocolSpec` を値としてコピーするため、外部文字列の寿命管理に依存しません。
 - 固定長protocolでは `bit_length` を使います。
 - 可変長protocolでは `min_bit_length..max_bit_length` を使います。`0` の場合は `bit_length` を下限/上限として扱います。
@@ -316,6 +318,8 @@ public:
 
   bool setPin(int gpio);
   bool setInverted(bool inverted);
+  bool setCarrierHz(uint32_t hz);
+  bool clearCarrierHz();
 
   bool addProtocol(const IRProtocolSpec& spec);
   bool clearProtocols();
@@ -342,7 +346,7 @@ public:
 - `raw.ticks == nullptr` または `raw.len == 0` は `false` を返します。
 - pointer overloadは `nullptr` を渡すと `false` を返します。
 - RAW送信では `repeat_count < 0` は `0` と同じです。
-- RMT TX出力はIR受信モジュール向けに38kHz carrierで変調します。carrier周波数の公開設定APIは現時点では持ちません。
+- carrierは `setCarrierHz()` で明示固定されていればその値、なければライブラリ既定値 `38000` を使います。
 
 ### 6.2 BITS送信
 
@@ -355,8 +359,25 @@ public:
 - repeatフレームは `spec.has_repeat == true` のprotocolでのみ送信できます。
 - `repeat_count < 0` の場合は `spec.default_repeat_count` を使います。
 - `repeat_count >= 0` の場合は呼び出し値を使います。
+- carrierは `setCarrierHz()` の明示固定値、`spec.carrier_hz`、ライブラリ既定値 `38000` の順で解決します。
 
-### 6.3 encode
+### 6.3 carrier設定
+
+`setCarrierHz(hz)` は送信carrier周波数をsender単位で明示固定します。
+
+- `hz == 0` は `clearCarrierHz()` と同じです。
+- 許可範囲は `20000..60000` Hzです。範囲外は `false` を返します。
+- `begin()` 前でも後でも呼べます。
+- `begin()` 後の変更は次回送信から反映されます。可能な場合はRMT TX channelにも即時反映します。
+- 送信中に呼んだ場合は `false` を返します。
+
+`clearCarrierHz()` はsender単位の明示固定を解除します。
+
+- RAW送信はライブラリ既定値 `38000` に戻ります。
+- BITS送信はprotocol specの `carrier_hz` を再び使います。
+- carrier duty比は公開APIにしません。実装内部で固定値を使います。
+
+### 6.4 encode
 
 `encode(decoded, out_raw)` はBITSをRAWへ変換します。送信は行いません。
 
