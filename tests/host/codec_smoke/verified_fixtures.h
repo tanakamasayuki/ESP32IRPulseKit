@@ -40,6 +40,21 @@ inline constexpr uint16_t nec_repeat_raw_ticks[] = {
 };
 inline constexpr size_t nec_repeat_raw_len = sizeof(nec_repeat_raw_ticks) / sizeof(nec_repeat_raw_ticks[0]);
 
+inline constexpr uint64_t panasonic48_40040100bcbd_bits = 0x40040100bcbdULL;
+inline constexpr size_t panasonic48_40040100bcbd_bit_length = 48;
+inline constexpr uint16_t panasonic48_40040100bcbd_raw_ticks[] = {
+    350, 175, 43, 130, 43, 43, 43, 130, 43, 130, 43, 130,
+    43, 130, 43, 43, 43, 130, 43, 43, 43, 43, 43, 130,
+    43, 130, 43, 130, 43, 130, 43, 43, 43, 130, 43, 43,
+    43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43,
+    43, 43, 43, 130, 43, 43, 43, 43, 43, 43, 43, 43,
+    43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 130,
+    43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43,
+    43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 130,
+    43, 43, 43
+};
+inline constexpr size_t panasonic48_40040100bcbd_raw_len = sizeof(panasonic48_40040100bcbd_raw_ticks) / sizeof(panasonic48_40040100bcbd_raw_ticks[0]);
+
 inline constexpr uint64_t samsung32_e0e0_40bf_bits = 0x40bfe0e0ULL;
 inline constexpr size_t samsung32_e0e0_40bf_bit_length = 32;
 inline constexpr uint16_t samsung32_e0e0_40bf_raw_ticks[] = {

@@ -321,6 +321,25 @@ void testAeha48FixtureDecode()
   EXPECT_EQ("aeha48-fixture/frame-length", 48, frame.bit_length);
 }
 
+void testPanasonic48FixtureDecode()
+{
+  esp32irpk::IRRawTickView view{};
+  view.ticks = test_fixtures::panasonic48_40040100bcbd_raw_ticks;
+  view.len = test_fixtures::panasonic48_40040100bcbd_raw_len;
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::PANASONIC48};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("panasonic48-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("panasonic48-fixture/candidates", 1, result.count);
+  EXPECT_EQ("panasonic48-fixture/protocol", esp32irpk::IRProtocolID::PANASONIC48, result.candidates[0].protocol_id);
+  EXPECT_EQ("panasonic48-fixture/bits", test_fixtures::panasonic48_40040100bcbd_bits, result.candidates[0].decoded.bits);
+  EXPECT_EQ("panasonic48-fixture/length", test_fixtures::panasonic48_40040100bcbd_bit_length, result.candidates[0].decoded.bit_length);
+
+  esp32irpk::frames::Panasonic48Frame frame =
+      esp32irpk::frames::Panasonic48Frame::fromBits(result.candidates[0].decoded);
+  EXPECT_EQ("panasonic48-fixture/data", 0x40040100bcbdULL, frame.data);
+}
+
 void testScoreThresholdFiltersCandidate()
 {
   esp32irpk::IRRawTickView view{};
@@ -501,6 +520,7 @@ void setup()
   testSony12FixtureDecode();
   testSamsung32FixtureDecode();
   testAeha48FixtureDecode();
+  testPanasonic48FixtureDecode();
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();
