@@ -31,10 +31,10 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | --- | --- | --- | --- | --- | --- |
 | NEC encode/decode roundtrip | ✅ | ✅ | ✅ NEC smoke | | Host/build/two-board smoke exist |
 | NEC repeat encode/decode | ✅ | | ⬜ | | Host smoke tests exist |
-| SONY decode | ✅ | | ⬜ | | Sony12 fixture host test; SONY15/20 pending |
-| Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test; SAMSUNG36 pending |
-| JVC decode | ✅ | | ⬜ | | JVC24 fixture host test; JVC32 pending |
-| Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test; PANASONIC40 pending |
+| SONY decode | ✅ | | ⬜ | | Sony12 fixture host test; SONY15/20 generated roundtrips exist |
+| Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test; SAMSUNG36 generated roundtrip exists |
+| JVC decode | ✅ | | ⬜ | | JVC24 fixture host test; JVC32 generated roundtrip exists |
+| Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test; PANASONIC40 generated roundtrip exists |
 | AEHA variable-length encode/decode | ✅ | | ⬜ | | Host smoke + MSB-first variable test |
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5, RC6_M0, RC6_M6 fixture host tests |
 | Protocol carrier preferences | ✅ | ✅ | ✅ NEC smoke | | Built-in values and sender override range checked in host |

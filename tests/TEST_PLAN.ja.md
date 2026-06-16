@@ -31,10 +31,10 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | --- | --- | --- | --- | --- | --- |
 | NEC encode/decode roundtrip | ✅ | ✅ | ✅ NEC smoke | | host/build/2台smoke追加済み |
 | NEC repeat encode/decode | ✅ | | ⬜ | | host smoke追加済み |
-| SONY decode | ✅ | | ⬜ | | Sony12 fixture host test。SONY15/20は未対応 |
-| Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test。SAMSUNG36は未対応 |
-| JVC decode | ✅ | | ⬜ | | JVC24 fixture host test。JVC32は未対応 |
-| Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test。PANASONIC40は未対応 |
+| SONY decode | ✅ | | ⬜ | | Sony12 fixture host test。SONY15/20はgenerated roundtrip済み |
+| Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test。SAMSUNG36はgenerated roundtrip済み |
+| JVC decode | ✅ | | ⬜ | | JVC24 fixture host test。JVC32はgenerated roundtrip済み |
+| Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test。PANASONIC40はgenerated roundtrip済み |
 | AEHA可変長encode/decode | ✅ | | ⬜ | | host smoke + MSB-first可変長test |
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5・RC6_M0・RC6_M6 fixture host test |
 | protocol carrier推奨値 | ✅ | ✅ | ✅ NEC smoke | | 標準protocol値とsender override範囲をhostで確認 |

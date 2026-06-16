@@ -262,6 +262,64 @@ void testToleranceBoundaries()
   EXPECT_EQ("tolerance/outside-count", 0, outside_result.count);
 }
 
+void expectEncodeDecodeRoundtrip(const char *name,
+                                 const esp32irpk::IRProtocolSpec &spec,
+                                 const esp32irpk::IRDecodedBits &bits)
+{
+  uint16_t ticks[160]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = ticks;
+  raw.capacity = sizeof(ticks) / sizeof(ticks[0]);
+
+  const esp32irpk::IRProtocolSpec specs[] = {spec};
+  EXPECT_TRUE(name, esp32irpk::codec::encodeBitsToRaw(bits, specs, 1, raw));
+
+  esp32irpk::IRRawTickView view{};
+  view.ticks = raw.ticks;
+  view.len = raw.len;
+
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE(name, esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ(name, 1, result.count);
+  EXPECT_EQ(name, bits.protocol_id, result.candidates[0].decoded.protocol_id);
+  EXPECT_EQ(name, bits.bit_length, result.candidates[0].decoded.bit_length);
+  EXPECT_EQ(name, bits.bits, result.candidates[0].decoded.bits);
+}
+
+void testGeneratedProtocolRoundtrips()
+{
+  esp32irpk::frames::Sony15Frame sony15{};
+  sony15.data = 0x3456;
+  expectEncodeDecodeRoundtrip("generated/sony15",
+                              esp32irpk::specs::SONY15,
+                              sony15.toBits());
+
+  esp32irpk::frames::Sony20Frame sony20{};
+  sony20.data = 0xabcde;
+  expectEncodeDecodeRoundtrip("generated/sony20",
+                              esp32irpk::specs::SONY20,
+                              sony20.toBits());
+
+  esp32irpk::frames::Samsung36Frame samsung36{};
+  samsung36.address = 0x1234;
+  samsung36.command = 0xabcde;
+  expectEncodeDecodeRoundtrip("generated/samsung36",
+                              esp32irpk::specs::SAMSUNG36,
+                              samsung36.toBits());
+
+  esp32irpk::frames::JVC32Frame jvc32{};
+  jvc32.data = 0x1234abcd;
+  expectEncodeDecodeRoundtrip("generated/jvc32",
+                              esp32irpk::specs::JVC32,
+                              jvc32.toBits());
+
+  esp32irpk::frames::Panasonic40Frame panasonic40{};
+  panasonic40.data = 0x123456789aULL;
+  expectEncodeDecodeRoundtrip("generated/panasonic40",
+                              esp32irpk::specs::PANASONIC40,
+                              panasonic40.toBits());
+}
+
 void testNecRepeatDecode()
 {
   esp32irpk::IRDecodedBits repeat_bits = esp32irpk::bits::necRepeat();
@@ -695,6 +753,7 @@ void setup()
   testEncodeRejectsInvalidInputs();
   testMsbFirstVariableLengthDecode();
   testToleranceBoundaries();
+  testGeneratedProtocolRoundtrips();
   testNecRepeatDecode();
   testNecRepeatEncode();
   testSenderEncodeLifecycle();
