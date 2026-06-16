@@ -415,6 +415,25 @@ void testRc6M0FixtureDecode()
   EXPECT_EQ("rc6-m0-fixture/data", 0x111234u, frame.data);
 }
 
+void testRc6M6FixtureDecode()
+{
+  esp32irpk::IRRawTickView view{};
+  view.ticks = test_fixtures::rc6_m6_689abcdef_raw_ticks;
+  view.len = test_fixtures::rc6_m6_689abcdef_raw_len;
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::RC6_M6_32};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("rc6-m6-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("rc6-m6-fixture/candidates", 1, result.count);
+  EXPECT_EQ("rc6-m6-fixture/protocol", esp32irpk::IRProtocolID::RC6_M6_32, result.candidates[0].protocol_id);
+  EXPECT_EQ("rc6-m6-fixture/bits", test_fixtures::rc6_m6_689abcdef_bits, result.candidates[0].decoded.bits);
+  EXPECT_EQ("rc6-m6-fixture/length", test_fixtures::rc6_m6_689abcdef_bit_length, result.candidates[0].decoded.bit_length);
+
+  esp32irpk::frames::RC6M6Frame frame =
+      esp32irpk::frames::RC6M6Frame::fromBits(result.candidates[0].decoded);
+  EXPECT_EQ("rc6-m6-fixture/data", 0xe89abcdefULL, frame.data);
+}
+
 void testScoreThresholdFiltersCandidate()
 {
   esp32irpk::IRRawTickView view{};
@@ -599,6 +618,7 @@ void setup()
   testJvc24FixtureDecode();
   testRc5FixtureDecode();
   testRc6M0FixtureDecode();
+  testRc6M6FixtureDecode();
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();

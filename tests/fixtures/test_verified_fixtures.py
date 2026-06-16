@@ -126,6 +126,16 @@ def rc6_m0_raw_ticks(payload: int, toggle: int = 1) -> list[int]:
     return rc_biphase_ticks(bits, unit_ticks=44, prefix=[266, 89])
 
 
+def rc6_m6_bits(payload: int) -> int:
+    return (1 << 35) | (6 << 32) | payload
+
+
+def rc6_m6_raw_ticks(payload: int) -> list[int]:
+    bits: list[tuple[int, int]] = [(1, 4), (1, 2), (1, 2), (0, 2)]
+    bits.extend(((payload >> bit_index) & 0x1, 2) for bit_index in range(31, -1, -1))
+    return rc_biphase_ticks(bits, unit_ticks=44, prefix=[266, 89])
+
+
 @pytest.mark.parametrize(
     "path",
     sorted(FIXTURE_DIR.glob("*.yaml")),
@@ -243,6 +253,17 @@ def test_rc6_m0_fixture_matches_reviewed_fields():
     assert data["bit_length"] == 21
     assert data["bits"] == rc6_m0_bits(payload, toggle=1)
     assert data["raw_ticks"] == rc6_m0_raw_ticks(payload, toggle=1)
+
+
+def test_rc6_m6_fixture_matches_reviewed_fields():
+    data = load_fixture("rc6_m6_689abcdef.yaml")
+    payload = data["fields"]["payload"]
+
+    assert data["protocol"] == "RC6_M6_32"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 36
+    assert data["bits"] == rc6_m6_bits(payload)
+    assert data["raw_ticks"] == rc6_m6_raw_ticks(payload)
 
 
 def test_cpp_fixture_header_is_current():
