@@ -361,7 +361,7 @@ public:
 - `repeat_count < 0` uses `spec.default_repeat_count`.
 - `repeat_count >= 0` uses the provided value.
 - Carrier is resolved in this order: explicit `setCarrierHz()` override, `spec.carrier_hz`, then the library default `38000`.
-- Built-in examples: NEC uses 38kHz, Sony SIRC uses 40kHz, and RC5/RC6 use 36kHz.
+- Built-in preferred values: NEC/AEHA/Panasonic/Samsung use 38kHz, JVC uses 37.9kHz, Sony SIRC uses 40kHz, and RC5/RC6 use 36kHz.
 
 ### 6.3 Carrier Configuration
 
@@ -377,7 +377,7 @@ public:
 
 - RAW send returns to the library default `38000`.
 - BITS send uses protocol `carrier_hz` again.
-- Carrier duty cycle is not public API. The implementation uses an internal fixed duty.
+- Carrier duty cycle is not public API. The implementation uses an internal fixed duty of about 1/3.
 
 ### 6.4 encode
 

@@ -90,10 +90,11 @@ RMT TXは通常のIR受信モジュールで受信できるよう、carrier変�
 - HALはmark区間にcarrierを重畳してGPIOへ出力する
 - ライブラリ既定値は38kHz
 - `IRProtocolSpec::carrier_hz` はprotocol推奨値を表す。`0` は既定値を使う
-- 標準protocolでも推奨carrierを確認していないものは `0` のままにし、38kHzを一律には明示しない
+- 標準protocolでも推奨carrierを確認していないものは `0` のままにし、38kHzを一律には設定しない
+- 現在の標準protocol推奨値は NEC/AEHA/Panasonic/Samsung=38kHz、JVC=37.9kHz、Sony=40kHz、RC5/RC6=36kHz
 - `IRSender::setCarrierHz()` はsender単位の明示固定で、protocol推奨値より優先する
 - `clearCarrierHz()` は明示固定を解除する
-- duty比は公開APIにせず、内部固定値を使う
+- duty比は公開APIにせず、内部固定の約1/3を使う
 - begin後のcarrier変更は次回送信から反映する。送信中変更は拒否する
 - 送受信hardware smokeはcarrier設定漏れを検出できる必要がある
 
