@@ -110,6 +110,47 @@ void testVariableLengthEncodeDecode()
   EXPECT_EQ("variable/bits", bits.bits, result.candidates[0].decoded.bits);
 }
 
+void testEncodeRejectsInvalidInputs()
+{
+  uint16_t ticks[160]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = ticks;
+  raw.capacity = sizeof(ticks) / sizeof(ticks[0]);
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::NEC, esp32irpk::specs::AEHA};
+
+  esp32irpk::IRDecodedBits unknown{};
+  unknown.protocol_id = esp32irpk::IRProtocolID::USER1;
+  unknown.bit_length = 32;
+  unknown.bits = 0x1234;
+  EXPECT_TRUE("encode-invalid/unknown-protocol", !esp32irpk::codec::encodeBitsToRaw(unknown, specs, 2, raw));
+  EXPECT_EQ("encode-invalid/unknown-len", 0, raw.len);
+
+  esp32irpk::IRDecodedBits nec_short = esp32irpk::bits::nec(0x00ff, 0x34);
+  nec_short.bit_length = 31;
+  EXPECT_TRUE("encode-invalid/fixed-short", !esp32irpk::codec::encodeBitsToRaw(nec_short, specs, 2, raw));
+  EXPECT_EQ("encode-invalid/fixed-short-len", 0, raw.len);
+
+  esp32irpk::IRDecodedBits aeha_short{};
+  aeha_short.protocol_id = esp32irpk::IRProtocolID::AEHA;
+  aeha_short.bit_length = 47;
+  aeha_short.bits = 0x123456789abcULL;
+  EXPECT_TRUE("encode-invalid/variable-short", !esp32irpk::codec::encodeBitsToRaw(aeha_short, specs, 2, raw));
+  EXPECT_EQ("encode-invalid/variable-short-len", 0, raw.len);
+
+  esp32irpk::IRDecodedBits aeha_long = aeha_short;
+  aeha_long.bit_length = 65;
+  EXPECT_TRUE("encode-invalid/variable-long", !esp32irpk::codec::encodeBitsToRaw(aeha_long, specs, 2, raw));
+  EXPECT_EQ("encode-invalid/variable-long-len", 0, raw.len);
+
+  esp32irpk::frames::Sony12Frame repeat_sony{};
+  repeat_sony.is_repeat = true;
+  const esp32irpk::IRProtocolSpec sony_specs[] = {esp32irpk::specs::SONY12};
+  EXPECT_TRUE("encode-invalid/repeat-unsupported",
+              !esp32irpk::codec::encodeBitsToRaw(repeat_sony.toBits(), sony_specs, 1, raw));
+  EXPECT_EQ("encode-invalid/repeat-unsupported-len", 0, raw.len);
+}
+
 void testMsbFirstVariableLengthDecode()
 {
   esp32irpk::IRProtocolSpec spec{};
@@ -277,6 +318,28 @@ void testReceiverDecodeLifecycle()
   EXPECT_TRUE("receiver-decode/after-clear", !rx.decode(view, result));
 }
 
+void testReceiverConfigurationLifecycle()
+{
+  esp32irpk::IRReceiver<1> rx(4);
+  EXPECT_TRUE("receiver-config/set-pin", rx.setPin(5));
+  EXPECT_TRUE("receiver-config/set-inverted", rx.setInverted(true));
+  EXPECT_TRUE("receiver-config/candidate-too-large", !rx.setDecodeCandidates(2));
+  EXPECT_TRUE("receiver-config/raw-only", rx.setDecodeCandidates(0));
+  EXPECT_TRUE("receiver-config/idle-threshold", rx.setIdleThresholdUs(42000));
+  EXPECT_TRUE("receiver-config/score-threshold", rx.setScoreThreshold(10));
+  EXPECT_TRUE("receiver-config/begin", rx.begin());
+  EXPECT_TRUE("receiver-config/set-pin-after-begin", !rx.setPin(6));
+  EXPECT_TRUE("receiver-config/set-inverted-after-begin", !rx.setInverted(false));
+  EXPECT_TRUE("receiver-config/candidates-after-begin", !rx.setDecodeCandidates(1));
+  EXPECT_TRUE("receiver-config/idle-after-begin", !rx.setIdleThresholdUs(30000));
+  EXPECT_TRUE("receiver-config/score-after-begin", !rx.setScoreThreshold(0));
+  EXPECT_TRUE("receiver-config/add-protocol-after-begin", !rx.addProtocol(esp32irpk::specs::NEC));
+  EXPECT_TRUE("receiver-config/clear-after-begin", !rx.clearProtocols());
+  EXPECT_TRUE("receiver-config/second-begin", !rx.begin());
+  rx.end();
+  EXPECT_TRUE("receiver-config/set-after-end", rx.setDecodeCandidates(1));
+}
+
 void testDecodeCandidateLimitZero()
 {
   esp32irpk::IRRawTickView view{};
@@ -370,6 +433,7 @@ void setup()
   testNecEncodeDecodeRoundtrip();
   testNecRejectsUndersizedBuffer();
   testVariableLengthEncodeDecode();
+  testEncodeRejectsInvalidInputs();
   testMsbFirstVariableLengthDecode();
   testNecRepeatDecode();
   testNecRepeatEncode();
@@ -378,6 +442,7 @@ void setup()
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();
+  testReceiverConfigurationLifecycle();
   testDecodeCandidateLimitZero();
   testDecodeConsumesConcatenatedFramePrefix();
   testFrameConversions();
