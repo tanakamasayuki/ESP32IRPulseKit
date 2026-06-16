@@ -84,6 +84,15 @@ inline constexpr uint16_t rc5_3fff_raw_ticks[] = {
 };
 inline constexpr size_t rc5_3fff_raw_len = sizeof(rc5_3fff_raw_ticks) / sizeof(rc5_3fff_raw_ticks[0]);
 
+inline constexpr uint64_t rc6_m0_11234_bits = 0x111234ULL;
+inline constexpr size_t rc6_m0_11234_bit_length = 21;
+inline constexpr uint16_t rc6_m0_11234_raw_ticks[] = {
+    266, 89, 88, 132, 44, 44, 44, 44, 132, 132, 44, 44,
+    44, 44, 88, 88, 44, 44, 88, 88, 44, 44, 44, 44,
+    88, 44, 44, 88, 88, 88, 44, 44, 44
+};
+inline constexpr size_t rc6_m0_11234_raw_len = sizeof(rc6_m0_11234_raw_ticks) / sizeof(rc6_m0_11234_raw_ticks[0]);
+
 inline constexpr uint64_t samsung32_e0e0_40bf_bits = 0x40bfe0e0ULL;
 inline constexpr size_t samsung32_e0e0_40bf_bit_length = 32;
 inline constexpr uint16_t samsung32_e0e0_40bf_raw_ticks[] = {

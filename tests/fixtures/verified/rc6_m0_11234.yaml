@@ -1,0 +1,44 @@
+name: rc6_m0_11234
+source: reviewed
+protocol: RC6_M0_16
+frame_type: NORMAL
+bit_length: 21
+bits: 0x111234
+tick_us: 10
+fields:
+  data: 0x111234
+  payload: 0x1234
+raw_ticks:
+  - 266
+  - 89
+  - 88
+  - 132
+  - 44
+  - 44
+  - 44
+  - 44
+  - 132
+  - 132
+  - 44
+  - 44
+  - 44
+  - 44
+  - 88
+  - 88
+  - 44
+  - 44
+  - 88
+  - 88
+  - 44
+  - 44
+  - 44
+  - 44
+  - 88
+  - 44
+  - 44
+  - 88
+  - 88
+  - 88
+  - 44
+  - 44
+  - 44

@@ -97,6 +97,35 @@ def rc5_raw_ticks(data: int) -> list[int]:
     return ticks
 
 
+def rc_biphase_ticks(bits: list[tuple[int, int]], unit_ticks: int, prefix: list[int] | None = None) -> list[int]:
+    raw = list(prefix or [])
+    level = True
+    current_ticks = 0
+    for bit, width_halves in bits:
+        half_count = width_halves // 2
+        halves = ([True] * half_count + [False] * half_count) if bit else ([False] * half_count + [True] * half_count)
+        for half in halves:
+            if half == level:
+                current_ticks += unit_ticks
+            else:
+                if current_ticks:
+                    raw.append(current_ticks)
+                current_ticks = unit_ticks
+                level = half
+    raw.append(current_ticks)
+    return raw
+
+
+def rc6_m0_bits(payload: int, toggle: int = 1) -> int:
+    return (1 << 20) | ((toggle & 0x1) << 16) | payload
+
+
+def rc6_m0_raw_ticks(payload: int, toggle: int = 1) -> list[int]:
+    bits: list[tuple[int, int]] = [(1, 4), (0, 2), (0, 2), (0, 2), (toggle, 4)]
+    bits.extend(((payload >> bit_index) & 0x1, 2) for bit_index in range(15, -1, -1))
+    return rc_biphase_ticks(bits, unit_ticks=44, prefix=[266, 89])
+
+
 @pytest.mark.parametrize(
     "path",
     sorted(FIXTURE_DIR.glob("*.yaml")),
@@ -203,6 +232,17 @@ def test_rc5_fixture_matches_reviewed_fields(name):
     assert data["bit_length"] == 14
     assert data["bits"] == frame_data
     assert data["raw_ticks"] == rc5_raw_ticks(frame_data)
+
+
+def test_rc6_m0_fixture_matches_reviewed_fields():
+    data = load_fixture("rc6_m0_11234.yaml")
+    payload = data["fields"]["payload"]
+
+    assert data["protocol"] == "RC6_M0_16"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 21
+    assert data["bits"] == rc6_m0_bits(payload, toggle=1)
+    assert data["raw_ticks"] == rc6_m0_raw_ticks(payload, toggle=1)
 
 
 def test_cpp_fixture_header_is_current():
