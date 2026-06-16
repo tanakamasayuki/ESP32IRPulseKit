@@ -38,6 +38,20 @@ def sony12_raw_ticks(data: int) -> list[int]:
     return raw
 
 
+def samsung32_bits(address: int, command: int) -> int:
+    return address | (command << 16)
+
+
+def samsung32_raw_ticks(address: int, command: int) -> list[int]:
+    bits = samsung32_bits(address, command)
+    raw = [450, 450]
+    for bit_index in range(32):
+        raw.append(56)
+        raw.append(169 if ((bits >> bit_index) & 0x1) else 56)
+    raw.append(56)
+    return raw
+
+
 @pytest.mark.parametrize(
     "path",
     sorted(FIXTURE_DIR.glob("*.yaml")),
@@ -87,6 +101,18 @@ def test_sony12_fixture_matches_reviewed_timing():
     assert data["bit_length"] == 12
     assert data["bits"] == frame_data
     assert data["raw_ticks"] == sony12_raw_ticks(frame_data)
+
+
+def test_samsung32_fixture_matches_reviewed_fields():
+    data = load_fixture("samsung32_e0e0_40bf.yaml")
+    address = data["fields"]["address"]
+    command = data["fields"]["command"]
+
+    assert data["protocol"] == "SAMSUNG32"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 32
+    assert data["bits"] == samsung32_bits(address, command)
+    assert data["raw_ticks"] == samsung32_raw_ticks(address, command)
 
 
 def test_cpp_fixture_header_is_current():

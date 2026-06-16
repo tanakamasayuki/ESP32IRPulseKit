@@ -281,6 +281,26 @@ void testSony12FixtureDecode()
   EXPECT_EQ("sony12-fixture/data", 0x0a90u, frame.data);
 }
 
+void testSamsung32FixtureDecode()
+{
+  esp32irpk::IRRawTickView view{};
+  view.ticks = test_fixtures::samsung32_e0e0_40bf_raw_ticks;
+  view.len = test_fixtures::samsung32_e0e0_40bf_raw_len;
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::SAMSUNG32};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("samsung32-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("samsung32-fixture/candidates", 1, result.count);
+  EXPECT_EQ("samsung32-fixture/protocol", esp32irpk::IRProtocolID::SAMSUNG32, result.candidates[0].protocol_id);
+  EXPECT_EQ("samsung32-fixture/bits", test_fixtures::samsung32_e0e0_40bf_bits, result.candidates[0].decoded.bits);
+  EXPECT_EQ("samsung32-fixture/length", test_fixtures::samsung32_e0e0_40bf_bit_length, result.candidates[0].decoded.bit_length);
+
+  esp32irpk::frames::Samsung32Frame frame =
+      esp32irpk::frames::Samsung32Frame::fromBits(result.candidates[0].decoded);
+  EXPECT_EQ("samsung32-fixture/address", 0xe0e0u, frame.address);
+  EXPECT_EQ("samsung32-fixture/command", 0x40bfu, frame.command);
+}
+
 void testScoreThresholdFiltersCandidate()
 {
   esp32irpk::IRRawTickView view{};
@@ -459,6 +479,7 @@ void setup()
   testSenderEncodeLifecycle();
   testNecFixtureDecode();
   testSony12FixtureDecode();
+  testSamsung32FixtureDecode();
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();
