@@ -66,6 +66,15 @@ inline constexpr uint16_t panasonic48_40040100bcbd_raw_ticks[] = {
 };
 inline constexpr size_t panasonic48_40040100bcbd_raw_len = sizeof(panasonic48_40040100bcbd_raw_ticks) / sizeof(panasonic48_40040100bcbd_raw_ticks[0]);
 
+inline constexpr uint64_t rc5_300f_bits = 0x300fULL;
+inline constexpr size_t rc5_300f_bit_length = 14;
+inline constexpr uint16_t rc5_300f_raw_ticks[] = {
+    89, 89, 89, 178, 89, 89, 89, 89, 89, 89, 89, 89,
+    89, 89, 89, 89, 89, 89, 178, 89, 89, 89, 89, 89,
+    89, 89
+};
+inline constexpr size_t rc5_300f_raw_len = sizeof(rc5_300f_raw_ticks) / sizeof(rc5_300f_raw_ticks[0]);
+
 inline constexpr uint64_t rc5_3fff_bits = 0x3fffULL;
 inline constexpr size_t rc5_3fff_bit_length = 14;
 inline constexpr uint16_t rc5_3fff_raw_ticks[] = {

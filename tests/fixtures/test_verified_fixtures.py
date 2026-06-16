@@ -193,8 +193,9 @@ def test_jvc24_fixture_matches_reviewed_fields():
     assert data["raw_ticks"] == jvc24_raw_ticks(frame_data)
 
 
-def test_rc5_fixture_matches_reviewed_fields():
-    data = load_fixture("rc5_3fff.yaml")
+@pytest.mark.parametrize("name", ["rc5_3fff.yaml", "rc5_300f.yaml"])
+def test_rc5_fixture_matches_reviewed_fields(name):
+    data = load_fixture(name)
     frame_data = data["fields"]["data"]
 
     assert data["protocol"] == "RC5"

@@ -361,21 +361,39 @@ void testJvc24FixtureDecode()
 
 void testRc5FixtureDecode()
 {
-  esp32irpk::IRRawTickView view{};
-  view.ticks = test_fixtures::rc5_3fff_raw_ticks;
-  view.len = test_fixtures::rc5_3fff_raw_len;
-
   const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::RC5};
-  esp32irpk::IRReceiveResult<4> result{};
-  EXPECT_TRUE("rc5-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
-  EXPECT_EQ("rc5-fixture/candidates", 1, result.count);
-  EXPECT_EQ("rc5-fixture/protocol", esp32irpk::IRProtocolID::RC5, result.candidates[0].protocol_id);
-  EXPECT_EQ("rc5-fixture/bits", test_fixtures::rc5_3fff_bits, result.candidates[0].decoded.bits);
-  EXPECT_EQ("rc5-fixture/length", test_fixtures::rc5_3fff_bit_length, result.candidates[0].decoded.bit_length);
+  {
+    esp32irpk::IRRawTickView view{};
+    view.ticks = test_fixtures::rc5_3fff_raw_ticks;
+    view.len = test_fixtures::rc5_3fff_raw_len;
 
-  esp32irpk::frames::RC5Frame frame =
-      esp32irpk::frames::RC5Frame::fromBits(result.candidates[0].decoded);
-  EXPECT_EQ("rc5-fixture/data", 0x3fffu, frame.data);
+    esp32irpk::IRReceiveResult<4> result{};
+    EXPECT_TRUE("rc5-fixture/decode-3fff", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+    EXPECT_EQ("rc5-fixture/candidates-3fff", 1, result.count);
+    EXPECT_EQ("rc5-fixture/protocol-3fff", esp32irpk::IRProtocolID::RC5, result.candidates[0].protocol_id);
+    EXPECT_EQ("rc5-fixture/bits-3fff", test_fixtures::rc5_3fff_bits, result.candidates[0].decoded.bits);
+    EXPECT_EQ("rc5-fixture/length-3fff", test_fixtures::rc5_3fff_bit_length, result.candidates[0].decoded.bit_length);
+
+    esp32irpk::frames::RC5Frame frame =
+        esp32irpk::frames::RC5Frame::fromBits(result.candidates[0].decoded);
+    EXPECT_EQ("rc5-fixture/data-3fff", 0x3fffu, frame.data);
+  }
+  {
+    esp32irpk::IRRawTickView view{};
+    view.ticks = test_fixtures::rc5_300f_raw_ticks;
+    view.len = test_fixtures::rc5_300f_raw_len;
+
+    esp32irpk::IRReceiveResult<4> result{};
+    EXPECT_TRUE("rc5-fixture/decode-300f", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+    EXPECT_EQ("rc5-fixture/candidates-300f", 1, result.count);
+    EXPECT_EQ("rc5-fixture/protocol-300f", esp32irpk::IRProtocolID::RC5, result.candidates[0].protocol_id);
+    EXPECT_EQ("rc5-fixture/bits-300f", test_fixtures::rc5_300f_bits, result.candidates[0].decoded.bits);
+    EXPECT_EQ("rc5-fixture/length-300f", test_fixtures::rc5_300f_bit_length, result.candidates[0].decoded.bit_length);
+
+    esp32irpk::frames::RC5Frame frame =
+        esp32irpk::frames::RC5Frame::fromBits(result.candidates[0].decoded);
+    EXPECT_EQ("rc5-fixture/data-300f", 0x300fu, frame.data);
+  }
 }
 
 void testScoreThresholdFiltersCandidate()

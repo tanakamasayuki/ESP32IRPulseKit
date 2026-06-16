@@ -12,6 +12,7 @@ namespace esp32irpk::specs
       .name = "RC5",
       .scheme = IRProtocolScheme::BIPHASE,
       .family = IRProtocolFamily::RC5,
+      .lsb_first = false,
       .bit_length = 14,
       .bit_tol_pct = 25,
   };
@@ -24,6 +25,7 @@ namespace esp32irpk::specs
       .name           = "RC6_M0_16",
       .scheme         = IRProtocolScheme::BIPHASE,
       .family         = IRProtocolFamily::RC6,
+      .lsb_first      = false,
       .bit_length     = 21, // start(1)+mode(3)+toggle(1)+payload(16)
       .bit_tol_pct    = 25,
   };
@@ -36,6 +38,7 @@ namespace esp32irpk::specs
       .name           = "RC6_M6_32",
       .scheme         = IRProtocolScheme::BIPHASE,
       .family         = IRProtocolFamily::RC6,
+      .lsb_first      = false,
       .bit_length     = 36, // start(1)+mode(3)+payload(32)
       .bit_tol_pct    = 25,
   };

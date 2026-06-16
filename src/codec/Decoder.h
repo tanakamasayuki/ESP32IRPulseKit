@@ -420,8 +420,8 @@ namespace esp32irpk::codec
       for (uint32_t i = 0; i < units; ++i)
       {
         halves.push_back(level);
-        level = !level; // Manchester toggles every half-bit
       }
+      level = !level;
       return true;
     }
 
