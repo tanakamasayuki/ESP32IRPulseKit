@@ -262,6 +262,25 @@ void testNecFixtureDecode()
   EXPECT_EQ("nec-fixture/command", 0x34, frame.command);
 }
 
+void testSony12FixtureDecode()
+{
+  esp32irpk::IRRawTickView view{};
+  view.ticks = test_fixtures::sony12_0a90_raw_ticks;
+  view.len = test_fixtures::sony12_0a90_raw_len;
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::SONY12};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("sony12-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("sony12-fixture/candidates", 1, result.count);
+  EXPECT_EQ("sony12-fixture/protocol", esp32irpk::IRProtocolID::SONY12, result.candidates[0].protocol_id);
+  EXPECT_EQ("sony12-fixture/bits", test_fixtures::sony12_0a90_bits, result.candidates[0].decoded.bits);
+  EXPECT_EQ("sony12-fixture/length", test_fixtures::sony12_0a90_bit_length, result.candidates[0].decoded.bit_length);
+
+  esp32irpk::frames::Sony12Frame frame =
+      esp32irpk::frames::Sony12Frame::fromBits(result.candidates[0].decoded);
+  EXPECT_EQ("sony12-fixture/data", 0x0a90u, frame.data);
+}
+
 void testScoreThresholdFiltersCandidate()
 {
   esp32irpk::IRRawTickView view{};
@@ -439,6 +458,7 @@ void setup()
   testNecRepeatEncode();
   testSenderEncodeLifecycle();
   testNecFixtureDecode();
+  testSony12FixtureDecode();
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();

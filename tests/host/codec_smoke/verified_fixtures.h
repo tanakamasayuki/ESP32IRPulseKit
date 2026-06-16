@@ -25,4 +25,13 @@ inline constexpr uint16_t nec_repeat_raw_ticks[] = {
 };
 inline constexpr size_t nec_repeat_raw_len = sizeof(nec_repeat_raw_ticks) / sizeof(nec_repeat_raw_ticks[0]);
 
+inline constexpr uint64_t sony12_0a90_bits = 0xa90ULL;
+inline constexpr size_t sony12_0a90_bit_length = 12;
+inline constexpr uint16_t sony12_0a90_raw_ticks[] = {
+    240, 60, 60, 60, 60, 60, 60, 60, 60, 60, 120, 60,
+    60, 60, 60, 60, 120, 60, 60, 60, 120, 60, 60, 60,
+    120, 60
+};
+inline constexpr size_t sony12_0a90_raw_len = sizeof(sony12_0a90_raw_ticks) / sizeof(sony12_0a90_raw_ticks[0]);
+
 } // namespace test_fixtures

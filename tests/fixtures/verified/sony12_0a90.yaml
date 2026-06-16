@@ -1,0 +1,36 @@
+name: sony12_0a90
+source: reviewed
+protocol: SONY12
+frame_type: NORMAL
+bit_length: 12
+bits: 0x0a90
+tick_us: 10
+fields:
+  data: 0x0a90
+raw_ticks:
+  - 240
+  - 60
+  - 60
+  - 60
+  - 60
+  - 60
+  - 60
+  - 60
+  - 60
+  - 60
+  - 120
+  - 60
+  - 60
+  - 60
+  - 60
+  - 60
+  - 120
+  - 60
+  - 60
+  - 60
+  - 120
+  - 60
+  - 60
+  - 60
+  - 120
+  - 60

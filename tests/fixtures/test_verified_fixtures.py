@@ -30,6 +30,14 @@ def nec_raw_ticks(address: int, command: int) -> list[int]:
     return raw
 
 
+def sony12_raw_ticks(data: int) -> list[int]:
+    raw = [240, 60]
+    for bit_index in range(12):
+        raw.append(120 if ((data >> bit_index) & 0x1) else 60)
+        raw.append(60)
+    return raw
+
+
 @pytest.mark.parametrize(
     "path",
     sorted(FIXTURE_DIR.glob("*.yaml")),
@@ -68,6 +76,17 @@ def test_nec_repeat_fixture_matches_reviewed_timing():
     assert data["bit_length"] == 0
     assert data["bits"] == 0xFFFFFFFFFFFFFFFF
     assert data["raw_ticks"] == [900, 225, 56]
+
+
+def test_sony12_fixture_matches_reviewed_timing():
+    data = load_fixture("sony12_0a90.yaml")
+    frame_data = data["fields"]["data"]
+
+    assert data["protocol"] == "SONY12"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 12
+    assert data["bits"] == frame_data
+    assert data["raw_ticks"] == sony12_raw_ticks(frame_data)
 
 
 def test_cpp_fixture_header_is_current():
