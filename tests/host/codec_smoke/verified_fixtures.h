@@ -21,6 +21,17 @@ inline constexpr uint16_t aeha48_123456789abc_raw_ticks[] = {
 };
 inline constexpr size_t aeha48_123456789abc_raw_len = sizeof(aeha48_123456789abc_raw_ticks) / sizeof(aeha48_123456789abc_raw_ticks[0]);
 
+inline constexpr uint64_t jvc24_00c0de_bits = 0xc0deULL;
+inline constexpr size_t jvc24_00c0de_bit_length = 24;
+inline constexpr uint16_t jvc24_00c0de_raw_ticks[] = {
+    844, 422, 53, 53, 53, 158, 53, 158, 53, 158, 53, 158,
+    53, 53, 53, 158, 53, 158, 53, 53, 53, 53, 53, 53,
+    53, 53, 53, 53, 53, 53, 53, 158, 53, 158, 53, 53,
+    53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53,
+    53, 53, 53
+};
+inline constexpr size_t jvc24_00c0de_raw_len = sizeof(jvc24_00c0de_raw_ticks) / sizeof(jvc24_00c0de_raw_ticks[0]);
+
 inline constexpr uint64_t nec_normal_00ff_34_bits = 0xcb3400ffULL;
 inline constexpr size_t nec_normal_00ff_34_bit_length = 32;
 inline constexpr uint16_t nec_normal_00ff_34_raw_ticks[] = {

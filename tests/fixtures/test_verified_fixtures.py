@@ -70,6 +70,15 @@ def panasonic_raw_ticks(data: int, bit_length: int) -> list[int]:
     return raw
 
 
+def jvc24_raw_ticks(data: int) -> list[int]:
+    raw = [844, 422]
+    for bit_index in range(24):
+        raw.append(53)
+        raw.append(158 if ((data >> bit_index) & 0x1) else 53)
+    raw.append(53)
+    return raw
+
+
 @pytest.mark.parametrize(
     "path",
     sorted(FIXTURE_DIR.glob("*.yaml")),
@@ -153,6 +162,17 @@ def test_panasonic48_fixture_matches_reviewed_fields():
     assert data["bit_length"] == 48
     assert data["bits"] == frame_data
     assert data["raw_ticks"] == panasonic_raw_ticks(frame_data, data["bit_length"])
+
+
+def test_jvc24_fixture_matches_reviewed_fields():
+    data = load_fixture("jvc24_00c0de.yaml")
+    frame_data = data["fields"]["data"]
+
+    assert data["protocol"] == "JVC24"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 24
+    assert data["bits"] == frame_data
+    assert data["raw_ticks"] == jvc24_raw_ticks(frame_data)
 
 
 def test_cpp_fixture_header_is_current():
