@@ -37,7 +37,7 @@ def test_nec_tx_example_builds(tmp_path):
     compile_sketch(repo / "examples" / "02_nec_tx", tmp_path)
 
 
-def test_tx_rx_hardware_sketches_build(tmp_path):
+def test_link_smoke_hardware_sketches_build(tmp_path):
     repo = Path(__file__).resolve().parents[2]
-    compile_sketch(repo / "tests" / "hardware" / "tx_rx", tmp_path, "rx_esp32s3")
-    compile_sketch(repo / "tests" / "hardware" / "tx_rx" / "peer_tx", tmp_path, "tx_esp32s3")
+    compile_sketch(repo / "tests" / "hardware" / "link_smoke", tmp_path, "rx_esp32s3")
+    compile_sketch(repo / "tests" / "hardware" / "link_smoke" / "peer_tx", tmp_path, "tx_esp32s3")

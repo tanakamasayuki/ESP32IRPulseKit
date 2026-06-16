@@ -1,4 +1,4 @@
-# TX/RX 2台構成テスト
+# リンクsmoke 2台構成テスト
 
 > English: [README.md](README.md)
 
@@ -6,7 +6,7 @@
 
 このディレクトリはpytest-embeddedのpeer構成です。
 
-- `tx_rx.ino`: RXボード。pytest上では `dut`
+- `link_smoke.ino`: RXボード。pytest上では `dut`
 - `peer_tx/peer_tx.ino`: TXボード。pytest上では `peers["tx"]`
 
 想定する接続:
@@ -78,7 +78,7 @@ RX出力:
 
 ```sh
 cd tests
-uv run --env-file .env pytest hardware/tx_rx
+uv run --env-file .env pytest hardware/link_smoke
 ```
 
 自動assertの前に原始的に確認する場合は、TX側Serialへ次を送ります。

@@ -27,7 +27,7 @@ uv run --env-file .env pytest build
 uv run pytest fixtures
 ```
 
-無指定の `pytest` は使わず、`host`、`build`、`fixtures`、`hardware/tx_rx` のように対象を指定します。`host/` はArduino host実行テスト、`build/` はArduino CLIビルドテスト、`hardware/` はESP32実機テストです。詳細は [tests/README.ja.md](tests/README.ja.md) を参照してください。
+無指定の `pytest` は使わず、`host`、`build`、`fixtures`、`hardware/link_smoke` のように対象を指定します。`host/` はArduino host実行テスト、`build/` はArduino CLIビルドテスト、`hardware/` はESP32実機テストです。詳細は [tests/README.ja.md](tests/README.ja.md) を参照してください。
 
 ## 開発メモ
 

@@ -49,7 +49,7 @@ def expect_nec_decode(rx):
         )
 
 
-def test_two_board_ir_link_smoke(dut, peers):
+def test_link_smoke_nec_two_board(dut, peers):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
 

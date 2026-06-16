@@ -1,4 +1,4 @@
-# TX/RX Two-Board Test
+# Link Smoke Two-Board Test
 
 > Japanese: [README.ja.md](README.ja.md)
 
@@ -6,7 +6,7 @@ The standard automated target is a two-board ESP32-S3 setup. Other SoCs such as 
 
 This directory uses the pytest-embedded peer layout.
 
-- `tx_rx.ino`: RX board, exposed as `dut` in pytest
+- `link_smoke.ino`: RX board, exposed as `dut` in pytest
 - `peer_tx/peer_tx.ino`: TX board, exposed as `peers["tx"]`
 
 Expected wiring:
@@ -78,7 +78,7 @@ Run example:
 
 ```sh
 cd tests
-uv run --env-file .env pytest hardware/tx_rx
+uv run --env-file .env pytest hardware/link_smoke
 ```
 
 For a primitive check before the automated assertion, send this to the TX Serial port.

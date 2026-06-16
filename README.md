@@ -27,4 +27,4 @@ uv run --env-file .env pytest build
 uv run pytest fixtures
 ```
 
-Do not run bare `pytest`; select `host`, `build`, `fixtures`, or `hardware/tx_rx` explicitly. `host/` is for Arduino host runtime tests, `build/` is for Arduino CLI build tests, and `hardware/` is for ESP32 hardware tests. See [tests/README.md](tests/README.md) for details.
+Do not run bare `pytest`; select `host`, `build`, `fixtures`, or `hardware/link_smoke` explicitly. `host/` is for Arduino host runtime tests, `build/` is for Arduino CLI build tests, and `hardware/` is for ESP32 hardware tests. See [tests/README.md](tests/README.md) for details.

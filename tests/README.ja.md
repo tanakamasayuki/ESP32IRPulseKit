@@ -30,15 +30,15 @@ uv run --env-file .env pytest build
 # fixtureスキーマ・固定データ検査
 uv run pytest fixtures
 
-# ESP32実機2台のTX/RXテスト
-uv run --env-file .env pytest hardware/tx_rx
+# ESP32実機2台のリンクsmokeテスト
+uv run --env-file .env pytest hardware/link_smoke
 ```
 
 ## ディレクトリ
 
 - `host/`: Arduino hostで実行するロジックテスト。codec、protocol spec、frame変換などをassertします。
 - `build/`: Arduino CLIビルドテスト。examplesや最小sketchがESP32向けにコンパイルできることを検証します。
-- `hardware/`: ESP32実機を使う自動テスト。TX/RX loopなど、RMTを含む経路を検証します。
+- `hardware/`: ESP32実機を使う自動テスト。`hardware/link_smoke` は安定した2台構成のリリース判定用smokeです。
 - `manual/`: 市販リモコン、外乱光、距離/角度など、環境を完全制御しにくい検証を置きます。
 - `fixtures/`: host/hardware/manualで共有するIR信号データを置きます。
 
