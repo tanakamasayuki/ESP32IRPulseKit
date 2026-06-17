@@ -92,9 +92,18 @@ def read_first_decode(rx, case: Case):
             f"timing/tolerance incompatibility.",
             pytrace=False,
         )
+    protocol = match.group("protocol").decode()
+    bit_length = int(match.group("length"))
+    if bit_length == 0 or protocol.startswith("OTHER_"):
+        pytest.fail(
+            f"RX produced a spurious decode (protocol={protocol}, len={bit_length}) "
+            f"for {case.protocol} bits=0x{case.bits:x} — no usable protocol/bits, "
+            f"treated as undecodable.",
+            pytrace=False,
+        )
     return {
-        "protocol": match.group("protocol").decode(),
-        "bit_length": int(match.group("length")),
+        "protocol": protocol,
+        "bit_length": bit_length,
         "bits": int(match.group("bits"), 16),
         "type": match.group("type").decode(),
         "score": int(match.group("score")),
