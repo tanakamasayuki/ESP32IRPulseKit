@@ -117,6 +117,18 @@ namespace
     rmtReadAsync(kIrRxGpio, g_rxbuf, &g_rxNum);
   }
 
+  void primeCapture()
+  {
+    // Some TX paths miss the very first RMT capture right after arming (a
+    // blocking software send can race the initial arm). Send one throwaway
+    // frame and drain it here (no RX_JITTER line emitted) so the measured loop
+    // starts primed and every variant yields the same frame count.
+    irsend.sendNEC(0xCB3400FFULL, 32);
+    for (uint32_t t0 = millis(); !rmtReceiveCompleted(kIrRxGpio) && millis() - t0 < 300;)
+      delay(1);
+    armRead();
+  }
+
   void dumpFrame()
   {
     uint32_t durs[kCap * 2];
@@ -128,6 +140,11 @@ namespace
     }
     while (m > 0 && durs[m - 1] == 0)
       m--;
+    // Skip spurious empty captures (e.g. a startup transient on the floating
+    // line that completes the first arm before any SEND) so they don't emit a
+    // len=0 line.
+    if (m == 0)
+      return;
     // Emit one logical line, but paced: the ~400-byte RX_JITTER line is too long
     // to push over the 115200 USB-UART bridge in one continuous burst without the
     // host/bridge receive buffer occasionally overrunning and dropping a few
@@ -176,6 +193,7 @@ void setup()
   rmtSetRxMaxThreshold(kIrRxGpio, kIdleThresholdUs);
   g_rxReady = true;
   armRead();
+  primeCapture();
   sendReady();
 }
 

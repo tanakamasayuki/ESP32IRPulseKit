@@ -34,9 +34,9 @@ def wait_ready(dut):
     dut.expect(re.compile(rb"RX_READY impl=\S+ .*resolution_us=1"), timeout=20)
 
 
-def capture_one(dut):
+def capture_one(dut, timeout=10):
     try:
-        match = dut.expect(RX_JITTER, timeout=10)
+        match = dut.expect(RX_JITTER, timeout=timeout)
     except (EOF, TIMEOUT):
         return None
     return [int(x) for x in match.group("us").decode().split(",") if x]
