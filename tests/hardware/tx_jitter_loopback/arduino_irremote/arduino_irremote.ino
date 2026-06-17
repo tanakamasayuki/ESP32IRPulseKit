@@ -142,7 +142,7 @@ namespace
     Serial.print((unsigned long)m);
     Serial.print(" us=");
     Serial.flush();
-    delay(3);
+    delay(10);
     for (size_t i = 0; i < m; ++i)
     {
       if (i > 0)
@@ -151,14 +151,14 @@ namespace
       if ((i & 0x0F) == 0x0F)
       {
         Serial.flush();
-        delay(3);
+        delay(10);
       }
     }
     Serial.println();
     Serial.flush();
     // Let the long line fully ship over USB before the loop re-arms RMT, so its
     // tail (newline + last values) is not occasionally dropped.
-    delay(3);
+    delay(10);
   }
 } // namespace
 
