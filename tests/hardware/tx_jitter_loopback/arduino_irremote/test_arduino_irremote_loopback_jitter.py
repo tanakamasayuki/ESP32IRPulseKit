@@ -1,5 +1,7 @@
+import os
 import re
 import statistics
+import time
 from collections import Counter
 
 import pytest
@@ -13,7 +15,13 @@ from pexpect import EOF, TIMEOUT
 TX_IMPL = "Arduino-IRremote"
 SEND_PROTOCOL = "NEC"
 SEND_BITS = 0xCB3400FF
-FRAMES = 50
+# A modest count is plenty; the per-frame timing is highly repeatable. Override
+# with JITTER_FRAMES.
+FRAMES = int(os.environ.get("JITTER_FRAMES", "50"))
+# Small pause between frames so the serial/USB pipeline fully drains before the
+# next long RX_JITTER line, minimizing corrupted (truncated) lines. Override
+# with JITTER_GAP_MS.
+INTER_FRAME_S = float(os.environ.get("JITTER_GAP_MS", "5")) / 1000.0
 
 
 RX_JITTER = re.compile(
@@ -46,6 +54,7 @@ def test_arduino_irremote_loopback_jitter(dut, record_property):
         cap = capture_one(dut)
         if cap:
             frames.append(cap)
+        time.sleep(INTER_FRAME_S)
 
     if not frames:
         pytest.fail(f"{TX_IMPL}: no frames captured by the 1 us RMT RX.", pytrace=False)

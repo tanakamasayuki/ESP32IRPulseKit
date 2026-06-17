@@ -38,7 +38,48 @@ cd tests
 uv run --env-file .env pytest hardware/tx_jitter_loopback/
 ```
 
-各バリアントが NEC を50回送信し、`JITTER_LOOPBACK_OBSERVED` にエッジごとの
-`mean_stdev_us` / `max_stdev_us` / `max_ptp_us` を出力します。IRリンクとキャリアを
-除いているため、ここでの差は送信側の生のタイミング精度（RMTハード vs
-タイマー/delay生成）を反映します。
+各バリアントが NEC を50回送信し（`JITTER_FRAMES` で上書き可）、フレーム間に小休止
+（`JITTER_GAP_MS`、既定5ms）を入れてシリアルを排出し `RX_JITTER` 行をクリーンに保ちます。
+その後 `JITTER_LOOPBACK_OBSERVED` にエッジごとの
+`mean_stdev_us` / `max_stdev_us` / `max_ptp_us` を出力します。1フレームの timing は
+非常に再現性が高いので、回数は控えめで十分です。IRリンクとキャリアを除いているため、
+ここでの差は送信側の生のタイミング精度（RMTハードDMA vs ソフトビットバンギング）を反映します。
+
+## 分析
+
+`pytest` は variant ごとに `JITTER_LOOPBACK_OBSERVED` の1行サマリを出します（`-rA` /
+`-s` 付き、または `record_property` 経由でJUnit/HTMLレポートに残る）。エッジ単位の
+詳細は `analyze.py` を各 `dut.log` に対して実行します。生の `RX_JITTER` 行から統計を
+再計算します:
+
+```sh
+# 最新の pytest-embedded 実行を自動検出し、*jitter* ログをすべて解析
+uv run python hardware/tx_jitter_loopback/analyze.py
+
+# 結果ディレクトリ / dut.log を明示し、worst エッジを増やす
+uv run python hardware/tx_jitter_loopback/analyze.py --worst 10 \
+    /tmp/pytest-embedded/<run>/test_arduino_irremote_loopback_jitter
+```
+
+出力は比較表＋送信側ごとの worst エッジ:
+
+```text
+capture                                clean corrupt  used edges  mean_sd  max_sd  max_ptp
+test_arduino_irremote_loopback_jitter    500       0   500    67     0.xx    2.xx        x
+test_irremoteesp8266_loopback_jitter     500       0   500    67     0.xx    2.xx        x
+test_pulsekit_loopback_jitter            500       0   500    67     0.00    0.00        0
+```
+
+数値の読み方:
+
+- `mean_sd` — エッジごと標準偏差の平均（典型的なジッター）。
+- `max_sd` / `max_ptp` — 最悪の単一エッジ。大きい値は割り込み preempt スパイク
+  （worst エッジの index/mean でどのパルスかを確認）。
+- すべて `0.00` — 完全に決定論的なタイミング（RMTハードDMA）。
+- `corrupt` — 宣言 `len=` と実際の `us=` 個数が不一致の行＝長いシリアル行が途中で
+  バイト落ちしたもの。送信ジッターではなく**転送上のアーティファクト**で、破棄されます。
+  スケッチは各行を1回の `write()` + `flush()` で出力し、これをほぼ0に抑えます。
+- `used` — エッジ数が最頻長と一致したクリーンなフレーム（エッジ統計に使用）。
+
+同じスクリプトは `hardware/tx_jitter/`（同じ `RX_JITTER` 形式）でも動くので、
+有線ループバック vs 無線の比較にも使えます。

@@ -128,23 +128,28 @@ void dumpFrame()
   }
   while (m > 0 && durs[m - 1] == 0)
     m--;
-  Serial.print("RX_JITTER seq=");
-  Serial.print(g_seq++);
-  Serial.print(" len=");
-  Serial.print(m);
-  Serial.print(" us=");
+  // Build the whole line and emit it in one write + flush, so the long line is
+  // not truncated/corrupted by serial buffer pressure (many small prints can
+  // drop bytes mid-line under load).
+  String out = "RX_JITTER seq=";
+  out += (unsigned long)g_seq++;
+  out += " len=";
+  out += (unsigned long)m;
+  out += " us=";
   for (size_t i = 0; i < m; ++i)
   {
     if (i > 0)
-      Serial.print(",");
-    Serial.print(durs[i]);
+      out += ',';
+    out += (unsigned long)durs[i];
   }
-  Serial.println();
+  Serial.println(out);
+  Serial.flush();
 }
 } // namespace
 
 void setup()
 {
+  Serial.setTxBufferSize(1024); // headroom for the long RX_JITTER lines
   Serial.begin(115200);
   delay(5000);
 
