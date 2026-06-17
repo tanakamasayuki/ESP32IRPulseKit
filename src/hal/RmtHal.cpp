@@ -137,11 +137,18 @@ namespace esp32irpk::hal
       return true;
 
     rmt_carrier_config_t carrier_cfg = {};
-    carrier_cfg.frequency_hz = carrier_hz;
-    carrier_cfg.duty_cycle = kDefaultCarrierDuty;
-    carrier_cfg.flags.polarity_active_low = false;
-    carrier_cfg.flags.always_on = false;
-    if (rmt_apply_carrier(reinterpret_cast<rmt_channel_handle_t>(tx_channel_), &carrier_cfg) != ESP_OK)
+    const rmt_carrier_config_t *cfg_ptr = nullptr;
+    if (carrier_hz != 0)
+    {
+      carrier_cfg.frequency_hz = carrier_hz;
+      carrier_cfg.duty_cycle = kDefaultCarrierDuty;
+      carrier_cfg.flags.polarity_active_low = false;
+      carrier_cfg.flags.always_on = false;
+      cfg_ptr = &carrier_cfg;
+    }
+    // carrier_hz == 0 -> pass NULL, which disables carrier modulation
+    // (solid marks), e.g. for wired-loopback / raw-waveform testing.
+    if (rmt_apply_carrier(reinterpret_cast<rmt_channel_handle_t>(tx_channel_), cfg_ptr) != ESP_OK)
       return false;
 
     carrier_hz_ = carrier_hz;

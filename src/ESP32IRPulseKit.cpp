@@ -69,6 +69,21 @@ namespace esp32irpk
     return true;
   }
 
+  bool IRSender::disableCarrier()
+  {
+    if (begun_ && rmt_tx_.isSending())
+      return false;
+
+    // carrier_hz_ == 0 with override resolves to 0 in resolveCarrierHz(), and
+    // RmtTx::applyCarrierHz(0) disables the RMT carrier (NULL config).
+    if (begun_ && !rmt_tx_.applyCarrierHz(0))
+      return false;
+
+    carrier_override_ = true;
+    carrier_hz_ = 0;
+    return true;
+  }
+
   bool IRSender::addProtocol(const IRProtocolSpec &spec)
   {
     if (begun_)

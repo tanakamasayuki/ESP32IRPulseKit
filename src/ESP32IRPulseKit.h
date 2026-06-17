@@ -233,6 +233,7 @@ namespace esp32irpk
     bool setInverted(bool inverted);
     bool setCarrierHz(uint32_t hz);
     bool clearCarrierHz();
+    bool disableCarrier(); // send with no carrier modulation (solid marks)
 
     bool addProtocol(const IRProtocolSpec &spec);
     bool clearProtocols();
