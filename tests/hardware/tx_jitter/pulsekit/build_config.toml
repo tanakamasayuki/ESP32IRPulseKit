@@ -1,0 +1,2 @@
+[defines]
+TEST_IR_RX_GPIO = "IR_RX_GPIO"
