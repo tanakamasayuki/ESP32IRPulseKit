@@ -27,6 +27,7 @@ rmt_data_t g_rxbuf[kCap];
 size_t g_rxNum = kCap;
 uint32_t g_seq = 0;
 bool g_ready = false;
+bool g_prime = true; // drop the first captured frame (priming; see dumpFrame)
 
 namespace
 {
@@ -64,24 +65,54 @@ void dumpFrame()
   // Drop the trailing zero duration(s) left by the idle terminator.
   while (m > 0 && durs[m - 1] == 0)
     m--;
-
+  // Re-arm immediately (before the paced serial emit below) so the next frame
+  // is not missed during the tens of ms the long line takes to ship. The TX is
+  // a separate board, triggered by the test the moment it sees this line, so an
+  // unarmed window during the emit would drop the next capture.
+  armRead();
+  // Skip spurious empty captures (e.g. a startup transient) so they don't emit
+  // a len=0 line.
+  if (m == 0)
+    return;
+  // Prime: drop the first real frame (no line emitted) so the measured loop
+  // starts from a steady state and every variant logs exactly FRAMES frames.
+  if (g_prime)
+  {
+    g_prime = false;
+    return;
+  }
+  // Emit one logical line, paced: the ~400-byte line is too long to push over
+  // the 115200 USB-UART bridge in one continuous burst without the host/bridge
+  // receive buffer occasionally overrunning and dropping bytes mid-line. Flush
+  // in small chunks with a brief inter-chunk gap so the bridge FIFO never backs
+  // up.
   Serial.print("RX_JITTER seq=");
   Serial.print(g_seq++);
   Serial.print(" len=");
   Serial.print(m);
   Serial.print(" us=");
+  Serial.flush();
+  delay(10);
   for (size_t i = 0; i < m; ++i)
   {
     if (i > 0)
       Serial.print(",");
     Serial.print(durs[i]);
+    if ((i & 0x0F) == 0x0F)
+    {
+      Serial.flush();
+      delay(10);
+    }
   }
   Serial.println();
+  Serial.flush();
+  delay(10);
 }
 } // namespace
 
 void setup()
 {
+  Serial.setTxBufferSize(1024); // headroom for the long RX_JITTER lines
   Serial.begin(115200);
   delay(5000);
 
@@ -110,8 +141,9 @@ void loop()
   if (g_ready && rmtReceiveCompleted(kIrRxGpio))
   {
     if (g_rxNum > 0)
-      dumpFrame();
-    armRead();
+      dumpFrame(); // copies out, re-arms, then emits
+    else
+      armRead();
   }
 
   delay(1);

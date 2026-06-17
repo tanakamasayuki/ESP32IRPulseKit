@@ -43,3 +43,25 @@ Expectation: RMT-based transmitters (ESP32IRPulseKit) should show low jitter;
 timer/delay-based libraries may show larger spreads. The test only asserts that
 enough consistent-length frames were captured to make the statistics
 meaningful; the numbers themselves are recorded as observations.
+
+Two details keep the capture clean and the frame counts equal across variants
+(same as the loopback rig):
+
+- **Paced serial output.** A full `RX_JITTER` line is ~400 bytes; pushed over the
+  115200 USB-UART bridge in one continuous burst, the host/bridge receive buffer
+  occasionally overruns and drops a few bytes mid-line. `dumpFrame()` flushes the
+  line in ~16-value chunks with a short inter-chunk gap. It also **re-arms the RMT
+  RX before** the paced emit (not after): the transmitter is a separate board the
+  test triggers the moment it sees the line, so an unarmed window during the slow
+  emit would drop the next capture.
+- **First-capture priming.** The RX sketch drops its first emitted frame, and the
+  test sends one warm-up frame via the peer before the measured loop, so every
+  variant logs exactly `FRAMES` frames.
+
+Analyze the raw logs with the shared `hardware/tx_jitter_loopback/analyze.py`
+(same `RX_JITTER` format), which also reports the `corrupt` count.
+
+> Note: this over-the-air rig measures the IR LED + TSOP carrier demodulation as
+> well as the transmitter, which dominates and can mask/invert the true TX
+> ranking. For **pure** transmit jitter, use the carrier-off wired rig in
+> [`hardware/tx_jitter_loopback/`](../tx_jitter_loopback/README.md).

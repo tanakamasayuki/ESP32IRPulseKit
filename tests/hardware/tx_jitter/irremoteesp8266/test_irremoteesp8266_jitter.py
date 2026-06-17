@@ -1,5 +1,6 @@
 import re
 import statistics
+import time
 from collections import Counter
 
 import pytest
@@ -51,6 +52,13 @@ def test_irremoteesp8266_tx_jitter(dut, peers, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
 
+    # Warm-up: the RX sketch drops its first emitted frame (priming), so send one
+    # throwaway frame via the peer and let the RX capture and drain it. This way
+    # the measured loop logs exactly FRAMES frames.
+    tx.write(f"SEND {SEND_PROTOCOL} {SEND_BITS:x}\n")
+    tx.expect_exact(f"TX_OK {SEND_PROTOCOL} {SEND_BITS:x}", timeout=5)
+    time.sleep(0.3)
+
     frames = []
     for _ in range(FRAMES):
         tx.write(f"SEND {SEND_PROTOCOL} {SEND_BITS:x}\n")
@@ -58,6 +66,7 @@ def test_irremoteesp8266_tx_jitter(dut, peers, record_property):
         cap = capture_one(rx)
         if cap:
             frames.append(cap)
+        time.sleep(0.005)
 
     if not frames:
         pytest.fail(f"{TX_IMPL}: no frames captured by the 1 us RMT RX.", pytrace=False)
