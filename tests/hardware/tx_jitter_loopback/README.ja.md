@@ -83,3 +83,29 @@ test_pulsekit_loopback_jitter            500       0   500    67     0.00    0.0
 
 同じスクリプトは `hardware/tx_jitter/`（同じ `RX_JITTER` 形式）でも動くので、
 有線ループバック vs 無線の比較にも使えます。
+
+## 観測結果
+
+代表的なラン（NEC、単板キャリアOFFループバック、ESP32-S3 2台、無負荷）。絶対値は
+構成依存で、見るべきは相対関係です。
+
+| TX library | 生成方式 | mean_sd | max_sd | max_ptp |
+| --- | --- | --: | --: | --: |
+| ESP32IRPulseKit | RMT（ハードDMA） | **0.00 µs** | 0.00 | 0 |
+| IRremoteESP8266 | ソフト `delayMicroseconds` | ~0.2-0.4 µs | ~1.4 | ~9 |
+| Arduino-IRremote | ソフト `delayMicroseconds` | ~0.6-0.8 µs | ~2.4 | ~9 |
+
+発見:
+
+- **RMT（ESP32IRPulseKit）は完全に決定論的**。全フレームの全エッジが一致（0µs
+  ジッター）。値はライブラリの10µs RMTティックに量子化されるが、完全に再現する。
+- **ソフト/`delayMicroseconds` 送信は定常状態でサブµsのジッター**だが、割り込み
+  preempt に弱い。初期の50フレームのランで Arduino-IRremote が1エッジだけ
+  `max_ptp ≈ 800 µs`（`sd ≈ 114 µs`）に跳ねたのを観測（単発のISR preempt）。無負荷では
+  稀だが、WiFi/BLE/他ISR下では頻度が上がる。RMTは負荷に関係なく0のまま。
+- いずれもプロトコル許容（NEC ±25% / ~560µs）に対して極小で、クリーンなリンクなら
+  3つとも問題なくデコードできる。RMTの利点は定常精度ではなく**負荷下での堅牢性**。
+
+手法メモ: 無線リグ（`hardware/tx_jitter/`）では IR LED + TSOP のキャリア復調が支配的で、
+ばらつきが大きく（数〜18µs）真のTX順位を覆い隠し・反転させていた。キャリアとTSOPを
+除いた本リグで初めて送信側本来のタイミングが見える。

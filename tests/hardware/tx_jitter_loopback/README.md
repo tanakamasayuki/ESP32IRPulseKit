@@ -88,3 +88,35 @@ Reading the numbers:
 
 The same script also works on `hardware/tx_jitter/` logs (same `RX_JITTER`
 format), so you can compare wired-loopback vs over-the-air runs.
+
+## Observed results
+
+Representative run (NEC, single-board carrier-off loopback, two ESP32-S3, no
+system load). Absolute numbers depend on the setup; the relative picture is the
+point.
+
+| TX library | generation | mean_sd | max_sd | max_ptp |
+| --- | --- | --: | --: | --: |
+| ESP32IRPulseKit | RMT (hardware DMA) | **0.00 µs** | 0.00 | 0 |
+| IRremoteESP8266 | software `delayMicroseconds` | ~0.2-0.4 µs | ~1.4 | ~9 |
+| Arduino-IRremote | software `delayMicroseconds` | ~0.6-0.8 µs | ~2.4 | ~9 |
+
+Findings:
+
+- **RMT (ESP32IRPulseKit) is perfectly deterministic**: every edge of every
+  frame is identical (0 µs jitter). The durations are quantized to the library's
+  10 µs RMT tick, but perfectly repeatable.
+- **Software/`delayMicroseconds` transmitters jitter at the sub-microsecond
+  level** in steady state, but are vulnerable to interrupt preemption. An early
+  50-frame run caught Arduino-IRremote with a single edge spiking to
+  `max_ptp ≈ 800 µs` (`sd ≈ 114 µs`) — a one-off ISR preemption. With no system
+  load such spikes are rare; under WiFi/BLE/other ISRs they would be more
+  frequent, while RMT stays at 0 regardless.
+- All values are tiny relative to the protocol tolerances (NEC ±25 % of ~560 µs),
+  so all three decode fine on a clean link. The advantage of RMT is robustness
+  under load, not steady-state accuracy.
+
+Methodology note: the over-the-air rig (`hardware/tx_jitter/`) measured *larger*
+spreads (single-digit to ~18 µs) dominated by the IR LED + TSOP carrier
+demodulation, which masked and even inverted the true TX ranking. Removing the
+carrier and TSOP (this rig) is what exposes the real per-transmitter timing.
