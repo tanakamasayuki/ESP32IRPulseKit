@@ -47,7 +47,7 @@ def capture_one(rx):
     return [int(x) for x in match.group("us").decode().split(",") if x]
 
 
-def test_tx_jitter(dut, peers, record_property):
+def test_pulsekit_tx_jitter(dut, peers, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
 
