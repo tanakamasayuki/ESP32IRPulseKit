@@ -9,14 +9,18 @@ Each test directory keeps the primary sketch as RX and `peer_tx/` as TX. Keeping
 Variants:
 
 ```text
-irremoteesp8266_tx/     # RX: ESP32IRPulseKit, TX: IRremoteESP8266  (template)
-irremoteesp8266_rx/     # RX: IRremoteESP8266, TX: ESP32IRPulseKit  (planned)
-arduino_irremote_tx/    # RX: ESP32IRPulseKit, TX: Arduino-IRremote (planned)
-arduino_irremote_rx/    # RX: Arduino-IRremote, TX: ESP32IRPulseKit (planned)
+irremoteesp8266_tx/     # RX: ESP32IRPulseKit, TX: IRremoteESP8266
+irremoteesp8266_rx/     # RX: IRremoteESP8266, TX: ESP32IRPulseKit
+arduino_irremote_tx/    # RX: ESP32IRPulseKit, TX: Arduino-IRremote
+arduino_irremote_rx/    # RX: Arduino-IRremote, TX: ESP32IRPulseKit
 ```
 
-[`irremoteesp8266_tx/`](irremoteesp8266_tx/) is the first template. Other
-variants follow the same structure.
+All four variants follow the same structure. `*_tx` variants keep the
+ESP32IRPulseKit RX sketch and swap the `peer_tx/` transmitter to an external
+library; `*_rx` variants keep the ESP32IRPulseKit `peer_tx/` transmitter and
+swap the primary receiver to an external library. Each test records
+`bit_order` (same / reversed / other) alongside the observed bits, since
+implementations often differ only by MSB/LSB-first integer representation.
 
 `compat_matrix` is optional. Use it to observe score, raw_len, decode results, raw timing variation, and bit-order/field interpretation differences.
 

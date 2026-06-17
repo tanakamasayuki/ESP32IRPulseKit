@@ -9,14 +9,17 @@ pytest-embedded のpeer構成に合わせ、各テストディレクトリでは
 バリアント:
 
 ```text
-irremoteesp8266_tx/     # RX: ESP32IRPulseKit, TX: IRremoteESP8266  (雛形)
-irremoteesp8266_rx/     # RX: IRremoteESP8266, TX: ESP32IRPulseKit  (予定)
-arduino_irremote_tx/    # RX: ESP32IRPulseKit, TX: Arduino-IRremote (予定)
-arduino_irremote_rx/    # RX: Arduino-IRremote, TX: ESP32IRPulseKit (予定)
+irremoteesp8266_tx/     # RX: ESP32IRPulseKit, TX: IRremoteESP8266
+irremoteesp8266_rx/     # RX: IRremoteESP8266, TX: ESP32IRPulseKit
+arduino_irremote_tx/    # RX: ESP32IRPulseKit, TX: Arduino-IRremote
+arduino_irremote_rx/    # RX: Arduino-IRremote, TX: ESP32IRPulseKit
 ```
 
-[`irremoteesp8266_tx/`](irremoteesp8266_tx/) が最初の雛形です。他のバリアントも
-同じ構成に従います。
+4バリアントすべて同じ構成です。`*_tx` は ESP32IRPulseKit のRX sketchを残して
+`peer_tx/` の送信側を外部ライブラリに差し替え、`*_rx` は ESP32IRPulseKit の
+`peer_tx/` 送信側を残して親の受信側を外部ライブラリに差し替えます。各テストは
+観測bitsに加えて `bit_order`（same / reversed / other）を記録します。実装間の差は
+MSB/LSB-first の整数表現の違いだけ、というケースが多いためです。
 
 `compat_matrix` は任意実行です。score、raw_len、decode結果、raw timingのばらつきを観測し、bit orderやfield解釈の差分を記録する目的で使います。
 
