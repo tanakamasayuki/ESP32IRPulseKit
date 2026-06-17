@@ -1,0 +1,5 @@
+# Single-board loopback rig. Loopback-specific keys (distinct from TEST_IR_*),
+# reflected from .env. Default wiring is GPIO5 (TX) -> GPIO6 (RX).
+[defines]
+TEST_LOOPBACK_TX_GPIO = "LOOPBACK_TX_GPIO"
+TEST_LOOPBACK_RX_GPIO = "LOOPBACK_RX_GPIO"
