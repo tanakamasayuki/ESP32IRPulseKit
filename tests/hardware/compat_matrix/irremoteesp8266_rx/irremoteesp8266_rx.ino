@@ -3,8 +3,11 @@
 // harness expects. The peer TX (peer_tx/) stays ESP32IRPulseKit, so this
 // observes how an external receiver interprets our transmitter's frames.
 //
-// IRremoteESP8266 has no "score" metric, so score is reported as 0. Per-tick
-// dumps are omitted (the harness only parses up to raw_len).
+// IRremoteESP8266 has no "score" metric, so score is reported as 0. When a
+// frame is received but not recognized (decodeHash fallback yields UNKNOWN), it
+// is dumped as RX_RAW with per-entry durations in microseconds, so the harness
+// can tell "received but undecodable" (a timing/tolerance difference) apart from
+// "no signal at all".
 #include <IRrecv.h>
 #include <IRutils.h>
 
@@ -108,6 +111,19 @@ void loop()
       Serial.print(results.repeat ? "REPEAT" : "NORMAL");
       Serial.print(" raw_len=");
       Serial.println(results.rawlen);
+    }
+    else
+    {
+      Serial.print("RX_RAW len=");
+      Serial.print(results.rawlen);
+      Serial.print(" us=");
+      for (uint16_t i = 0; i < results.rawlen; ++i)
+      {
+        if (i > 0)
+          Serial.print(",");
+        Serial.print((uint32_t)results.rawbuf[i] * kRawTick);
+      }
+      Serial.println();
     }
     irrecv.resume();
   }

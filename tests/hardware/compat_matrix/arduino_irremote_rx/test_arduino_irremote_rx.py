@@ -28,13 +28,16 @@ def classify_bit_order(sent: int, observed: int, bit_length: int) -> str:
     return "other"
 
 
-RX_DECODE = re.compile(
+# Match either a successful decode or a received-but-undecodable RX_RAW dump.
+# "protocol" group is None when the RX_RAW branch matched.
+RX_RESULT = re.compile(
     rb"RX_DECODE protocol=(?P<protocol>[A-Z0-9_]+) "
     rb"score=(?P<score>-?\d+) "
     rb"len=(?P<length>\d+) "
     rb"bits=0x(?P<bits>[0-9A-Fa-f]+) "
     rb"type=(?P<type>NORMAL|REPEAT) "
     rb"raw_len=(?P<raw_len>\d+)"
+    rb"|RX_RAW len=(?P<raw_only_len>\d+)"
 )
 
 
@@ -74,11 +77,19 @@ def assert_serial_control(tx, rx):
 
 def read_first_decode(rx, case: Case):
     try:
-        match = rx.expect(RX_DECODE, timeout=10)
+        match = rx.expect(RX_RESULT, timeout=12)
     except (EOF, TIMEOUT):
         pytest.fail(
-            f"Arduino-IRremote RX did not decode anything for {case.protocol} "
-            f"bits=0x{case.bits:x}.",
+            f"Arduino-IRremote RX saw no IR signal for {case.protocol} "
+            f"bits=0x{case.bits:x} (no RX_DECODE or RX_RAW within timeout).",
+            pytrace=False,
+        )
+    if match.group("protocol") is None:
+        raw_len = int(match.group("raw_only_len"))
+        pytest.fail(
+            f"Arduino-IRremote RX received a frame (raw_len={raw_len}) but could "
+            f"not decode {case.protocol} bits=0x{case.bits:x} — likely a "
+            f"timing/tolerance incompatibility.",
             pytrace=False,
         )
     return {

@@ -3,12 +3,16 @@
 // harness expects. The peer TX (peer_tx/) stays ESP32IRPulseKit, so this
 // observes how an external receiver interprets our transmitter's frames.
 //
-// Arduino-IRremote has no "score" metric, so score is reported as 0. Per-tick
-// dumps are omitted (the harness only parses up to raw_len).
+// Arduino-IRremote has no "score" metric, so score is reported as 0. When a
+// frame is received but not recognized (DECODE_HASH fallback yields UNKNOWN), it
+// is dumped as RX_RAW with per-entry durations in microseconds, so the harness
+// can tell "received but undecodable" (a timing/tolerance difference) apart from
+// "no signal at all".
 #define DECODE_NEC
 #define DECODE_SONY
 #define DECODE_SAMSUNG
 #define DECODE_JVC
+#define DECODE_HASH  // report unrecognized frames as UNKNOWN (for RX_RAW)
 #include <Arduino.h>
 #include <IRremote.hpp>
 
@@ -107,6 +111,19 @@ void loop()
       Serial.print((d.flags & IRDATA_FLAGS_IS_REPEAT) ? "REPEAT" : "NORMAL");
       Serial.print(" raw_len=");
       Serial.println((uint32_t)d.rawlen);
+    }
+    else
+    {
+      Serial.print("RX_RAW len=");
+      Serial.print((uint32_t)IrReceiver.irparams.rawlen);
+      Serial.print(" us=");
+      for (uint16_t i = 0; i < IrReceiver.irparams.rawlen; ++i)
+      {
+        if (i > 0)
+          Serial.print(",");
+        Serial.print((uint32_t)IrReceiver.irparams.rawbuf[i] * MICROS_PER_TICK);
+      }
+      Serial.println();
     }
     IrReceiver.resume();
   }
