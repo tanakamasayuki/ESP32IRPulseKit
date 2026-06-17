@@ -142,7 +142,7 @@ namespace
     Serial.print((unsigned long)m);
     Serial.print(" us=");
     Serial.flush();
-    delay(1);
+    delay(3);
     for (size_t i = 0; i < m; ++i)
     {
       if (i > 0)
@@ -151,7 +151,7 @@ namespace
       if ((i & 0x0F) == 0x0F)
       {
         Serial.flush();
-        delay(1);
+        delay(3);
       }
     }
     Serial.println();
