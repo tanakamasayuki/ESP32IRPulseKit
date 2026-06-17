@@ -41,12 +41,24 @@ uv run --env-file .env pytest hardware/tx_jitter_loopback/
 ```
 
 Each variant sends NEC 50 times (override with `JITTER_FRAMES`) with a small
-pause between frames (`JITTER_GAP_MS`, default 5 ms) so the serial pipeline
-drains and `RX_JITTER` lines stay clean, then prints `JITTER_LOOPBACK_OBSERVED`
-with per-edge `mean_stdev_us` / `max_stdev_us` / `max_ptp_us`. The per-frame
-timing is highly repeatable, so a modest count is enough. Because the IR link and
-carrier are removed, differences here reflect the transmitter's raw timing
-precision (RMT hardware DMA vs software bit-banging).
+pause between frames (`JITTER_GAP_MS`, default 5 ms), then prints
+`JITTER_LOOPBACK_OBSERVED` with per-edge `mean_stdev_us` / `max_stdev_us` /
+`max_ptp_us`. The per-frame timing is highly repeatable, so a modest count is
+enough. Because the IR link and carrier are removed, differences here reflect the
+transmitter's raw timing precision (RMT hardware DMA vs software bit-banging).
+
+Two details keep the capture clean and the frame counts equal across variants:
+
+- **Paced serial output.** A full `RX_JITTER` line is ~400 bytes; pushed over the
+  115200 USB-UART bridge in one continuous burst, the host/bridge receive buffer
+  occasionally overruns and drops a few bytes mid-line. `dumpFrame()` flushes the
+  line in ~16-value chunks with a short inter-chunk gap so the bridge FIFO never
+  backs up, eliminating corrupted lines.
+- **First-capture priming.** Some transmitters miss the very first RMT capture
+  right after arming (a blocking software send can race the initial arm). Each
+  sketch sends one throwaway frame in `setup()` and drains it without emitting a
+  line, so the measured loop starts primed and every variant logs exactly
+  `JITTER_FRAMES` frames.
 
 ## Analyze
 
@@ -68,9 +80,9 @@ Output is a comparison table plus the worst edges per transmitter:
 
 ```text
 capture                                clean corrupt  used edges  mean_sd  max_sd  max_ptp
-test_arduino_irremote_loopback_jitter    500       0   500    67     0.xx    2.xx        x
-test_irremoteesp8266_loopback_jitter     500       0   500    67     0.xx    2.xx        x
-test_pulsekit_loopback_jitter            500       0   500    67     0.00    0.00        0
+test_arduino_irremote_loopback_jitter     50       0    50    67     0.77    2.65        9
+test_irremoteesp8266_loopback_jitter      50       0    50    67     0.40    2.92        6
+test_pulsekit_loopback_jitter             50       0    50    67     0.00    0.00        0
 ```
 
 Reading the numbers:
@@ -81,8 +93,8 @@ Reading the numbers:
 - `0.00` everywhere — perfectly deterministic timing (RMT hardware DMA).
 - `corrupt` — lines whose declared `len=` did not match the actual count of `us=`
   values, i.e. the long serial line lost bytes in transit. These are a reporting
-  artifact (not transmit jitter) and are discarded; the sketches emit each line
-  in one `write()` + `flush()` to keep this near zero.
+  artifact (not transmit jitter) and are discarded; the paced chunked output (see
+  Run) keeps this at zero.
 - `used` — clean frames whose edge count matched the modal length (used for the
   per-edge stats).
 
@@ -98,8 +110,8 @@ point.
 | TX library | generation | mean_sd | max_sd | max_ptp |
 | --- | --- | --: | --: | --: |
 | ESP32IRPulseKit | RMT (hardware DMA) | **0.00 µs** | 0.00 | 0 |
-| IRremoteESP8266 | software `delayMicroseconds` | ~0.2-0.4 µs | ~1.4 | ~9 |
-| Arduino-IRremote | software `delayMicroseconds` | ~0.6-0.8 µs | ~2.4 | ~9 |
+| IRremoteESP8266 | software `delayMicroseconds` | ~0.3-0.4 µs | ~1.5-2.9 | ~6-9 |
+| Arduino-IRremote | software `delayMicroseconds` | ~0.7-0.8 µs | ~2.6-3.0 | ~9-11 |
 
 Findings:
 

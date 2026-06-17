@@ -39,11 +39,21 @@ uv run --env-file .env pytest hardware/tx_jitter_loopback/
 ```
 
 各バリアントが NEC を50回送信し（`JITTER_FRAMES` で上書き可）、フレーム間に小休止
-（`JITTER_GAP_MS`、既定5ms）を入れてシリアルを排出し `RX_JITTER` 行をクリーンに保ちます。
-その後 `JITTER_LOOPBACK_OBSERVED` にエッジごとの
+（`JITTER_GAP_MS`、既定5ms）を入れます。その後 `JITTER_LOOPBACK_OBSERVED` にエッジごとの
 `mean_stdev_us` / `max_stdev_us` / `max_ptp_us` を出力します。1フレームの timing は
 非常に再現性が高いので、回数は控えめで十分です。IRリンクとキャリアを除いているため、
 ここでの差は送信側の生のタイミング精度（RMTハードDMA vs ソフトビットバンギング）を反映します。
+
+キャプチャをクリーンに保ち、バリアント間でフレーム数を揃えるための工夫が2点あります:
+
+- **シリアル出力のペーシング**: `RX_JITTER` 1行は約400バイト。115200のUSB-UARTブリッジへ
+  一気に流すと、ホスト/ブリッジの受信バッファが時々溢れて行の途中で数バイト落ちます。
+  `dumpFrame()` は約16値ごとに `flush()`＋短い隙間を入れて分割送出し、ブリッジFIFOが
+  詰まらないようにして corrupt 行をゼロにします。
+- **初回キャプチャの priming**: 送信実装によっては arm 直後の**最初の1キャプチャを取り逃す**
+  （ブロッキングなソフト送信が初回 arm とレースする）。各スケッチは `setup()` で1発だけ
+  捨てフレームを送って行を出さずに drain するので、計測ループは安定状態から始まり、
+  全バリアントがちょうど `JITTER_FRAMES` 個のフレームを記録します。
 
 ## 分析
 
@@ -65,9 +75,9 @@ uv run python hardware/tx_jitter_loopback/analyze.py --worst 10 \
 
 ```text
 capture                                clean corrupt  used edges  mean_sd  max_sd  max_ptp
-test_arduino_irremote_loopback_jitter    500       0   500    67     0.xx    2.xx        x
-test_irremoteesp8266_loopback_jitter     500       0   500    67     0.xx    2.xx        x
-test_pulsekit_loopback_jitter            500       0   500    67     0.00    0.00        0
+test_arduino_irremote_loopback_jitter     50       0    50    67     0.77    2.65        9
+test_irremoteesp8266_loopback_jitter      50       0    50    67     0.40    2.92        6
+test_pulsekit_loopback_jitter             50       0    50    67     0.00    0.00        0
 ```
 
 数値の読み方:
@@ -78,7 +88,7 @@ test_pulsekit_loopback_jitter            500       0   500    67     0.00    0.0
 - すべて `0.00` — 完全に決定論的なタイミング（RMTハードDMA）。
 - `corrupt` — 宣言 `len=` と実際の `us=` 個数が不一致の行＝長いシリアル行が途中で
   バイト落ちしたもの。送信ジッターではなく**転送上のアーティファクト**で、破棄されます。
-  スケッチは各行を1回の `write()` + `flush()` で出力し、これをほぼ0に抑えます。
+  分割ペーシング出力（「実行」参照）でこれを0に抑えています。
 - `used` — エッジ数が最頻長と一致したクリーンなフレーム（エッジ統計に使用）。
 
 同じスクリプトは `hardware/tx_jitter/`（同じ `RX_JITTER` 形式）でも動くので、
@@ -92,8 +102,8 @@ test_pulsekit_loopback_jitter            500       0   500    67     0.00    0.0
 | TX library | 生成方式 | mean_sd | max_sd | max_ptp |
 | --- | --- | --: | --: | --: |
 | ESP32IRPulseKit | RMT（ハードDMA） | **0.00 µs** | 0.00 | 0 |
-| IRremoteESP8266 | ソフト `delayMicroseconds` | ~0.2-0.4 µs | ~1.4 | ~9 |
-| Arduino-IRremote | ソフト `delayMicroseconds` | ~0.6-0.8 µs | ~2.4 | ~9 |
+| IRremoteESP8266 | ソフト `delayMicroseconds` | ~0.3-0.4 µs | ~1.5-2.9 | ~6-9 |
+| Arduino-IRremote | ソフト `delayMicroseconds` | ~0.7-0.8 µs | ~2.6-3.0 | ~9-11 |
 
 発見:
 
