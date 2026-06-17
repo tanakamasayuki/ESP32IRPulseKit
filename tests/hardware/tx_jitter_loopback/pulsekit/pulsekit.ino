@@ -165,6 +165,9 @@ void dumpFrame()
   }
   Serial.println(out);
   Serial.flush();
+  // Let the long line fully ship over USB before the loop re-arms RMT, so its
+  // tail (newline + last values) is not occasionally dropped.
+  delay(3);
 }
 } // namespace
 
