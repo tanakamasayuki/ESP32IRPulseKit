@@ -111,3 +111,17 @@ in the wrong direction and pushes the zero-space past the decode tolerance.
   NEC bits by nearest expected space (threshold ≈1125 us) with a loose mark
   check, instead of strict ±25 % membership — how most NEC decoders work. Not
   yet implemented; it does not touch the committed 33 % default-duty decision.
+
+### JVC → IRremoteESP8266: root cause isolated
+
+The JVC case (PulseKit TX → IRremoteESP8266 RX) is marginal (~1/5) even though
+`irremoteesp8266_self` decodes JVC 5/5 at the same placement — so it is a
+**transmitter** issue, not environment. Raising TX duty to 50 % does not fix it.
+The `hardware/carrier_loopback/` probe (1 µs RMT capture of the raw carrier, no
+TSOP) pinned it down: the carrier period is clean, but each identical 530 µs mark
+holds **20 or 21 carrier cycles in a ~50/50 coin-flip** (free-running carrier
+phase). That ±1 cycle (~26 µs) shifts the demodulated mark/space enough that some
+zero-spaces cross IRremoteESP8266's tight ~594 µs JVC window. See
+[carrier_loopback/README.md](../carrier_loopback/README.md) for the data and the
+candidate fix (per-mark carrier phase alignment, likely via a symbol-encoded
+carrier at ~1 µs resolution).

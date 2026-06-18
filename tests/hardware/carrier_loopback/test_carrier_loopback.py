@@ -1,3 +1,4 @@
+import collections
 import os
 import re
 import sys
@@ -29,14 +30,10 @@ def wait_ready(dut):
     dut.expect(re.compile(rb"RX_READY impl=\S+ .*carrier=on resolution_us=1"), timeout=20)
 
 
-def test_carrier_loopback_probe(dut, record_property):
-    wait_ready(dut)
-    dut.write("PING\n")
-    dut.expect_exact("PONG", timeout=5)
-
+def capture_set(dut, mark_us):
     lines = []
     for _ in range(SENDS):
-        dut.write(f"CAP {MARK_US} {SPACE_US} {COUNT} {DUTY} {CARRIER_HZ}\n")
+        dut.write(f"CAP {mark_us} {SPACE_US} {COUNT} {DUTY} {CARRIER_HZ}\n")
         try:
             dut.expect_exact("CAP_OK", timeout=5)
             m = dut.expect(CARRIER_RAW, timeout=8)
@@ -44,25 +41,38 @@ def test_carrier_loopback_probe(dut, record_property):
             continue
         lines.append(m.group(0).decode(errors="replace").strip())
         time.sleep(0.02)
+    return lines
 
-    text = "\n".join(lines)
+
+def test_carrier_loopback_probe(dut, record_property):
+    wait_ready(dut)
+    dut.write("PING\n")
+    dut.expect_exact("PONG", timeout=5)
+
+    # CL_MARKS (comma list) sweeps mark widths in one flash; defaults to CL_MARK.
+    marks_list = [int(x) for x in os.environ.get("CL_MARKS", str(MARK_US)).split(",")]
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w") as fh:
-        fh.write(text + "\n")
 
-    frames, marks, summary = analyze.analyze(text)
-    print(f"\nCARRIER_LOOPBACK mark={MARK_US} space={SPACE_US} count={COUNT} "
-          f"duty={DUTY} hz={CARRIER_HZ} sends={SENDS}")
-    analyze.print_summary(summary, marks)
+    last_summary = {}
+    for mark_us in marks_list:
+        lines = capture_set(dut, mark_us)
+        text = "\n".join(lines)
+        out = OUT if len(marks_list) == 1 else OUT.replace(".txt", f"_{mark_us}.txt")
+        with open(out, "w") as fh:
+            fh.write(text + "\n")
 
-    record_property("marks", summary.get("marks", 0))
-    record_property("period_mean_us", round(summary.get("period_mean", 0), 2))
-    record_property("cycles_per_mark", str(summary.get("cycles_per_mark", [])))
-    record_property("on_span_sd_us", round(summary.get("on_span_sd", 0), 2))
+        frames, marks, summary = analyze.analyze(text)
+        last_summary = summary
+        hist = dict(sorted(collections.Counter(m["cycles"] for m in marks).items()))
+        period = summary.get("period_mean", float("nan"))
+        cyc_float = mark_us / period if period == period and period else float("nan")
+        print(f"\nCARRIER_LOOPBACK mark={mark_us} space={SPACE_US} duty={DUTY} "
+              f"hz={CARRIER_HZ} sends={SENDS}  (mark/period = {cyc_float:.2f} cycles)")
+        analyze.print_summary(summary, marks)
+        print(f"  cycles histogram: {hist}")
+        record_property(f"hist_{mark_us}", str(hist))
 
-    # This is an observation rig: only sanity-check that we captured carrier.
-    assert summary, "no carrier marks parsed (check loopback jumper LOOPBACK_TX->RX)"
-    assert summary["marks"] >= COUNT, "too few marks captured"
-    assert 15.0 <= summary["period_mean"] <= 40.0, (
-        f"carrier period {summary['period_mean']:.1f}us out of plausible range "
-        f"for {CARRIER_HZ} Hz")
+    assert last_summary, "no carrier marks parsed (check loopback jumper LOOPBACK_TX->RX)"
+    assert last_summary["marks"] >= COUNT, "too few marks captured"
+    assert 15.0 <= last_summary["period_mean"] <= 40.0, (
+        f"carrier period {last_summary['period_mean']:.1f}us out of range for {CARRIER_HZ} Hz")
