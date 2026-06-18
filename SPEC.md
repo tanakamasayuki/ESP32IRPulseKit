@@ -136,6 +136,7 @@ struct IRProtocolSpec {
 - Fixed-length protocols use `bit_length`.
 - Variable-length protocols use `min_bit_length..max_bit_length`. A `0` bound falls back to `bit_length`.
 - `default_repeat_count` is the default extra send count used when `repeat_count < 0`. `0` means one send; `2` means three sends total.
+- `bit_tol_pct` is the standard error range for a good signal for that protocol. It is not an absolute candidate rejection limit. A mark/space outside this range may still be kept as a decode candidate when the frame shape and bit classification are still clear; the extra error is reflected in `score`.
 - `order` is assigned by registration. Users do not need to set it.
 
 ### 2.4 Decode Result
@@ -183,9 +184,23 @@ struct IRRxStats {
 
 - `candidates` are sorted by descending score. Ties are broken by earlier registration order.
 - `candidate()` returns the best candidate. `bits()` returns the best candidate's BITS. Both return `nullptr` when there is no candidate.
+- `score` is a relative measure of how closely the received waveform matches the protocol spec. A waveform similar to multiple protocols may produce multiple candidates; users normally inspect the best candidate and the score gap. The absolute score value and formula are not compatibility guarantees.
 - `DECODE_SKIPPED`: decode was skipped, for example in RAW-only mode.
 - `RAW_TRUNCATED`: RAW exceeded the internal limit and was truncated.
 - `RMT_OVERFLOW`: RMT receive may have overflowed.
+
+### 2.5 Decode Matching And score
+
+Decode is not an exact-match-only operation. Real IR receive timings can shift systematically with the receiver module, distance, angle, carrier duty, and ambient light, so ESP32IRPulseKit separates candidate formation from scoring.
+
+- Obvious mismatches are rejected early, for example a very different header, broken mark/space layout, bit count outside the protocol range, invalid repeat shape, or a missing required gap/trailer.
+- Waveforms inside `bit_tol_pct` are treated as high-quality matches.
+- Waveforms slightly outside `bit_tol_pct` can still remain candidates when the protocol encoding rules can classify the bits clearly.
+- For SPACE_ENC protocols whose 0/1 spaces are well separated, decoding may classify each bit by the nearest expected space instead of relying only on strict tolerance windows. The error from the nominal timing is accumulated into `score`.
+- For BIPHASE protocols, candidates may remain while the half-bit/grid structure is still valid; deviation from the unit timing is reflected in `score`.
+- It is normal for similar protocols to remain as candidates for the same RAW input. Final priority is descending score, then registration order for ties.
+
+Therefore, a protocol timing tolerance such as NEC bit timing ±25% is the reference for a good match, not the widest possible candidate range. The wider internal candidate tolerance is an implementation detail, but waveforms whose bit classification is ambiguous or whose frame shape is invalid are rejected.
 
 ## 3. Built-in Protocols
 

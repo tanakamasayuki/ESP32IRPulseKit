@@ -39,6 +39,7 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5, RC6_M0, RC6_M6 fixture host tests |
 | Protocol carrier preferences | ✅ | ✅ | ✅ NEC smoke | | Built-in values and sender override range checked in host |
 | Candidate ordering and score threshold | ✅ | | | | Host smoke test exists |
+| Relaxed candidate matching and score degradation | ⬜ | | ⬜ compat | | RAW slightly beyond tolerance should remain a candidate and score lower than ideal timing |
 | Encode rejection / invalid inputs | ✅ | | | | Undersized buffer, unknown id, bad length |
 | RAW-only mode (0 candidates) | ✅ | | | | Host smoke test exists |
 | Tolerance boundaries | ✅ | | | | SPACE_ENC ±25% boundaries checked in host smoke |
@@ -89,9 +90,21 @@ Hardware tests distinguish two send modes.
 - `SEND protocol bits`: tests the integrated `IRSender` and `IRReceiver` path
 - `SEND_RAW raw_ticks`: tests decode behavior against known waveforms
 
+## Decode Score Fixture Policy
+
+Decode tests cover candidate formation and score ranking, not only strict pass/fail.
+
+- Host tests keep fixed RAW inputs for ideal timing, tolerance boundaries, slightly out-of-tolerance but classifiable timing, and clearly broken timing
+- Slightly out-of-tolerance waveforms should remain decode candidates and score lower than ideal timing for the same protocol
+- Clearly broken waveforms should produce no candidate, or be dropped by score threshold
+- For SPACE_ENC, classifiable jitter stays sufficiently far from the 0/1 space midpoint; ambiguous midpoint cases are rejection cases
+- For BIPHASE, jitter that preserves the half-bit/grid structure is a candidate case; broken grid structure is a rejection case
+- `hardware/compat_matrix` observes timing variation from external libraries and physical setup; reproducible cases should be promoted into host fixtures
+
 ## Priority
 
 1. Select the Arduino host runner and add host runtime tests.
 2. Add build tests for examples and minimal sketches.
 3. Add two-board TX/RX hardware tests.
-4. Promote captured real remote RAW fixtures into host/hardware tests.
+4. Add host tests for noisy RAW fixtures that verify candidate retention and score degradation.
+5. Promote captured real remote RAW fixtures into host/hardware tests.

@@ -136,6 +136,7 @@ struct IRProtocolSpec {
 - 固定長protocolでは `bit_length` を使います。
 - 可変長protocolでは `min_bit_length..max_bit_length` を使います。`0` の場合は `bit_length` を下限/上限として扱います。
 - `default_repeat_count` は `repeat_count < 0` の送信で使う既定の追加送信回数です。`0` は1回だけ送信、`2` は合計3回送信です。
+- `bit_tol_pct` は、そのprotocolで「良好な信号」とみなす標準的な誤差率です。decode候補を必ず棄却する絶対上限ではありません。仕様値から外れたmark/spaceでも、フレーム形状とbit分類が十分に成立する場合は候補として残り、誤差分はscoreへ反映されます。
 - `order` は登録順です。利用者が設定する必要はありません。
 
 ### 2.4 Decode Result
@@ -183,9 +184,23 @@ struct IRRxStats {
 
 - `candidates` はscore降順で返ります。同scoreの場合は登録順が早いものを優先します。
 - `candidate()` は最上位候補、`bits()` は最上位候補のBITSを返します。候補がない場合は `nullptr` です。
+- `score` は受信波形がprotocol specへどれだけ近いかを表す相対値です。複数protocolに似た波形は複数候補として残ることがあり、利用者は通常、最上位候補とscore差を見ます。scoreの絶対値や計算式は互換性契約ではありません。
 - `DECODE_SKIPPED`: RAW-only設定などでdecodeしなかったことを示します。
 - `RAW_TRUNCATED`: RAWが内部上限を超えて切り詰められたことを示します。
 - `RMT_OVERFLOW`: RMT受信でoverflowが発生した可能性を示します。
+
+### 2.5 Decode判定とscore
+
+decodeは、完全一致だけを受け入れる判定ではありません。実IR受信では受信モジュール、距離、角度、carrier duty、外乱光によりmark/spaceが系統的に伸縮するため、ESP32IRPulseKit は次の方針で候補化とscore付けを行います。
+
+- 明らかな別物は早期除外します。例: headerが大きく異なる、mark/spaceの並びが壊れている、bit数が範囲外、repeat形状が成立しない、必要なgap/trailerが成立しない。
+- `bit_tol_pct` 内の波形は高品質な一致として扱います。
+- `bit_tol_pct` を少し超える波形でも、protocolの符号化規則上bit値を分類できる場合は候補として残します。
+- SPACE_ENC系では、0/1のspace長が十分に離れているprotocolについて、strictな許容窓だけでなく近い期待spaceへの分類を使えます。分類後のnominalからの誤差はscoreへ累積します。
+- BIPHASE系では、half-bit/grid構造が成立する範囲で候補化し、単位幅からのずれをscoreへ反映します。
+- 似たprotocolが同じRAWから候補に残ることは正常です。最終的な優先順位はscore降順、同scoreなら登録順です。
+
+このため、protocol仕様上の許容値（例: NECのbit timing ±25%）は「候補に残す最大範囲」ではなく「良好一致の基準」です。候補化のための内部許容は実装詳細ですが、bit分類が曖昧になるほど外れた波形や、フレーム形状が成立しない波形は候補から除外されます。
 
 ## 3. 内蔵Protocol
 

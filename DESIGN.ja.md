@@ -53,10 +53,23 @@ decodeは登録済みprotocolすべてに対して行います。
 
 大まかな流れ:
 
-1. ヘッダー、bit長、mark/space列などで早期除外する
-2. 成立した候補にscoreを付ける
-3. score降順、同scoreなら登録順で候補を並べる
-4. `setScoreThreshold()` 未満の候補は捨てる
+1. ヘッダー、bit長、mark/space列などで明らかな不一致を早期除外する
+2. protocolの符号化規則でbit値を分類できる波形を候補として残す
+3. nominal timingからの誤差を累積してscoreを付ける
+4. score降順、同scoreなら登録順で候補を並べる
+5. `setScoreThreshold()` 未満の候補は捨てる
+
+`IRProtocolSpec::bit_tol_pct` は「良好一致」の基準であり、候補化の絶対上限ではありません。実IR受信ではTSOPなどの復調器でmark/spaceが系統的にずれるため、少し外れた信号は候補として残し、悪さをscoreへ載せます。
+
+候補化の原則:
+
+- フレームとして明らかに成立しないものは早期除外する
+- header/repeat/header-like構造はprotocol識別に強く効くため、bit本体より保守的に扱う
+- SPACE_ENCは、0/1 spaceが十分に離れていればnearest expected spaceでbit分類できる
+- BIPHASEは、half-bit/grid構造が成立する範囲で候補化する
+- bit分類が曖昧な領域、mark/space順序の破綻、bit数範囲外は候補から落とす
+
+似たprotocolが同じRAWから複数候補に残ることは想定内です。最終的にはscore差、protocol固有の追加評価、登録順で順位を決めます。scoreの内訳は公開APIにしませんが、実装上は「strict windowを超えたら即棄却」ではなく「分類できる限り候補化し、誤差を累積する」方針を維持します。
 
 scoreは公開API上の相対評価値です。絶対値の厳密な意味は固定しません。
 

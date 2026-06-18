@@ -54,9 +54,22 @@ Decode runs against all registered protocols.
 High-level flow:
 
 1. Reject obvious mismatches such as header, bit length, and broken mark/space layout
-2. Score matching candidates
-3. Sort candidates by descending score; ties use registration order
-4. Drop candidates below `setScoreThreshold()`
+2. Keep waveforms as candidates when the protocol encoding rules can still classify the bits
+3. Accumulate timing error from nominal values into `score`
+4. Sort candidates by descending score; ties use registration order
+5. Drop candidates below `setScoreThreshold()`
+
+`IRProtocolSpec::bit_tol_pct` is the reference range for a good match, not the absolute candidate limit. Real IR receiver modules can shift marks/spaces systematically, so slightly out-of-spec signals should remain candidates when their bits are still clear, with the degradation reflected in score.
+
+Candidate-formation principles:
+
+- Reject waveforms that clearly cannot be valid frames
+- Treat header/repeat/header-like structure more conservatively than body bits because it strongly identifies the protocol
+- For SPACE_ENC, classify bits by nearest expected space when 0/1 spaces are sufficiently separated
+- For BIPHASE, keep candidates while the half-bit/grid structure is still valid
+- Reject ambiguous bit-classification regions, broken mark/space order, and bit counts outside the protocol range
+
+It is expected that similar protocols can remain as candidates for the same RAW input. Final ranking is decided by score gap, protocol-specific adjustments, and registration order. Score internals are not public API, but implementation should preserve the policy of "classify when possible and score the error" rather than "reject immediately when a strict window is exceeded."
 
 `score` is a relative public API value. Its absolute meaning is not fixed.
 

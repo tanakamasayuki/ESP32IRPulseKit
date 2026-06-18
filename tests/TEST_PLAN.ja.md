@@ -39,6 +39,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5・RC6_M0・RC6_M6 fixture host test |
 | protocol carrier推奨値 | ✅ | ✅ | ✅ NEC smoke | | 標準protocol値とsender override範囲をhostで確認 |
 | 候補順位・score threshold | ✅ | | | | host smoke追加済み |
+| 緩め候補化とscore劣化 | ⬜ | | ⬜ compat | | ±toleranceを少し超えるRAWを候補に残し、理想波形より低scoreになることを確認する |
 | encode拒否・不正入力 | ✅ | | | | バッファ不足・未知ID・bit長不一致 |
 | RAWのみモード(候補0) | ✅ | | | | host smoke追加済み |
 | tolerance境界 | ✅ | | | | SPACE_ENCの±25%境界をhost smokeで確認 |
@@ -89,9 +90,21 @@ hardwareテストでは2種類の送信を分けます。
 - `SEND protocol bits`: `IRSender` と `IRReceiver` の統合経路を見る。初期実装は `SEND NEC <address_hex> <command_hex>`
 - `SEND_RAW raw_ticks`: 既知波形に対するdecodeを見る
 
+## Decode score fixture方針
+
+decodeはstrictな合否だけでなく、候補化とscore順位を検証します。
+
+- hostでは、理想波形、tolerance境界、toleranceを少し超えるがbit分類できる波形、明らかに壊れた波形を固定RAWとして持つ
+- toleranceを少し超える波形は、decode候補として残り、同じprotocolの理想波形より低いscoreになることをassertする
+- 明らかに壊れた波形は候補なし、またはscore thresholdで落ちることをassertする
+- SPACE_ENCでは0/1 spaceの中間から十分離れた揺らぎを候補化対象にし、中間付近の曖昧な波形は除外対象にする
+- BIPHASEではhalf-bit/grid構造を保つ揺らぎを候補化対象にし、gridが破綻した波形は除外対象にする
+- hardware/compat_matrixでは外部ライブラリや物理条件で発生した揺らぎを観測し、再現性のあるものはhost fixtureへ昇格する
+
 ## 優先順
 
 1. Arduino host基盤を選び、host実行テストを追加する
 2. examplesと最小sketchのbuildテストを追加する
 3. 2台構成のTX/RX実機テストを追加する
-4. 市販リモコンで収集したRAW fixtureをhost/hardwareテストへ取り込む
+4. 揺らぎ多めのRAW fixtureで候補化とscore劣化をhostテスト化する
+5. 市販リモコンで収集したRAW fixtureをhost/hardwareテストへ取り込む
