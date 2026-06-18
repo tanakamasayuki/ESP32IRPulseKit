@@ -587,6 +587,111 @@ void testNecLikeRankingWithNoisyTiming()
               jvc_result.count == 1 || jvc_result.candidates[0].score > jvc_result.candidates[1].score);
 }
 
+void testSonyFamilyRankingWithNoisyTiming()
+{
+  esp32irpk::IRDecodedBits sony12{};
+  sony12.protocol_id = esp32irpk::IRProtocolID::SONY12;
+  sony12.frame_type = esp32irpk::IRFrameType::NORMAL;
+  sony12.bit_length = 12;
+  sony12.bits = 0x0a90ULL;
+
+  esp32irpk::IRDecodedBits sony20{};
+  sony20.protocol_id = esp32irpk::IRProtocolID::SONY20;
+  sony20.frame_type = esp32irpk::IRFrameType::NORMAL;
+  sony20.bit_length = 20;
+  sony20.bits = 0x0abcdeULL;
+
+  const esp32irpk::IRProtocolSpec tx_sony12_specs[] = {esp32irpk::specs::SONY12};
+  const esp32irpk::IRProtocolSpec tx_sony20_specs[] = {esp32irpk::specs::SONY20};
+  const esp32irpk::IRProtocolSpec rank_specs[] = {
+      esp32irpk::specs::SONY20,
+      esp32irpk::specs::SONY15,
+      esp32irpk::specs::SONY12,
+  };
+
+  uint16_t raw_ticks[96]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = raw_ticks;
+  raw.capacity = sizeof(raw_ticks) / sizeof(raw_ticks[0]);
+
+  EXPECT_TRUE("ranking/sony12-encode", esp32irpk::codec::encodeBitsToRaw(sony12, tx_sony12_specs, 1, raw));
+  uint16_t noisy_sony12_ticks[96]{};
+  esp32irpk::IRRawTickView noisy_sony12{};
+  perturbRawTicks(raw, noisy_sony12_ticks, sizeof(noisy_sony12_ticks) / sizeof(noisy_sony12_ticks[0]), noisy_sony12);
+
+  esp32irpk::IRReceiveResult<4> sony12_result{};
+  EXPECT_TRUE("ranking/sony12-noisy-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_sony12, rank_specs, 3, 4, 0, sony12_result));
+  EXPECT_EQ("ranking/sony12-noisy-first", esp32irpk::IRProtocolID::SONY12, sony12_result.candidates[0].protocol_id);
+  EXPECT_EQ("ranking/sony12-noisy-bits", sony12.bits, sony12_result.candidates[0].decoded.bits);
+
+  EXPECT_TRUE("ranking/sony20-encode", esp32irpk::codec::encodeBitsToRaw(sony20, tx_sony20_specs, 1, raw));
+  uint16_t noisy_sony20_ticks[96]{};
+  esp32irpk::IRRawTickView noisy_sony20{};
+  perturbRawTicks(raw, noisy_sony20_ticks, sizeof(noisy_sony20_ticks) / sizeof(noisy_sony20_ticks[0]), noisy_sony20);
+
+  esp32irpk::IRReceiveResult<4> sony20_result{};
+  EXPECT_TRUE("ranking/sony20-noisy-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_sony20, rank_specs, 3, 4, 0, sony20_result));
+  EXPECT_EQ("ranking/sony20-noisy-first", esp32irpk::IRProtocolID::SONY20, sony20_result.candidates[0].protocol_id);
+  EXPECT_EQ("ranking/sony20-noisy-bits", sony20.bits, sony20_result.candidates[0].decoded.bits);
+  EXPECT_TRUE("ranking/sony20-noisy-score-gap",
+              sony20_result.count == 1 || sony20_result.candidates[0].score > sony20_result.candidates[1].score);
+}
+
+void testLengthVariantRankingWithNoisyTiming()
+{
+  esp32irpk::IRDecodedBits samsung36{};
+  samsung36.protocol_id = esp32irpk::IRProtocolID::SAMSUNG36;
+  samsung36.frame_type = esp32irpk::IRFrameType::NORMAL;
+  samsung36.bit_length = 36;
+  samsung36.bits = 0xabcdeabcdULL;
+
+  esp32irpk::IRDecodedBits jvc32{};
+  jvc32.protocol_id = esp32irpk::IRProtocolID::JVC32;
+  jvc32.frame_type = esp32irpk::IRFrameType::NORMAL;
+  jvc32.bit_length = 32;
+  jvc32.bits = 0x1234abcdULL;
+
+  const esp32irpk::IRProtocolSpec tx_samsung36_specs[] = {esp32irpk::specs::SAMSUNG36};
+  const esp32irpk::IRProtocolSpec samsung_rank_specs[] = {
+      esp32irpk::specs::SAMSUNG32,
+      esp32irpk::specs::SAMSUNG36,
+  };
+  const esp32irpk::IRProtocolSpec tx_jvc32_specs[] = {esp32irpk::specs::JVC32};
+  const esp32irpk::IRProtocolSpec jvc_rank_specs[] = {
+      esp32irpk::specs::JVC24,
+      esp32irpk::specs::JVC32,
+  };
+
+  uint16_t raw_ticks[128]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = raw_ticks;
+  raw.capacity = sizeof(raw_ticks) / sizeof(raw_ticks[0]);
+
+  EXPECT_TRUE("ranking/samsung36-encode", esp32irpk::codec::encodeBitsToRaw(samsung36, tx_samsung36_specs, 1, raw));
+  uint16_t noisy_samsung36_ticks[128]{};
+  esp32irpk::IRRawTickView noisy_samsung36{};
+  perturbRawTicks(raw, noisy_samsung36_ticks, sizeof(noisy_samsung36_ticks) / sizeof(noisy_samsung36_ticks[0]), noisy_samsung36);
+
+  esp32irpk::IRReceiveResult<4> samsung_result{};
+  EXPECT_TRUE("ranking/samsung36-noisy-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_samsung36, samsung_rank_specs, 2, 4, 0, samsung_result));
+  EXPECT_EQ("ranking/samsung36-noisy-first", esp32irpk::IRProtocolID::SAMSUNG36, samsung_result.candidates[0].protocol_id);
+  EXPECT_EQ("ranking/samsung36-noisy-bits", samsung36.bits, samsung_result.candidates[0].decoded.bits);
+
+  EXPECT_TRUE("ranking/jvc32-encode", esp32irpk::codec::encodeBitsToRaw(jvc32, tx_jvc32_specs, 1, raw));
+  uint16_t noisy_jvc32_ticks[128]{};
+  esp32irpk::IRRawTickView noisy_jvc32{};
+  perturbRawTicks(raw, noisy_jvc32_ticks, sizeof(noisy_jvc32_ticks) / sizeof(noisy_jvc32_ticks[0]), noisy_jvc32);
+
+  esp32irpk::IRReceiveResult<4> jvc_result{};
+  EXPECT_TRUE("ranking/jvc32-noisy-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_jvc32, jvc_rank_specs, 2, 4, 0, jvc_result));
+  EXPECT_EQ("ranking/jvc32-noisy-first", esp32irpk::IRProtocolID::JVC32, jvc_result.candidates[0].protocol_id);
+  EXPECT_EQ("ranking/jvc32-noisy-bits", jvc32.bits, jvc_result.candidates[0].decoded.bits);
+}
+
 void testSpaceEncodedDecodeAllowsClippedFinalSpace()
 {
   esp32irpk::frames::Sony12Frame sony12{};
@@ -1108,6 +1213,8 @@ void setup()
   testBiphaseEncodeDecodeRoundtrips();
   testSimilarSpaceEncodedRankingWithNoisyTiming();
   testNecLikeRankingWithNoisyTiming();
+  testSonyFamilyRankingWithNoisyTiming();
+  testLengthVariantRankingWithNoisyTiming();
   testSpaceEncodedDecodeAllowsClippedFinalSpace();
   testNecRepeatDecode();
   testNecRepeatEncode();
