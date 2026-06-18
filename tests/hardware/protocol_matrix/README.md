@@ -10,8 +10,12 @@ The primary sketch is RX and `peer_tx/` is TX. The peer name stays fixed as `tx`
 
 - NEC
 - SONY12
+- SONY15
+- SONY20
 - SAMSUNG32
+- SAMSUNG36
 - JVC24
+- JVC32
 
 ## Run
 
@@ -21,4 +25,3 @@ uv run --env-file .env pytest hardware/protocol_matrix/
 ```
 
 pytest prints `PROTOCOL_MATRIX_OBSERVED` with protocol, bits, score, and raw_len. Score and raw_len depend on the physical setup, so they are not fixed to exact values.
-

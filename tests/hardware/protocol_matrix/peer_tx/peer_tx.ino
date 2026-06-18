@@ -108,13 +108,29 @@ void handleSend(const String &line)
   {
     ok = sendBits(esp32irpk::IRProtocolID::SONY12, 12, bits);
   }
+  else if (protocolText == "SONY15")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::SONY15, 15, bits);
+  }
+  else if (protocolText == "SONY20")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::SONY20, 20, bits);
+  }
   else if (protocolText == "SAMSUNG32")
   {
     ok = sendBits(esp32irpk::IRProtocolID::SAMSUNG32, 32, bits);
   }
+  else if (protocolText == "SAMSUNG36")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::SAMSUNG36, 36, bits);
+  }
   else if (protocolText == "JVC24")
   {
     ok = sendBits(esp32irpk::IRProtocolID::JVC24, 24, bits);
+  }
+  else if (protocolText == "JVC32")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::JVC32, 32, bits);
   }
   else
   {
@@ -173,4 +189,3 @@ void loop()
   }
   delay(1);
 }
-
