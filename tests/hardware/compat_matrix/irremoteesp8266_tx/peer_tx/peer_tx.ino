@@ -105,13 +105,29 @@ void handleSend(const String &line)
   {
     irsend.sendSony(bits, 12, 0);
   }
+  else if (protocolText == "SONY15")
+  {
+    irsend.sendSony(bits, 15, 0);
+  }
+  else if (protocolText == "SONY20")
+  {
+    irsend.sendSony(bits, 20, 0);
+  }
   else if (protocolText == "SAMSUNG32")
   {
     irsend.sendSAMSUNG(bits, 32);
   }
+  else if (protocolText == "SAMSUNG36")
+  {
+    irsend.sendSAMSUNG(bits, 36);
+  }
   else if (protocolText == "JVC24")
   {
     irsend.sendJVC(bits, 24);
+  }
+  else if (protocolText == "JVC32")
+  {
+    irsend.sendJVC(bits, 32);
   }
   else
   {

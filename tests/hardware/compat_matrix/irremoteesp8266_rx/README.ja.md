@@ -20,8 +20,12 @@ IRremoteESP8266 には score 指標が無いため `score=0` を出力します�
 
 - NEC
 - SONY12
+- SONY15
+- SONY20
 - SAMSUNG32
+- SAMSUNG36
 - JVC24
+- JVC32
 
 ## 実行
 

@@ -22,8 +22,12 @@ active-low IR receiver module and has no inverted-input option, so
 
 - NEC
 - SONY12
+- SONY15
+- SONY20
 - SAMSUNG32
+- SAMSUNG36
 - JVC24
+- JVC32
 
 ## Run
 

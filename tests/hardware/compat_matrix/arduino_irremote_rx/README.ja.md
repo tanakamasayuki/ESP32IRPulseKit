@@ -21,8 +21,12 @@ Arduino-IRremote は標準的なactive-lowのIR受信モジュール前提で反
 
 - NEC
 - SONY12
+- SONY15
+- SONY20
 - SAMSUNG32
+- SAMSUNG36
 - JVC24
+- JVC32
 
 ## 実行
 

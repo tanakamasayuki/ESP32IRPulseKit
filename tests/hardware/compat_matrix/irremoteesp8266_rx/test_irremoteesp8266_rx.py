@@ -53,8 +53,12 @@ class Case:
 CASES = [
     Case("NEC", 0xCB3400FF),
     Case("SONY12", 0x0A90),
+    Case("SONY15", 0x3456),
+    Case("SONY20", 0xABCDE),
     Case("SAMSUNG32", 0x40BFE0E0),
+    Case("SAMSUNG36", 0xABCDEABCD),
     Case("JVC24", 0x00C0DE),
+    Case("JVC32", 0x1234ABCD),
 ]
 
 

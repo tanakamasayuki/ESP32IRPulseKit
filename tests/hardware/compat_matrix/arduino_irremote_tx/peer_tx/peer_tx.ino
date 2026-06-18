@@ -110,13 +110,29 @@ void handleSend(const String &line)
   {
     IrSender.sendSonyMSB((unsigned long)bits, 12);
   }
+  else if (protocolText == "SONY15")
+  {
+    IrSender.sendSonyMSB((unsigned long)bits, 15);
+  }
+  else if (protocolText == "SONY20")
+  {
+    IrSender.sendSonyMSB((unsigned long)bits, 20);
+  }
   else if (protocolText == "SAMSUNG32")
   {
     IrSender.sendSamsungMSB((unsigned long)bits, 32);
   }
+  else if (protocolText == "SAMSUNG36")
+  {
+    IrSender.sendSamsungMSB((unsigned long)bits, 36);
+  }
   else if (protocolText == "JVC24")
   {
     IrSender.sendJVCMSB((unsigned long)bits, 24);
+  }
+  else if (protocolText == "JVC32")
+  {
+    IrSender.sendJVCMSB((unsigned long)bits, 32);
   }
   else
   {

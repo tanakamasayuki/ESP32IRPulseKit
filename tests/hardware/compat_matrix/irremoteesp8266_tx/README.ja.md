@@ -16,8 +16,12 @@ sketchのみです。
 
 - NEC
 - SONY12
+- SONY15
+- SONY20
 - SAMSUNG32
+- SAMSUNG36
 - JVC24
+- JVC32
 
 ## 実行
 
