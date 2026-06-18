@@ -403,6 +403,36 @@ void testGeneratedProtocolRoundtrips()
                               panasonic40.toBits());
 }
 
+void testBiphaseEncodeDecodeRoundtrips()
+{
+  esp32irpk::IRDecodedBits rc5{};
+  rc5.protocol_id = esp32irpk::IRProtocolID::RC5;
+  rc5.frame_type = esp32irpk::IRFrameType::NORMAL;
+  rc5.bit_length = 14;
+  rc5.bits = 0x300f;
+  expectEncodeDecodeRoundtrip("generated/rc5",
+                              esp32irpk::specs::RC5,
+                              rc5);
+
+  esp32irpk::IRDecodedBits rc6_m0{};
+  rc6_m0.protocol_id = esp32irpk::IRProtocolID::RC6_M0_16;
+  rc6_m0.frame_type = esp32irpk::IRFrameType::NORMAL;
+  rc6_m0.bit_length = 21;
+  rc6_m0.bits = 0x111234;
+  expectEncodeDecodeRoundtrip("generated/rc6-m0",
+                              esp32irpk::specs::RC6_M0_16,
+                              rc6_m0);
+
+  esp32irpk::IRDecodedBits rc6_m6{};
+  rc6_m6.protocol_id = esp32irpk::IRProtocolID::RC6_M6_32;
+  rc6_m6.frame_type = esp32irpk::IRFrameType::NORMAL;
+  rc6_m6.bit_length = 36;
+  rc6_m6.bits = 0xe89abcdefULL;
+  expectEncodeDecodeRoundtrip("generated/rc6-m6",
+                              esp32irpk::specs::RC6_M6_32,
+                              rc6_m6);
+}
+
 void testSpaceEncodedDecodeAllowsClippedFinalSpace()
 {
   esp32irpk::frames::Sony12Frame sony12{};
@@ -710,6 +740,39 @@ void testRc6M6FixtureDecode()
   EXPECT_EQ("rc6-m6-fixture/data", 0xe89abcdefULL, frame.data);
 }
 
+void testBiphaseDecodeAllowsClippedFinalHalf()
+{
+  const uint16_t rc5_clipped_ticks[] = {
+      84, 94, 84, 183, 86, 93, 85, 93, 84, 94, 84, 93, 84,
+      94, 84, 94, 84, 94, 175, 93, 84, 94, 84, 94, 84};
+  esp32irpk::IRRawTickView rc5_view{};
+  rc5_view.ticks = rc5_clipped_ticks;
+  rc5_view.len = sizeof(rc5_clipped_ticks) / sizeof(rc5_clipped_ticks[0]);
+
+  const esp32irpk::IRProtocolSpec rc5_specs[] = {esp32irpk::specs::RC5};
+  esp32irpk::IRReceiveResult<4> rc5_result{};
+  EXPECT_TRUE("rc5-clipped-final-half/decode",
+              esp32irpk::codec::decodeRawToBits(rc5_view, rc5_specs, 1, 4, 0, rc5_result));
+  EXPECT_EQ("rc5-clipped-final-half/protocol", esp32irpk::IRProtocolID::RC5, rc5_result.candidates[0].protocol_id);
+  EXPECT_EQ("rc5-clipped-final-half/bits", 0x300fULL, rc5_result.candidates[0].decoded.bits);
+
+  const uint16_t rc6_m6_clipped_ticks[] = {
+      259, 96, 81, 94, 39, 50, 39, 91, 84, 93, 38, 49, 39, 49,
+      85, 93, 37, 49, 84, 49, 40, 91, 84, 93, 84, 91, 84, 49,
+      40, 47, 39, 49, 40, 93, 40, 47, 84, 49, 39, 94, 81, 49,
+      40, 49, 40, 48, 37, 94, 84, 49, 40, 47, 39, 49, 40};
+  esp32irpk::IRRawTickView rc6_view{};
+  rc6_view.ticks = rc6_m6_clipped_ticks;
+  rc6_view.len = sizeof(rc6_m6_clipped_ticks) / sizeof(rc6_m6_clipped_ticks[0]);
+
+  const esp32irpk::IRProtocolSpec rc6_specs[] = {esp32irpk::specs::RC6_M0_16, esp32irpk::specs::RC6_M6_32};
+  esp32irpk::IRReceiveResult<4> rc6_result{};
+  EXPECT_TRUE("rc6-m6-clipped-final-half/decode",
+              esp32irpk::codec::decodeRawToBits(rc6_view, rc6_specs, 2, 4, 0, rc6_result));
+  EXPECT_EQ("rc6-m6-clipped-final-half/protocol", esp32irpk::IRProtocolID::RC6_M6_32, rc6_result.candidates[0].protocol_id);
+  EXPECT_EQ("rc6-m6-clipped-final-half/bits", 0xe89abcdefULL, rc6_result.candidates[0].decoded.bits);
+}
+
 void testScoreThresholdFiltersCandidate()
 {
   esp32irpk::IRRawTickView view{};
@@ -888,6 +951,7 @@ void setup()
   testSpaceEncodedRelaxedCandidateScoring();
   testSpaceEncodedAmbiguousSpaceRejects();
   testGeneratedProtocolRoundtrips();
+  testBiphaseEncodeDecodeRoundtrips();
   testSpaceEncodedDecodeAllowsClippedFinalSpace();
   testNecRepeatDecode();
   testNecRepeatEncode();
@@ -902,6 +966,7 @@ void setup()
   testRc5FixtureDecode();
   testRc6M0FixtureDecode();
   testRc6M6FixtureDecode();
+  testBiphaseDecodeAllowsClippedFinalHalf();
   testScoreThresholdFiltersCandidate();
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();

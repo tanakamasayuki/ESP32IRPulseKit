@@ -516,8 +516,10 @@ namespace esp32irpk::codec
       uint32_t err_sum = 0;
       if (!buildHalves(raw, 0, unit_us, spec.bit_tol_pct, halves, err_sum))
         return false;
-      if (halves.size() < bits * 2)
+      if (halves.size() + 1 < bits * 2)
         return false;
+      if (halves.size() == bits * 2 - 1)
+        halves.push_back(!halves.back());
       if (halves.size() > bits * 2)
         halves.resize(bits * 2);
 
@@ -578,8 +580,12 @@ namespace esp32irpk::codec
       size_t toggle_halves = has_toggle ? 4 : 0;
       size_t total_bits = 1 + 3 + (has_toggle ? 1 : 0) + payload_bits;
       size_t expected_halves = start_bit_halves + toggle_halves + (total_bits - 1 - (has_toggle ? 1 : 0)) * 2 + (has_toggle ? 0 : 0);
-      if (halves.size() < expected_halves)
+      if (halves.size() + 1 < expected_halves)
         return false;
+      if (halves.size() > expected_halves + 1)
+        return false;
+      if (halves.size() == expected_halves - 1)
+        halves.push_back(!halves.back());
       size_t pos = 0;
 
       auto decodeBitWidth = [&](size_t width_halves, bool &bit_out) -> bool
