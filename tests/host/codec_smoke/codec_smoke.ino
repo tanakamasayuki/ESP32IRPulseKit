@@ -512,6 +512,81 @@ void testSimilarSpaceEncodedRankingWithNoisyTiming()
               panasonic_result.count == 1 || panasonic_result.candidates[0].score > panasonic_result.candidates[1].score);
 }
 
+void testNecLikeRankingWithNoisyTiming()
+{
+  esp32irpk::IRDecodedBits nec{};
+  nec.protocol_id = esp32irpk::IRProtocolID::NEC;
+  nec.frame_type = esp32irpk::IRFrameType::NORMAL;
+  nec.bit_length = 32;
+  nec.bits = 0xcb3400ffULL;
+
+  esp32irpk::IRDecodedBits samsung{};
+  samsung.protocol_id = esp32irpk::IRProtocolID::SAMSUNG32;
+  samsung.frame_type = esp32irpk::IRFrameType::NORMAL;
+  samsung.bit_length = 32;
+  samsung.bits = 0x40bfe0e0ULL;
+
+  esp32irpk::IRDecodedBits jvc{};
+  jvc.protocol_id = esp32irpk::IRProtocolID::JVC24;
+  jvc.frame_type = esp32irpk::IRFrameType::NORMAL;
+  jvc.bit_length = 24;
+  jvc.bits = 0x00c0deULL;
+
+  const esp32irpk::IRProtocolSpec tx_nec_specs[] = {esp32irpk::specs::NEC};
+  const esp32irpk::IRProtocolSpec tx_samsung_specs[] = {esp32irpk::specs::SAMSUNG32};
+  const esp32irpk::IRProtocolSpec tx_jvc_specs[] = {esp32irpk::specs::JVC24};
+  const esp32irpk::IRProtocolSpec rank_specs[] = {
+      esp32irpk::specs::JVC32,
+      esp32irpk::specs::SAMSUNG32,
+      esp32irpk::specs::NEC,
+      esp32irpk::specs::JVC24,
+  };
+
+  uint16_t raw_ticks[128]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = raw_ticks;
+  raw.capacity = sizeof(raw_ticks) / sizeof(raw_ticks[0]);
+
+  EXPECT_TRUE("ranking/nec-like-nec-encode", esp32irpk::codec::encodeBitsToRaw(nec, tx_nec_specs, 1, raw));
+  uint16_t noisy_nec_ticks[128]{};
+  esp32irpk::IRRawTickView noisy_nec{};
+  perturbRawTicks(raw, noisy_nec_ticks, sizeof(noisy_nec_ticks) / sizeof(noisy_nec_ticks[0]), noisy_nec);
+
+  esp32irpk::IRReceiveResult<4> nec_result{};
+  EXPECT_TRUE("ranking/nec-like-nec-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_nec, rank_specs, 4, 4, 0, nec_result));
+  EXPECT_EQ("ranking/nec-like-nec-first", esp32irpk::IRProtocolID::NEC, nec_result.candidates[0].protocol_id);
+  EXPECT_EQ("ranking/nec-like-nec-bits", nec.bits, nec_result.candidates[0].decoded.bits);
+  EXPECT_TRUE("ranking/nec-like-nec-score-gap",
+              nec_result.count == 1 || nec_result.candidates[0].score > nec_result.candidates[1].score);
+
+  EXPECT_TRUE("ranking/nec-like-samsung-encode", esp32irpk::codec::encodeBitsToRaw(samsung, tx_samsung_specs, 1, raw));
+  uint16_t noisy_samsung_ticks[128]{};
+  esp32irpk::IRRawTickView noisy_samsung{};
+  perturbRawTicks(raw, noisy_samsung_ticks, sizeof(noisy_samsung_ticks) / sizeof(noisy_samsung_ticks[0]), noisy_samsung);
+
+  esp32irpk::IRReceiveResult<4> samsung_result{};
+  EXPECT_TRUE("ranking/nec-like-samsung-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_samsung, rank_specs, 4, 4, 0, samsung_result));
+  EXPECT_EQ("ranking/nec-like-samsung-first", esp32irpk::IRProtocolID::SAMSUNG32, samsung_result.candidates[0].protocol_id);
+  EXPECT_EQ("ranking/nec-like-samsung-bits", samsung.bits, samsung_result.candidates[0].decoded.bits);
+  EXPECT_TRUE("ranking/nec-like-samsung-score-gap",
+              samsung_result.count == 1 || samsung_result.candidates[0].score > samsung_result.candidates[1].score);
+
+  EXPECT_TRUE("ranking/nec-like-jvc-encode", esp32irpk::codec::encodeBitsToRaw(jvc, tx_jvc_specs, 1, raw));
+  uint16_t noisy_jvc_ticks[128]{};
+  esp32irpk::IRRawTickView noisy_jvc{};
+  perturbRawTicks(raw, noisy_jvc_ticks, sizeof(noisy_jvc_ticks) / sizeof(noisy_jvc_ticks[0]), noisy_jvc);
+
+  esp32irpk::IRReceiveResult<4> jvc_result{};
+  EXPECT_TRUE("ranking/nec-like-jvc-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_jvc, rank_specs, 4, 4, 0, jvc_result));
+  EXPECT_EQ("ranking/nec-like-jvc-first", esp32irpk::IRProtocolID::JVC24, jvc_result.candidates[0].protocol_id);
+  EXPECT_EQ("ranking/nec-like-jvc-bits", jvc.bits, jvc_result.candidates[0].decoded.bits);
+  EXPECT_TRUE("ranking/nec-like-jvc-score-gap",
+              jvc_result.count == 1 || jvc_result.candidates[0].score > jvc_result.candidates[1].score);
+}
+
 void testSpaceEncodedDecodeAllowsClippedFinalSpace()
 {
   esp32irpk::frames::Sony12Frame sony12{};
@@ -1032,6 +1107,7 @@ void setup()
   testGeneratedProtocolRoundtrips();
   testBiphaseEncodeDecodeRoundtrips();
   testSimilarSpaceEncodedRankingWithNoisyTiming();
+  testNecLikeRankingWithNoisyTiming();
   testSpaceEncodedDecodeAllowsClippedFinalSpace();
   testNecRepeatDecode();
   testNecRepeatEncode();
