@@ -18,8 +18,8 @@ meter lets you find a good physical placement by hand.
 ## What it shows
 
 ```
-[GOOD                       ] decode 100%(30/30)  recv 100%  mark 561(+1)sd5  sp0 590(+30)sd11  sp1 1702  compat-margin +47us  score 88
-[TOO CLOSE (saturated)      ] decode  70%(21/30)  recv 100%  mark 521(-39)sd9 sp0 712(+152)sd24 sp1 1840 compat-margin -75us  score 38
+[GOOD                       ] decode 100%(30/30)  recv 100%  mark 561(+1)sd5  sp0 590(+30)sd11  sp1 1702  compat-margin(JVC) +39us  score 86
+[TOO CLOSE (saturated)      ] decode  70%(21/30)  recv 100%  mark 521(-39)sd9 sp0 712(+152)sd24 sp1 1840 compat-margin(JVC) -83us  score 36
 ```
 
 - **verdict** — `GOOD` / `TOO CLOSE (saturated)` / `TOO FAR / WEAK` /
@@ -29,10 +29,14 @@ meter lets you find a good physical placement by hand.
 - **mark / sp0 / sp1** — mean received widths (us) vs NEC nominal (560 / 560 /
   1690) with the signed deviation; `sd` is the jitter. Mark *short* + sp0
   *inflated* is the close-range saturation signature.
-- **compat-margin** — headroom (us) of the worst-case (p90) zero-space before
-  the **tightest external RX** (IRremoteESP8266, zero ceiling ≈ 637 us) rejects
-  it. Negative means an external receiver would likely drop frames even if our
-  own decoder still accepts them.
+- **compat-margin(JVC)** — worst-case (p90) headroom (us) against the
+  **strictest external receiver**: **JVC on IRremoteESP8266**, whose zero-space
+  window tops out at `(525−50)×1.25 ≈ 594 us` — tighter than NEC's ~638 us. The
+  meter transmits NEC, measures the demod's zero-space *inflation* (≈ the mark
+  deficit, a roughly fixed absolute surplus), and projects it onto JVC's 525 us
+  nominal. Negative means an external RX would likely drop frames even if our own
+  decoder still accepts them. Scoring against JVC means **"GOOD" implies every
+  built-in protocol should decode externally, not just NEC**.
 - **score 0–100** — `60·decode_rate + 25·compat_margin_term + 15·stability`.
 
 Read it as: chase a high score *and* a positive compat-margin. If the verdict is
@@ -44,12 +48,15 @@ reduce angle/obstruction.
 From `tests/`:
 
 ```sh
-# first time (or after editing the sketches): build + upload both boards
-uv run python hardware/link_quality/monitor.py --flash
-
-# subsequent runs (boards already flashed): just connect and measure
+# default: build + upload both boards, then run
 uv run python hardware/link_quality/monitor.py
+
+# skip flashing and connect to already-flashed boards
+uv run python hardware/link_quality/monitor.py --no-flash
 ```
+
+Flashing is the default on purpose: re-flashing is cheap, but measuring stale or
+mismatched firmware silently is not — better to always upload than to be fooled.
 
 Options: `--window N` (rolling frames, default 30), `--interval S` (seconds
 between sends, default 0.2), `--bits HEX` (NEC payload, default `cb3400ff`),

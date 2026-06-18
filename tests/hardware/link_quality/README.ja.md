@@ -16,8 +16,8 @@ TXボードがNEC固定フレームを連続送信し、RXボードが復調、�
 ## 表示内容
 
 ```
-[GOOD                       ] decode 100%(30/30)  recv 100%  mark 561(+1)sd5  sp0 590(+30)sd11  sp1 1702  compat-margin +47us  score 88
-[TOO CLOSE (saturated)      ] decode  70%(21/30)  recv 100%  mark 521(-39)sd9 sp0 712(+152)sd24 sp1 1840 compat-margin -75us  score 38
+[GOOD                       ] decode 100%(30/30)  recv 100%  mark 561(+1)sd5  sp0 590(+30)sd11  sp1 1702  compat-margin(JVC) +39us  score 86
+[TOO CLOSE (saturated)      ] decode  70%(21/30)  recv 100%  mark 521(-39)sd9 sp0 712(+152)sd24 sp1 1840 compat-margin(JVC) -83us  score 36
 ```
 
 - **verdict（判定）** — `GOOD` / `TOO CLOSE (saturated)＝近すぎ飽和` /
@@ -27,9 +27,13 @@ TXボードがNEC固定フレームを連続送信し、RXボードが復調、�
 - **recv %** — 何らかのRX行が出たフレーム率（取りこぼし＝遠すぎ）。
 - **mark / sp0 / sp1** — 受信幅の平均(us)とNEC公称(560/560/1690)との符号付き差。
   `sd`はジッター。マーク短＋sp0膨張が近接飽和のサイン。
-- **compat-margin** — 最悪値(p90)のゼロ空白が、**最も狭い外部RX**
-  （IRremoteESP8266、ゼロ上限≈637us）に弾かれるまでの余裕(us)。負なら、当方
-  デコーダは通っても外部受信機は落とす可能性が高い。
+- **compat-margin(JVC)** — **最も厳しい外部受信機**に対する最悪値(p90)の余裕(us)。
+  基準は **IRremoteESP8266 の JVC**：ゼロ空白上限が `(525−50)×1.25 ≈ 594us` で、
+  NECの ~638us より狭い。メーターはNECを送信し、復調のゼロ空白**膨張量**
+  （≒マーク欠損、ほぼ一定の絶対オーバー分）を測り、それを JVC の 525us 公称へ
+  投影して算出する。負なら、当方デコーダは通っても外部受信機は落とす可能性が高い。
+  JVC基準にしているので、**「GOOD」＝NECだけでなく全内蔵プロトコルが外部でデコード
+  される見込み**を意味する。
 - **score 0–100** — `60·decode率 + 25·compat余裕項 + 15·安定度`。
 
 読み方：スコアを高く、かつ compat-margin を正に。判定が `TOO CLOSE` なら離す、
@@ -40,12 +44,15 @@ TXボードがNEC固定フレームを連続送信し、RXボードが復調、�
 `tests/` から：
 
 ```sh
-# 初回（またはスケッチ編集後）: 両ボードをビルド＋書き込み
-uv run python hardware/link_quality/monitor.py --flash
-
-# 2回目以降（書き込み済み）: 接続して計測のみ
+# 既定: 両ボードをビルド＋書き込みしてから計測
 uv run python hardware/link_quality/monitor.py
+
+# 書き込みを省略して、書き込み済みボードに接続
+uv run python hardware/link_quality/monitor.py --no-flash
 ```
+
+書き込みを既定にしているのは意図的：再書き込みは安いが、古い／不一致のファームを
+黙って計測する方が怖い。毎回転送する方が安全。
 
 オプション: `--window N`（直近フレーム数、既定30）、`--interval S`（送信間隔秒、
 既定0.2）、`--bits HEX`（NECペイロード、既定 `cb3400ff`）、`--no-color`。

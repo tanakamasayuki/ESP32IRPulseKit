@@ -10,8 +10,13 @@ spaces inflated), TOO FAR (weak / dropouts), UNSTABLE (jitter), or GOOD.
 It is NOT a pass/fail test. Stop it with Ctrl-C; a summary is printed.
 
 Usage (from tests/):
-    uv run python hardware/link_quality/monitor.py            # connect only
-    uv run python hardware/link_quality/monitor.py --flash    # build+upload first
+    uv run python hardware/link_quality/monitor.py              # build+upload, then run
+    uv run python hardware/link_quality/monitor.py --no-flash   # connect to flashed boards
+
+Flashing is the default so stale/mismatched firmware can't silently fool the
+reading. The compat margin is scored against the strictest external receiver
+(JVC on IRremoteESP8266, ~594us zero-space ceiling), so "GOOD" means every
+built-in protocol should decode externally, not just NEC.
 
 Reads tests/.env for ports / GPIOs.
 """
@@ -34,9 +39,14 @@ SPACE_SPLIT = (NEC_ZERO_SPACE + NEC_ONE_SPACE) / 2  # zero/one classifier ~1125u
 
 # Our own decoder accepts zero-space up to 560*1.25 = 700us.
 OUR_ZERO_CEIL = NEC_ZERO_SPACE * 1.25
-# IRremoteESP8266 is the tightest external RX: it subtracts a 50us mark-excess
-# from the desired space, so its zero-space window tops out at (560-50)*1.25.
-COMPAT_ZERO_CEIL = (NEC_ZERO_SPACE - 50) * 1.25  # ~637.5us
+# The meter transmits a NEC frame, so the measured zero-space has a 560us nominal.
+SENT_ZERO_US = NEC_ZERO_SPACE
+# Strictest external receiver: IRremoteESP8266 decoding *JVC*. It subtracts a
+# 50us mark-excess from the desired space, so its zero-space window tops out at
+# (nominal-50)*1.25. JVC's 525us nominal gives the tightest ceiling of all the
+# protocols (594us vs NEC's 638us), so we score against JVC to be conservative.
+STRICT_ZERO_NOMINAL = 525            # JVC zero-space nominal
+STRICT_ZERO_CEIL = (525 - 50) * 1.25  # ~594us (JVC on IRremoteESP8266)
 TICK_US = 10  # our RX dumps ticks in 10us units
 
 REPO = Path(__file__).resolve().parents[3]  # .../ESP32IRPulseKit
@@ -159,7 +169,9 @@ def pct(values, p):
 
 def main():
     ap = argparse.ArgumentParser(description="Live IR link-quality meter")
-    ap.add_argument("--flash", action="store_true", help="build+upload both sketches first")
+    ap.add_argument("--no-flash", action="store_true",
+                    help="skip build+upload and connect to already-flashed boards "
+                         "(default: always flash, so stale/mismatched firmware can't fool you)")
     ap.add_argument("--window", type=int, default=30, help="rolling window (frames)")
     ap.add_argument("--interval", type=float, default=0.2, help="seconds between sends")
     ap.add_argument("--bits", default="cb3400ff", help="NEC payload (hex)")
@@ -175,7 +187,7 @@ def main():
     tx_inv = env.get("TEST_IR_TX_INVERTED", "0")
     color = not args.no_color and sys.stdout.isatty()
 
-    if args.flash:
+    if not args.no_flash:
         flash(RX_DIR, "rx_esp32s3", rx_port,
               f'build.defines=-DIR_RX_GPIO="{rx_gpio}" -DIR_RX_INVERTED="{rx_inv}"')
         flash(TX_DIR, "tx_esp32s3", tx_port,
@@ -241,8 +253,13 @@ def score_and_verdict(n, recv, decoded, marks, zeros, ones):
     sp0_p90 = pct(zeros, 90)
 
     mark_bias = (mark_mean - NEC_MARK) if marks else 0.0
-    # headroom (us) before the tightest external RX rejects a zero-space.
-    compat_margin = (COMPAT_ZERO_CEIL - sp0_p90) if sp0_p90 is not None else float("nan")
+    # The demod inflates the zero-space by ~the mark deficit (a roughly fixed
+    # absolute surplus, independent of the nominal). We measure that surplus from
+    # the transmitted NEC frame, then project it onto the *strictest* protocol
+    # (JVC) to report worst-case headroom before an external RX rejects it.
+    inflation = (sp0_p90 - SENT_ZERO_US) if sp0_p90 is not None else float("nan")
+    compat_margin = (STRICT_ZERO_CEIL - (STRICT_ZERO_NOMINAL + inflation)
+                     if sp0_p90 is not None else float("nan"))
     jitter = statistics.fmean([mark_sd, sp0_sd]) if marks else 0.0
 
     def clamp(x):
@@ -286,7 +303,7 @@ def render(window, expect_bits, color):
         f"mark {f(s['mark_mean'])}({s['mark_bias']:+.0f})sd{f(s['mark_sd'])}  "
         f"sp0 {f(s['sp0_mean'])}({s['sp0_mean']-NEC_ZERO_SPACE:+.0f})sd{f(s['sp0_sd'])}  "
         f"sp1 {f(s['sp1_mean'])}  "
-        f"compat-margin {s['compat_margin']:+.0f}us  "
+        f"compat-margin(JVC) {s['compat_margin']:+.0f}us  "
         f"score {s['score']:3d}"
     )
     # pad to clear leftovers, update in place
@@ -304,7 +321,7 @@ def summary(window, expect_bits):
     print(f"  mark           : {s['mark_mean']:.0f}us ({s['mark_bias']:+.0f}) sd {s['mark_sd']:.0f}")
     print(f"  zero-space     : {s['sp0_mean']:.0f}us ({s['sp0_mean']-NEC_ZERO_SPACE:+.0f}) sd {s['sp0_sd']:.0f}")
     print(f"  one-space      : {s['sp1_mean']:.0f}us")
-    print(f"  compat margin  : {s['compat_margin']:+.0f}us vs IRremoteESP8266 zero ceiling ({COMPAT_ZERO_CEIL:.0f}us)")
+    print(f"  compat margin  : {s['compat_margin']:+.0f}us  (strictest: JVC on IRremoteESP8266, zero ceiling {STRICT_ZERO_CEIL:.0f}us)")
 
 
 if __name__ == "__main__":
