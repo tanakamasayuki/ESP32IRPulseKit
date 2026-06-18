@@ -24,3 +24,59 @@ implementations often differ only by MSB/LSB-first integer representation.
 
 `compat_matrix` is optional. Use it to observe score, raw_len, decode results, raw timing variation, and bit-order/field interpretation differences.
 
+## Current findings & hypotheses (NEC, as of 2026-06-18)
+
+Running the NEC case at a **very short TX↔RX distance (<10 cm)** gives 2 of 4
+directions failing, while the other 2 pass:
+
+| Direction | Result | What the RX sees |
+|---|---|---|
+| IRremoteESP8266 (50% duty) TX → our RX | ✅ pass | zero-space ~590 us |
+| our TX → Arduino-IRremote RX | ✅ pass | — |
+| **Arduino-IRremote (30% duty) TX → our RX** | ❌ fail | zero-space inflates to **~780 us** (> our 700 us ceiling) |
+| **our TX → IRremoteESP8266 RX** | ❌ fail | zero-space ~594–672 us (> their ~637 us ceiling) |
+
+### Hypothesis: the failures are a close-range TSOP demodulation **bias**, not jitter
+
+At short range the TSOP demodulator **saturates** and cuts the mark's trailing
+edge early; by conservation, the time lost from the mark is added to the
+following space. The result is a **systematic offset**: marks arrive ~80–90 us
+*short* and zero-spaces ~80–90 us *long*. A normal-distance TSOP does the
+opposite (marks long, spaces short) — which is exactly what every library's
+~50 us "mark excess" compensation assumes, so the close-range saturation biases
+in the wrong direction and pushes the zero-space past the decode tolerance.
+
+- **Failure A** (our RX): Arduino's 30%-duty signal inflates the zero-space to
+  ~780 us, past our 560 ±25 % = 700 us window. Our decoder requires a space
+  within ±25 % of *either* 560 or 1690, so 780 lands in the dead-zone.
+- **Failure B** (IRremoteESP8266 RX): it *subtracts* 50 us from the desired
+  space (assuming the normal direction), tightening the zero-space ceiling to
+  ~637 us — the wrong way for our inflated ~650/672 us spaces. Raising our TX
+  duty to 50 % did **not** fix it (still spikes to 672).
+
+### Why the jitter rigs showed almost no difference
+
+`tx_jitter_loopback`, `tx_jitter`, and `carrier_jitter` measured frame-to-frame
+**variation** (standard deviation, ~5–30 us). This bias is a different axis:
+
+- The loopback rig is **wired (no TSOP)**, so it has no demodulation bias at all
+  — only the RMT's intrinsic determinism.
+- The carrier/jitter rigs reported **sd**, normalizing out the constant mean
+  offset; their headline result was "sd valleys at integer carrier cycles".
+- The variation here is still ~20 us (same ballpark) — what breaks decoding is
+  the ~90 us **mean bias**, which only the over-the-air *decode-compatibility*
+  path surfaces.
+
+### Status / next steps
+
+- This is a hypothesis pending **re-measurement at a realistic distance**, where
+  the TSOP should behave normally and both failing directions are expected to
+  decode. Distance is the only lever that can fix Failure B (we cannot change
+  IRremoteESP8266's decoder).
+- Use `hardware/link_quality/` (manual meter) to find a placement where the
+  zero-space bias is small and the external-RX "compat margin" is positive.
+- A possible library-side robustness improvement (fixes Failure A only): classify
+  NEC bits by nearest expected space (threshold ≈1125 us) with a loose mark
+  check, instead of strict ±25 % membership — how most NEC decoders work. Not
+  yet implemented; it does not touch the committed 33 % default-duty decision.
+
