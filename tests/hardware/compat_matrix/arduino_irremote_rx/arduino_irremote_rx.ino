@@ -31,7 +31,7 @@ namespace
 {
 // Map Arduino-IRremote's protocol to the uppercase names the harness regex
 // expects ([A-Z0-9_]+). Width is appended to match the in-house naming
-// (SONY12 / SAMSUNG32 / JVC24); NEC stays NEC.
+// (SONY12 / SAMSUNG32 / JVC); NEC stays NEC.
 String protocolName(const IRData &d)
 {
   switch (d.protocol)

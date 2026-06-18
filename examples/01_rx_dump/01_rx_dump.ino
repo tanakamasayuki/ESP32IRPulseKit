@@ -188,28 +188,18 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println(f.command, HEX);
     break;
   }
-  case esp32irpk::IRProtocolID::JVC24:
+  case esp32irpk::IRProtocolID::JVC:
   {
-    esp32irpk::frames::JVC24Frame f = esp32irpk::frames::JVC24Frame::fromBits(b);
+    esp32irpk::frames::JVCFrame f = esp32irpk::frames::JVCFrame::fromBits(b);
     if (f.is_repeat)
     {
-      Serial.println("  frame: JVC24 REPEAT");
+      Serial.println("  frame: JVC REPEAT");
       break;
     }
-    Serial.print("  frame: JVC24 data=0x");
-    Serial.println(f.data, HEX);
-    break;
-  }
-  case esp32irpk::IRProtocolID::JVC32:
-  {
-    esp32irpk::frames::JVC32Frame f = esp32irpk::frames::JVC32Frame::fromBits(b);
-    if (f.is_repeat)
-    {
-      Serial.println("  frame: JVC32 REPEAT");
-      break;
-    }
-    Serial.print("  frame: JVC32 data=0x");
-    Serial.println(f.data, HEX);
+    Serial.print("  frame: JVC addr=0x");
+    Serial.print(f.address, HEX);
+    Serial.print(" cmd=0x");
+    Serial.println(f.command, HEX);
     break;
   }
   case esp32irpk::IRProtocolID::RC5:

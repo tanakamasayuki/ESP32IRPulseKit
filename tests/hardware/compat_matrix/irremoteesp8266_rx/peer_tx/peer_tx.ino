@@ -124,13 +124,9 @@ void handleSend(const String &line)
   {
     ok = sendBits(esp32irpk::IRProtocolID::SAMSUNG36, 36, bits);
   }
-  else if (protocolText == "JVC24")
+  else if (protocolText == "JVC")
   {
-    ok = sendBits(esp32irpk::IRProtocolID::JVC24, 24, bits);
-  }
-  else if (protocolText == "JVC32")
-  {
-    ok = sendBits(esp32irpk::IRProtocolID::JVC32, 32, bits);
+    ok = sendBits(esp32irpk::IRProtocolID::JVC, 16, bits);
   }
   else
   {

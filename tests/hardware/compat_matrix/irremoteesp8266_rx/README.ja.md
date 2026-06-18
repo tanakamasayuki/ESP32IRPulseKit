@@ -24,8 +24,7 @@ IRremoteESP8266 には score 指標が無いため `score=0` を出力します�
 - SONY20
 - SAMSUNG32
 - SAMSUNG36
-- JVC24
-- JVC32
+- JVC
 
 ## 実行
 
@@ -49,5 +48,4 @@ pytestは送信protocol/bitsと、RXが観測したprotocol・bits・raw_len・`
 | ケース | 観測 | 判定 |
 |---|---|---|
 | SAMSUNG36 | `RX_RAW len=76`。フレームは受信しているがIRremoteESP8266がdecodeしない | IRremoteESP8266 2.9.0 には `decodeSamsung36()` がある。PulseKitの現行SAMSUNG36はSamsung32の36bit拡張だが、IRremoteESP8266のSamsung36は16bitブロック + 20bitブロックの二分割波形なので、PulseKit側の仕様差を修正候補として調査する |
-| JVC24 | `RX_DECODE protocol=OTHER_64 len=24 bits=0x07B0300` | IRremoteESP8266の標準JVCは `kJvcBits = 16`。PulseKitのJVC24は標準JVC RXの範囲外 |
-| JVC32 | `RX_DECODE protocol=OTHER_26 len=32 bits=0x0B3D52C48` | 32bit長の波形としては拾うがJVCとして分類しない。IRremoteESP8266の標準JVCは16bitなので範囲外 |
+| JVC | （再測定待ち） | 標準の16bit JVCフレームになったため、外部ライブラリの16bit JVCと相互運用できる見込み。要再測定で確認。 |

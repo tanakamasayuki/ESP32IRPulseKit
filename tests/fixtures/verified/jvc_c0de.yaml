@@ -1,15 +1,16 @@
-name: jvc24_00c0de
+name: jvc_c0de
 source: reviewed
-protocol: JVC24
+protocol: JVC
 frame_type: NORMAL
-bit_length: 24
-bits: 0x00c0de
+bit_length: 16
+bits: 0xc0de
 tick_us: 10
 fields:
-  data: 0x00c0de
+  address: 0xde
+  command: 0xc0
 raw_ticks:
-  - 844
-  - 422
+  - 840
+  - 420
   - 53
   - 53
   - 53
@@ -42,20 +43,4 @@ raw_ticks:
   - 158
   - 53
   - 158
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
-  - 53
   - 53

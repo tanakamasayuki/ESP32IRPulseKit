@@ -73,8 +73,7 @@ void testProtocolCarrierPreferences()
   EXPECT_EQ("carrier/panasonic48", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::PANASONIC48.carrier_hz);
   EXPECT_EQ("carrier/samsung32", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::SAMSUNG32.carrier_hz);
   EXPECT_EQ("carrier/samsung36", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::SAMSUNG36.carrier_hz);
-  EXPECT_EQ("carrier/jvc24", 37900, esp32irpk::specs::JVC24.carrier_hz);
-  EXPECT_EQ("carrier/jvc32", 37900, esp32irpk::specs::JVC32.carrier_hz);
+  EXPECT_EQ("carrier/jvc", 37900, esp32irpk::specs::JVC.carrier_hz);
   EXPECT_EQ("carrier/sony12", 40000, esp32irpk::specs::SONY12.carrier_hz);
   EXPECT_EQ("carrier/sony15", 40000, esp32irpk::specs::SONY15.carrier_hz);
   EXPECT_EQ("carrier/sony20", 40000, esp32irpk::specs::SONY20.carrier_hz);
@@ -390,11 +389,12 @@ void testGeneratedProtocolRoundtrips()
                               esp32irpk::specs::SAMSUNG36,
                               samsung36.toBits());
 
-  esp32irpk::frames::JVC32Frame jvc32{};
-  jvc32.data = 0x1234abcd;
-  expectEncodeDecodeRoundtrip("generated/jvc32",
-                              esp32irpk::specs::JVC32,
-                              jvc32.toBits());
+  esp32irpk::frames::JVCFrame jvc{};
+  jvc.address = 0xde;
+  jvc.command = 0xc0;
+  expectEncodeDecodeRoundtrip("generated/jvc",
+                              esp32irpk::specs::JVC,
+                              jvc.toBits());
 
   esp32irpk::frames::Panasonic40Frame panasonic40{};
   panasonic40.data = 0x123456789aULL;
@@ -527,19 +527,18 @@ void testNecLikeRankingWithNoisyTiming()
   samsung.bits = 0x40bfe0e0ULL;
 
   esp32irpk::IRDecodedBits jvc{};
-  jvc.protocol_id = esp32irpk::IRProtocolID::JVC24;
+  jvc.protocol_id = esp32irpk::IRProtocolID::JVC;
   jvc.frame_type = esp32irpk::IRFrameType::NORMAL;
-  jvc.bit_length = 24;
-  jvc.bits = 0x00c0deULL;
+  jvc.bit_length = 16;
+  jvc.bits = 0xc0deULL;
 
   const esp32irpk::IRProtocolSpec tx_nec_specs[] = {esp32irpk::specs::NEC};
   const esp32irpk::IRProtocolSpec tx_samsung_specs[] = {esp32irpk::specs::SAMSUNG32};
-  const esp32irpk::IRProtocolSpec tx_jvc_specs[] = {esp32irpk::specs::JVC24};
+  const esp32irpk::IRProtocolSpec tx_jvc_specs[] = {esp32irpk::specs::JVC};
   const esp32irpk::IRProtocolSpec rank_specs[] = {
-      esp32irpk::specs::JVC32,
       esp32irpk::specs::SAMSUNG32,
       esp32irpk::specs::NEC,
-      esp32irpk::specs::JVC24,
+      esp32irpk::specs::JVC,
   };
 
   uint16_t raw_ticks[128]{};
@@ -554,7 +553,7 @@ void testNecLikeRankingWithNoisyTiming()
 
   esp32irpk::IRReceiveResult<4> nec_result{};
   EXPECT_TRUE("ranking/nec-like-nec-decode",
-              esp32irpk::codec::decodeRawToBits(noisy_nec, rank_specs, 4, 4, 0, nec_result));
+              esp32irpk::codec::decodeRawToBits(noisy_nec, rank_specs, 3, 4, 0, nec_result));
   EXPECT_EQ("ranking/nec-like-nec-first", esp32irpk::IRProtocolID::NEC, nec_result.candidates[0].protocol_id);
   EXPECT_EQ("ranking/nec-like-nec-bits", nec.bits, nec_result.candidates[0].decoded.bits);
   EXPECT_TRUE("ranking/nec-like-nec-score-gap",
@@ -567,7 +566,7 @@ void testNecLikeRankingWithNoisyTiming()
 
   esp32irpk::IRReceiveResult<4> samsung_result{};
   EXPECT_TRUE("ranking/nec-like-samsung-decode",
-              esp32irpk::codec::decodeRawToBits(noisy_samsung, rank_specs, 4, 4, 0, samsung_result));
+              esp32irpk::codec::decodeRawToBits(noisy_samsung, rank_specs, 3, 4, 0, samsung_result));
   EXPECT_EQ("ranking/nec-like-samsung-first", esp32irpk::IRProtocolID::SAMSUNG32, samsung_result.candidates[0].protocol_id);
   EXPECT_EQ("ranking/nec-like-samsung-bits", samsung.bits, samsung_result.candidates[0].decoded.bits);
   EXPECT_TRUE("ranking/nec-like-samsung-score-gap",
@@ -580,8 +579,8 @@ void testNecLikeRankingWithNoisyTiming()
 
   esp32irpk::IRReceiveResult<4> jvc_result{};
   EXPECT_TRUE("ranking/nec-like-jvc-decode",
-              esp32irpk::codec::decodeRawToBits(noisy_jvc, rank_specs, 4, 4, 0, jvc_result));
-  EXPECT_EQ("ranking/nec-like-jvc-first", esp32irpk::IRProtocolID::JVC24, jvc_result.candidates[0].protocol_id);
+              esp32irpk::codec::decodeRawToBits(noisy_jvc, rank_specs, 3, 4, 0, jvc_result));
+  EXPECT_EQ("ranking/nec-like-jvc-first", esp32irpk::IRProtocolID::JVC, jvc_result.candidates[0].protocol_id);
   EXPECT_EQ("ranking/nec-like-jvc-bits", jvc.bits, jvc_result.candidates[0].decoded.bits);
   EXPECT_TRUE("ranking/nec-like-jvc-score-gap",
               jvc_result.count == 1 || jvc_result.candidates[0].score > jvc_result.candidates[1].score);
@@ -647,21 +646,10 @@ void testLengthVariantRankingWithNoisyTiming()
   samsung36.bit_length = 36;
   samsung36.bits = 0xabcdeabcdULL;
 
-  esp32irpk::IRDecodedBits jvc32{};
-  jvc32.protocol_id = esp32irpk::IRProtocolID::JVC32;
-  jvc32.frame_type = esp32irpk::IRFrameType::NORMAL;
-  jvc32.bit_length = 32;
-  jvc32.bits = 0x1234abcdULL;
-
   const esp32irpk::IRProtocolSpec tx_samsung36_specs[] = {esp32irpk::specs::SAMSUNG36};
   const esp32irpk::IRProtocolSpec samsung_rank_specs[] = {
       esp32irpk::specs::SAMSUNG32,
       esp32irpk::specs::SAMSUNG36,
-  };
-  const esp32irpk::IRProtocolSpec tx_jvc32_specs[] = {esp32irpk::specs::JVC32};
-  const esp32irpk::IRProtocolSpec jvc_rank_specs[] = {
-      esp32irpk::specs::JVC24,
-      esp32irpk::specs::JVC32,
   };
 
   uint16_t raw_ticks[128]{};
@@ -679,17 +667,6 @@ void testLengthVariantRankingWithNoisyTiming()
               esp32irpk::codec::decodeRawToBits(noisy_samsung36, samsung_rank_specs, 2, 4, 0, samsung_result));
   EXPECT_EQ("ranking/samsung36-noisy-first", esp32irpk::IRProtocolID::SAMSUNG36, samsung_result.candidates[0].protocol_id);
   EXPECT_EQ("ranking/samsung36-noisy-bits", samsung36.bits, samsung_result.candidates[0].decoded.bits);
-
-  EXPECT_TRUE("ranking/jvc32-encode", esp32irpk::codec::encodeBitsToRaw(jvc32, tx_jvc32_specs, 1, raw));
-  uint16_t noisy_jvc32_ticks[128]{};
-  esp32irpk::IRRawTickView noisy_jvc32{};
-  perturbRawTicks(raw, noisy_jvc32_ticks, sizeof(noisy_jvc32_ticks) / sizeof(noisy_jvc32_ticks[0]), noisy_jvc32);
-
-  esp32irpk::IRReceiveResult<4> jvc_result{};
-  EXPECT_TRUE("ranking/jvc32-noisy-decode",
-              esp32irpk::codec::decodeRawToBits(noisy_jvc32, jvc_rank_specs, 2, 4, 0, jvc_result));
-  EXPECT_EQ("ranking/jvc32-noisy-first", esp32irpk::IRProtocolID::JVC32, jvc_result.candidates[0].protocol_id);
-  EXPECT_EQ("ranking/jvc32-noisy-bits", jvc32.bits, jvc_result.candidates[0].decoded.bits);
 }
 
 void testSpaceEncodedDecodeAllowsClippedFinalSpace()
@@ -905,23 +882,24 @@ void testPanasonic48FixtureDecode()
   EXPECT_EQ("panasonic48-fixture/data", 0x40040100bcbdULL, frame.data);
 }
 
-void testJvc24FixtureDecode()
+void testJvcFixtureDecode()
 {
   esp32irpk::IRRawTickView view{};
-  view.ticks = test_fixtures::jvc24_00c0de_raw_ticks;
-  view.len = test_fixtures::jvc24_00c0de_raw_len;
+  view.ticks = test_fixtures::jvc_c0de_raw_ticks;
+  view.len = test_fixtures::jvc_c0de_raw_len;
 
-  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::JVC24};
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::JVC};
   esp32irpk::IRReceiveResult<4> result{};
-  EXPECT_TRUE("jvc24-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
-  EXPECT_EQ("jvc24-fixture/candidates", 1, result.count);
-  EXPECT_EQ("jvc24-fixture/protocol", esp32irpk::IRProtocolID::JVC24, result.candidates[0].protocol_id);
-  EXPECT_EQ("jvc24-fixture/bits", test_fixtures::jvc24_00c0de_bits, result.candidates[0].decoded.bits);
-  EXPECT_EQ("jvc24-fixture/length", test_fixtures::jvc24_00c0de_bit_length, result.candidates[0].decoded.bit_length);
+  EXPECT_TRUE("jvc-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("jvc-fixture/candidates", 1, result.count);
+  EXPECT_EQ("jvc-fixture/protocol", esp32irpk::IRProtocolID::JVC, result.candidates[0].protocol_id);
+  EXPECT_EQ("jvc-fixture/bits", test_fixtures::jvc_c0de_bits, result.candidates[0].decoded.bits);
+  EXPECT_EQ("jvc-fixture/length", test_fixtures::jvc_c0de_bit_length, result.candidates[0].decoded.bit_length);
 
-  esp32irpk::frames::JVC24Frame frame =
-      esp32irpk::frames::JVC24Frame::fromBits(result.candidates[0].decoded);
-  EXPECT_EQ("jvc24-fixture/data", 0x00c0deu, frame.data);
+  esp32irpk::frames::JVCFrame frame =
+      esp32irpk::frames::JVCFrame::fromBits(result.candidates[0].decoded);
+  EXPECT_EQ("jvc-fixture/address", 0xdeu, frame.address);
+  EXPECT_EQ("jvc-fixture/command", 0xc0u, frame.command);
 }
 
 void testRc5FixtureDecode()
@@ -1180,11 +1158,12 @@ void testFrameConversions()
   EXPECT_EQ("frame/samsung36-address", 0xabcdu, samsung36_roundtrip.address);
   EXPECT_EQ("frame/samsung36-command", 0xabcdeu, samsung36_roundtrip.command);
 
-  esp32irpk::frames::JVC24Frame jvc24{};
-  jvc24.data = 0x1abcdef;
-  esp32irpk::IRDecodedBits jvc24_bits = jvc24.toBits();
-  EXPECT_EQ("frame/jvc24-length", 24, jvc24_bits.bit_length);
-  EXPECT_EQ("frame/jvc24-mask", 0xabcdefULL, jvc24_bits.bits);
+  esp32irpk::frames::JVCFrame jvc{};
+  jvc.address = 0xde;
+  jvc.command = 0xc0;
+  esp32irpk::IRDecodedBits jvc_bits = jvc.toBits();
+  EXPECT_EQ("frame/jvc-length", 16, jvc_bits.bit_length);
+  EXPECT_EQ("frame/jvc-mask", 0xc0deULL, jvc_bits.bits);
 
   esp32irpk::frames::Panasonic48Frame panasonic48{};
   panasonic48.data = 0x123456789abcULL;
@@ -1225,7 +1204,7 @@ void setup()
   testSamsung32FixtureDecode();
   testAeha48FixtureDecode();
   testPanasonic48FixtureDecode();
-  testJvc24FixtureDecode();
+  testJvcFixtureDecode();
   testRc5FixtureDecode();
   testRc6M0FixtureDecode();
   testRc6M6FixtureDecode();

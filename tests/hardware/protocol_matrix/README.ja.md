@@ -14,8 +14,7 @@ pytest-embedded のpeer構成に合わせ、親sketchをRX、`peer_tx/` をTXに
 - SONY20
 - SAMSUNG32
 - SAMSUNG36
-- JVC24
-- JVC32
+- JVC
 - AEHA
 - PANASONIC40
 - PANASONIC48

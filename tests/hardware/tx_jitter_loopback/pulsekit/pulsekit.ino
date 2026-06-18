@@ -114,8 +114,8 @@ namespace
       ok = sendBits(esp32irpk::IRProtocolID::SONY12, 12, bits);
     else if (protocolText == "SAMSUNG32")
       ok = sendBits(esp32irpk::IRProtocolID::SAMSUNG32, 32, bits);
-    else if (protocolText == "JVC24")
-      ok = sendBits(esp32irpk::IRProtocolID::JVC24, 24, bits);
+    else if (protocolText == "JVC")
+      ok = sendBits(esp32irpk::IRProtocolID::JVC, 16, bits);
     else
     {
       Serial.println("TX_ERROR unsupported_protocol");

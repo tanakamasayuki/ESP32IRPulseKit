@@ -100,8 +100,8 @@ namespace
       IrSender.sendSonyMSB((unsigned long)bits, 12);
     else if (protocolText == "SAMSUNG32")
       IrSender.sendSamsungMSB((unsigned long)bits, 32);
-    else if (protocolText == "JVC24")
-      IrSender.sendJVCMSB((unsigned long)bits, 24);
+    else if (protocolText == "JVC")
+      IrSender.sendJVCMSB((unsigned long)bits, 16);
     else
     {
       Serial.println("TX_ERROR unsupported_protocol");

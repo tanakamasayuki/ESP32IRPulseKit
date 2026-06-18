@@ -33,7 +33,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | NEC repeat encode/decode | ✅ | | ⬜ | | host smoke追加済み |
 | SONY decode | ✅ | | ⬜ | | Sony12 fixture host test。SONY15/20はgenerated roundtrip + 生成式確認済み |
 | Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test。SAMSUNG36はgenerated roundtrip + 生成式確認済み |
-| JVC decode | ✅ | | ⬜ | | JVC24 fixture host test。JVC32はgenerated roundtrip + 生成式確認済み |
+| JVC decode | ✅ | | ⬜ | | JVC fixture host test。encode/decode roundtrip + 生成式確認済み |
 | Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test。PANASONIC40はgenerated roundtrip + 生成式確認済み |
 | AEHA可変長encode/decode | ✅ | | ⬜ | | host smoke + MSB-first可変長test |
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5・RC6_M0・RC6_M6 fixture host test |
@@ -48,7 +48,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | RMT TX RAW送信 | | ✅ sketch build | ✅ NEC smoke | | TX peerスケッチ + 2台smoke |
 | RMT RX RAW受信 | | ✅ sketch build | ✅ NEC smoke | | RX dutスケッチ + 2台smoke |
 | TX->RX loop | | | ✅ NEC smoke | | TX/RX 2台構成のpytest追加済み |
-| protocol matrix | | ✅ sketch build | ✅ | | ESP32IRPulseKit TX -> ESP32IRPulseKit RXでNEC/SONY12/SAMSUNG32/JVC24を確認 |
+| protocol matrix | | ✅ sketch build | ✅ | | ESP32IRPulseKit TX -> ESP32IRPulseKit RXでNEC/SONY12/SAMSUNG32/JVCを確認 |
 | 市販リモコン受信 | | | | ⬜ | 手動fixture化候補 |
 
 ## hardware構成

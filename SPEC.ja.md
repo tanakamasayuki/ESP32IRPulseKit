@@ -216,8 +216,7 @@ esp32irpk::specs::SONY15
 esp32irpk::specs::SONY20
 esp32irpk::specs::SAMSUNG32
 esp32irpk::specs::SAMSUNG36
-esp32irpk::specs::JVC24
-esp32irpk::specs::JVC32
+esp32irpk::specs::JVC
 esp32irpk::specs::RC5
 esp32irpk::specs::RC6_M0_16
 esp32irpk::specs::RC6_M6_32

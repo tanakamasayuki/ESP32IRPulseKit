@@ -58,8 +58,7 @@ CASES = [
     Case("SONY20", 0xABCDE),
     Case("SAMSUNG32", 0x40BFE0E0),
     Case("SAMSUNG36", 0xABCDEABCD),
-    Case("JVC24", 0x00C0DE),
-    Case("JVC32", 0x1234ABCD),
+    Case("JVC", 0xC0DE),
 ]
 
 

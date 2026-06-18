@@ -45,11 +45,10 @@ namespace esp32irpk
     SONY20 = 7,
     SAMSUNG32 = 8,
     SAMSUNG36 = 9,
-    JVC24 = 10,
-    JVC32 = 11,
-    RC5 = 12,
-    RC6_M0_16 = 13,
-    RC6_M6_32 = 14,
+    JVC = 10,
+    RC5 = 11,
+    RC6_M0_16 = 12,
+    RC6_M6_32 = 13,
     USER1 = 1000,
     USER2 = 1001,
     USER3 = 1002,
@@ -301,10 +300,8 @@ namespace esp32irpk::detail
       out.push_back(specs::SAMSUNG32);
     if (!has(specs::SAMSUNG36.protocol_id))
       out.push_back(specs::SAMSUNG36);
-    if (!has(specs::JVC24.protocol_id))
-      out.push_back(specs::JVC24);
-    if (!has(specs::JVC32.protocol_id))
-      out.push_back(specs::JVC32);
+    if (!has(specs::JVC.protocol_id))
+      out.push_back(specs::JVC);
     if (!has(specs::RC5.protocol_id))
       out.push_back(specs::RC5);
     if (!has(specs::RC6_M0_16.protocol_id))

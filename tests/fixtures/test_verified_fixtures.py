@@ -84,21 +84,12 @@ def panasonic_raw_ticks(data: int, bit_length: int) -> list[int]:
     return raw
 
 
-def jvc24_raw_ticks(data: int) -> list[int]:
-    raw = [844, 422]
-    for bit_index in range(24):
+def jvc_raw_ticks(data: int) -> list[int]:
+    raw = [840, 420]
+    for bit_index in range(16):
         raw.append(53)
         raw.append(158 if ((data >> bit_index) & 0x1) else 53)
     raw.append(53)
-    return raw
-
-
-def jvc32_raw_ticks(data: int) -> list[int]:
-    raw = [840, 420]
-    for bit_index in range(32):
-        raw.append(55)
-        raw.append(180 if ((data >> bit_index) & 0x1) else 55)
-    raw.append(55)
     return raw
 
 
@@ -252,15 +243,16 @@ def test_panasonic48_fixture_matches_reviewed_fields():
     assert data["raw_ticks"] == panasonic_raw_ticks(frame_data, data["bit_length"])
 
 
-def test_jvc24_fixture_matches_reviewed_fields():
-    data = load_fixture("jvc24_00c0de.yaml")
-    frame_data = data["fields"]["data"]
+def test_jvc_fixture_matches_reviewed_fields():
+    data = load_fixture("jvc_c0de.yaml")
 
-    assert data["protocol"] == "JVC24"
+    assert data["protocol"] == "JVC"
     assert data["frame_type"] == "NORMAL"
-    assert data["bit_length"] == 24
-    assert data["bits"] == frame_data
-    assert data["raw_ticks"] == jvc24_raw_ticks(frame_data)
+    assert data["bit_length"] == 16
+    assert data["bits"] == 0xC0DE
+    assert data["fields"]["address"] == 0xDE
+    assert data["fields"]["command"] == 0xC0
+    assert data["raw_ticks"] == jvc_raw_ticks(data["bits"])
 
 
 @pytest.mark.parametrize(
@@ -269,7 +261,7 @@ def test_jvc24_fixture_matches_reviewed_fields():
         ("sony15_3456", 0x3456, 15, sony_raw_ticks(0x3456, 15), False),
         ("sony20_abcde", 0xABCDE, 20, sony_raw_ticks(0xABCDE, 20), False),
         ("samsung36_1234_abcde", samsung36_bits(0x1234, 0xABCDE), 36, samsung36_raw_ticks(0x1234, 0xABCDE), True),
-        ("jvc32_1234abcd", 0x1234ABCD, 32, jvc32_raw_ticks(0x1234ABCD), True),
+        ("jvc_c0de", 0xC0DE, 16, jvc_raw_ticks(0xC0DE), True),
         ("panasonic40_123456789a", 0x123456789A, 40, panasonic_raw_ticks(0x123456789A, 40), True),
     ],
 )

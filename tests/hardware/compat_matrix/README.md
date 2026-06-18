@@ -42,8 +42,7 @@ Local library coverage as of 2026-06-18:
 | SONY20 | TX/RX support | TX/RX support | Normal compatibility target |
 | SAMSUNG32 | TX/RX support | TX/RX support | Normal compatibility target |
 | SAMSUNG36 | No dedicated decoder; raw sender can emit 36 bits | `sendSamsung36()` / `decodeSamsung36()` exist | IRremoteESP8266 compatibility is a fix candidate. Arduino-IRremote RX is outside coverage |
-| JVC24 | Standard JVC is 16-bit | Standard JVC is 16-bit | Outside external RX coverage. External TX -> PulseKit RX remains useful |
-| JVC32 | Standard JVC is 16-bit | Standard JVC is 16-bit | Outside external RX coverage. External TX -> PulseKit RX remains useful |
+| JVC | TX/RX support (16-bit) | TX/RX support (16-bit) | Normal compatibility target |
 | AEHA | Kaseikyo family exists; relation to PulseKit AEHA not settled | Panasonic/Kaseikyo family exists; relation to PulseKit AEHA not settled | Investigation candidate |
 | PANASONIC40 | Kaseikyo/Panasonic family exists; 40-bit shape not confirmed | Panasonic/Kaseikyo family exists; 40-bit shape not confirmed | Investigation candidate |
 | PANASONIC48 | Kaseikyo/Panasonic family exists | Panasonic/Kaseikyo family exists | Next addition candidate |

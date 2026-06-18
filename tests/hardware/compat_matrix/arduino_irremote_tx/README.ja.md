@@ -25,8 +25,7 @@ Arduino-IRremote の新しい送信APIは address/command 指向のため、任�
 - SONY20
 - SAMSUNG32
 - SAMSUNG36
-- JVC24
-- JVC32
+- JVC
 
 ## 実行
 

@@ -98,8 +98,8 @@ namespace
       irsend.sendSony(bits, 12, 0);
     else if (protocolText == "SAMSUNG32")
       irsend.sendSAMSUNG(bits, 32);
-    else if (protocolText == "JVC24")
-      irsend.sendJVC(bits, 24);
+    else if (protocolText == "JVC")
+      irsend.sendJVC(bits, 16);
     else
     {
       Serial.println("TX_ERROR unsupported_protocol");

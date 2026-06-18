@@ -25,8 +25,7 @@ Arduino-IRremote は標準的なactive-lowのIR受信モジュール前提で反
 - SONY20
 - SAMSUNG32
 - SAMSUNG36
-- JVC24
-- JVC32
+- JVC
 
 ## 実行
 
@@ -50,5 +49,4 @@ pytestは送信protocol/bitsと、RXが観測したprotocol・bits・raw_len・`
 | ケース | 観測 | 判定 |
 |---|---|---|
 | SAMSUNG36 | `RX_RAW len=76`。フレームは受信しているがArduino-IRremoteがdecodeしない | Arduino-IRremote 4.7.1 はSamsung32/Samsung48を扱うが、Samsung36専用decodeは見当たらない。外部RXの対応範囲外として扱う |
-| JVC24 | `RX_RAW len=52`。フレームは受信しているがdecodeしない | Arduino-IRremoteの標準JVCは `JVC_BITS = 16`。PulseKitのJVC24は標準JVC RXの範囲外 |
-| JVC32 | `RX_DECODE protocol=OTHER_9 len=32 bits=0x01234ABCD` | 32bit長の波形としては拾うがJVCとして分類しない。Arduino-IRremoteの標準JVCは16bitなので範囲外 |
+| JVC | （再測定待ち） | 標準の16bit JVCフレームになったため、外部ライブラリの16bit JVCと相互運用できる見込み。要再測定で確認。 |

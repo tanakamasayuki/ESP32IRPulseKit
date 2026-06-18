@@ -33,7 +33,7 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | NEC repeat encode/decode | ✅ | | ⬜ | | Host smoke tests exist |
 | SONY decode | ✅ | | ⬜ | | Sony12 fixture host test; SONY15/20 generated roundtrips and formula checks exist |
 | Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test; SAMSUNG36 generated roundtrip and formula check exist |
-| JVC decode | ✅ | | ⬜ | | JVC24 fixture host test; JVC32 generated roundtrip and formula check exist |
+| JVC decode | ✅ | | ⬜ | | JVC fixture host test; encode/decode roundtrip and formula check exist |
 | Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test; PANASONIC40 generated roundtrip and formula check exist |
 | AEHA variable-length encode/decode | ✅ | | ⬜ | | Host smoke + MSB-first variable test |
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5, RC6_M0, RC6_M6 fixture host tests |
@@ -48,7 +48,7 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | RMT TX RAW send | | ✅ sketch build | ✅ NEC smoke | | TX peer sketch + two-board smoke |
 | RMT RX RAW receive | | ✅ sketch build | ✅ NEC smoke | | RX dut sketch + two-board smoke |
 | TX->RX loop | | | ✅ NEC smoke | | Two-board pytest exists |
-| Protocol matrix | | ✅ sketch build | ✅ | | ESP32IRPulseKit TX -> ESP32IRPulseKit RX checks NEC/SONY12/SAMSUNG32/JVC24 |
+| Protocol matrix | | ✅ sketch build | ✅ | | ESP32IRPulseKit TX -> ESP32IRPulseKit RX checks NEC/SONY12/SAMSUNG32/JVC |
 | Real remote receive | | | | ⬜ | Candidate for fixture promotion |
 
 ## Hardware Setup

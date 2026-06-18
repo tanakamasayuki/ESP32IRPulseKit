@@ -21,16 +21,14 @@ inline constexpr uint16_t aeha48_123456789abc_raw_ticks[] = {
 };
 inline constexpr size_t aeha48_123456789abc_raw_len = sizeof(aeha48_123456789abc_raw_ticks) / sizeof(aeha48_123456789abc_raw_ticks[0]);
 
-inline constexpr uint64_t jvc24_00c0de_bits = 0xc0deULL;
-inline constexpr size_t jvc24_00c0de_bit_length = 24;
-inline constexpr uint16_t jvc24_00c0de_raw_ticks[] = {
-    844, 422, 53, 53, 53, 158, 53, 158, 53, 158, 53, 158,
+inline constexpr uint64_t jvc_c0de_bits = 0xc0deULL;
+inline constexpr size_t jvc_c0de_bit_length = 16;
+inline constexpr uint16_t jvc_c0de_raw_ticks[] = {
+    840, 420, 53, 53, 53, 158, 53, 158, 53, 158, 53, 158,
     53, 53, 53, 158, 53, 158, 53, 53, 53, 53, 53, 53,
-    53, 53, 53, 53, 53, 53, 53, 158, 53, 158, 53, 53,
-    53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53,
-    53, 53, 53
+    53, 53, 53, 53, 53, 53, 53, 158, 53, 158, 53
 };
-inline constexpr size_t jvc24_00c0de_raw_len = sizeof(jvc24_00c0de_raw_ticks) / sizeof(jvc24_00c0de_raw_ticks[0]);
+inline constexpr size_t jvc_c0de_raw_len = sizeof(jvc_c0de_raw_ticks) / sizeof(jvc_c0de_raw_ticks[0]);
 
 inline constexpr uint64_t nec_normal_00ff_34_bits = 0xcb3400ffULL;
 inline constexpr size_t nec_normal_00ff_34_bit_length = 32;

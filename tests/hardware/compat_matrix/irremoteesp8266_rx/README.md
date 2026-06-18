@@ -26,8 +26,7 @@ active-low IR receiver module and has no inverted-input option, so
 - SONY20
 - SAMSUNG32
 - SAMSUNG36
-- JVC24
-- JVC32
+- JVC
 
 ## Run
 
@@ -52,5 +51,4 @@ external-RX coverage limit or something PulseKit should adjust.
 | Case | Observation | Assessment |
 |---|---|---|
 | SAMSUNG36 | `RX_RAW len=76`; the frame is received but IRremoteESP8266 does not decode it | IRremoteESP8266 2.9.0 has `decodeSamsung36()`. PulseKit currently models SAMSUNG36 as a 36-bit Samsung32-style frame, while IRremoteESP8266's Samsung36 is a two-block 16-bit + 20-bit waveform. Treat as a PulseKit spec/encoder investigation item |
-| JVC24 | `RX_DECODE protocol=OTHER_64 len=24 bits=0x07B0300` | IRremoteESP8266's standard JVC decoder uses `kJvcBits = 16`. PulseKit JVC24 is outside that standard JVC RX coverage |
-| JVC32 | `RX_DECODE protocol=OTHER_26 len=32 bits=0x0B3D52C48` | The receiver sees a 32-bit waveform but does not classify it as JVC. Standard JVC RX coverage is 16-bit |
+| JVC | (pending re-measurement) | Now a standard 16-bit JVC frame; expected to interoperate with the external library's 16-bit JVC. Re-run to confirm. |

@@ -40,8 +40,7 @@ READMEに理由と観測ログを残します。
 | SONY20 | 送受信あり | 送受信あり | 通常互換対象 |
 | SAMSUNG32 | 送受信あり | 送受信あり | 通常互換対象 |
 | SAMSUNG36 | 専用decodeなし。raw送信APIでは36bit送信可能 | `sendSamsung36()` / `decodeSamsung36()` あり | IRremoteESP8266互換は修正候補。Arduino-IRremote RXは対応範囲外 |
-| JVC24 | 標準JVCは16bit | 標準JVCは16bit | 外部RXでは対応範囲外。外部TX -> PulseKit RXは観測対象 |
-| JVC32 | 標準JVCは16bit | 標準JVCは16bit | 外部RXでは対応範囲外。外部TX -> PulseKit RXは観測対象 |
+| JVC | 送受信あり（16bit） | 送受信あり（16bit） | 通常互換対象 |
 | AEHA | Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | Panasonic/Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | 次の調査候補 |
 | PANASONIC40 | Kaseikyo/Panasonic系あり。40bit形は未確認 | Panasonic/Kaseikyo系あり。40bit形は未確認 | 次の調査候補 |
 | PANASONIC48 | Kaseikyo/Panasonic系あり | Panasonic/Kaseikyo系あり | 次の追加候補 |

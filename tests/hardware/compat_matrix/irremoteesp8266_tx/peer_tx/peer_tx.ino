@@ -121,13 +121,9 @@ void handleSend(const String &line)
   {
     irsend.sendSamsung36(bits, 36);
   }
-  else if (protocolText == "JVC24")
+  else if (protocolText == "JVC")
   {
-    irsend.sendJVC(bits, 24);
-  }
-  else if (protocolText == "JVC32")
-  {
-    irsend.sendJVC(bits, 32);
+    irsend.sendJVC(bits, 16);
   }
   else
   {

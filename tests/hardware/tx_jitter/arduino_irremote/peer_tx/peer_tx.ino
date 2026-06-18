@@ -114,9 +114,9 @@ void handleSend(const String &line)
   {
     IrSender.sendSamsungMSB((unsigned long)bits, 32);
   }
-  else if (protocolText == "JVC24")
+  else if (protocolText == "JVC")
   {
-    IrSender.sendJVCMSB((unsigned long)bits, 24);
+    IrSender.sendJVCMSB((unsigned long)bits, 16);
   }
   else
   {

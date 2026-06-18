@@ -20,8 +20,7 @@ sketch under `peer_tx/`.
 - SONY20
 - SAMSUNG32
 - SAMSUNG36
-- JVC24
-- JVC32
+- JVC
 
 ## Run
 

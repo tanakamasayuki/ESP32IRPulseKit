@@ -25,8 +25,7 @@ inverted-output option, so `IR_TX_INVERTED` is reported but not applied.
 - SONY20
 - SAMSUNG32
 - SAMSUNG36
-- JVC24
-- JVC32
+- JVC
 
 ## Run
 

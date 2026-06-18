@@ -32,7 +32,7 @@ namespace
 {
 // Map IRremoteESP8266's protocol to the uppercase names the harness regex
 // expects ([A-Z0-9_]+). Width is appended to match the in-house naming
-// (SONY12 / SAMSUNG32 / JVC24); NEC stays NEC.
+// (SONY12 / SAMSUNG32 / JVC); NEC stays NEC.
 String protocolName(const decode_results &r)
 {
   switch (r.decode_type)
