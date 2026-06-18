@@ -132,6 +132,18 @@ void handleSend(const String &line)
   {
     ok = sendBits(esp32irpk::IRProtocolID::JVC32, 32, bits);
   }
+  else if (protocolText == "AEHA")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::AEHA, 48, bits);
+  }
+  else if (protocolText == "PANASONIC40")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::PANASONIC40, 40, bits);
+  }
+  else if (protocolText == "PANASONIC48")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::PANASONIC48, 48, bits);
+  }
   else
   {
     Serial.println("TX_ERROR unsupported_protocol");

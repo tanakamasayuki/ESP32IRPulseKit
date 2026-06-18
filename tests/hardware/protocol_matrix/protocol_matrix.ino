@@ -28,8 +28,11 @@ void printRawTicks(const esp32irpk::IRRawTickView &raw)
 
 void printBits64(uint64_t bits)
 {
-  Serial.print((uint32_t)(bits >> 32), HEX);
-  Serial.print((uint32_t)(bits & 0xffffffffu), HEX);
+  const char hex[] = "0123456789ABCDEF";
+  for (int shift = 60; shift >= 0; shift -= 4)
+  {
+    Serial.print(hex[(bits >> shift) & 0xFULL]);
+  }
 }
 
 void sendReady()

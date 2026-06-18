@@ -31,6 +31,9 @@ CASES = [
     Case("SAMSUNG36", 36, 0xABCDEABCD),
     Case("JVC24", 24, 0x00C0DE),
     Case("JVC32", 32, 0x1234ABCD),
+    Case("AEHA", 48, 0x123456749ABC),
+    Case("PANASONIC40", 40, 0x123456789A),
+    Case("PANASONIC48", 48, 0x40040100BCBD),
 ]
 
 
