@@ -433,6 +433,85 @@ void testBiphaseEncodeDecodeRoundtrips()
                               rc6_m6);
 }
 
+void perturbRawTicks(const esp32irpk::IRRawTickBuffer &src,
+                     uint16_t *dst,
+                     size_t capacity,
+                     esp32irpk::IRRawTickView &out)
+{
+  size_t n = src.len < capacity ? src.len : capacity;
+  for (size_t i = 0; i < n; ++i)
+  {
+    uint16_t tick = src.ticks[i];
+    if (i >= 2)
+    {
+      if ((i % 4) == 0 && tick > 2)
+        tick = static_cast<uint16_t>(tick - 2);
+      else if ((i % 4) == 1)
+        tick = static_cast<uint16_t>(tick + 3);
+      else if ((i % 4) == 2 && tick > 1)
+        tick = static_cast<uint16_t>(tick - 1);
+      else if ((i % 4) == 3)
+        tick = static_cast<uint16_t>(tick + 2);
+    }
+    dst[i] = tick;
+  }
+  out.ticks = dst;
+  out.len = n;
+}
+
+void testSimilarSpaceEncodedRankingWithNoisyTiming()
+{
+  esp32irpk::IRDecodedBits aeha{};
+  aeha.protocol_id = esp32irpk::IRProtocolID::AEHA;
+  aeha.frame_type = esp32irpk::IRFrameType::NORMAL;
+  aeha.bit_length = 48;
+  aeha.bits = 0x123456749abcULL; // AEHA parity nibble matches low16 customer code.
+
+  esp32irpk::IRDecodedBits panasonic{};
+  panasonic.protocol_id = esp32irpk::IRProtocolID::PANASONIC48;
+  panasonic.frame_type = esp32irpk::IRFrameType::NORMAL;
+  panasonic.bit_length = 48;
+  panasonic.bits = 0x40040100bcbdULL;
+
+  const esp32irpk::IRProtocolSpec tx_aeha_specs[] = {esp32irpk::specs::AEHA};
+  const esp32irpk::IRProtocolSpec tx_panasonic_specs[] = {esp32irpk::specs::PANASONIC48};
+  const esp32irpk::IRProtocolSpec rank_specs[] = {
+      esp32irpk::specs::PANASONIC48,
+      esp32irpk::specs::AEHA,
+  };
+
+  uint16_t raw_ticks[128]{};
+  esp32irpk::IRRawTickBuffer raw{};
+  raw.ticks = raw_ticks;
+  raw.capacity = sizeof(raw_ticks) / sizeof(raw_ticks[0]);
+
+  EXPECT_TRUE("ranking/aeha-encode", esp32irpk::codec::encodeBitsToRaw(aeha, tx_aeha_specs, 1, raw));
+  uint16_t noisy_aeha_ticks[128]{};
+  esp32irpk::IRRawTickView noisy_aeha{};
+  perturbRawTicks(raw, noisy_aeha_ticks, sizeof(noisy_aeha_ticks) / sizeof(noisy_aeha_ticks[0]), noisy_aeha);
+
+  esp32irpk::IRReceiveResult<4> aeha_result{};
+  EXPECT_TRUE("ranking/aeha-noisy-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_aeha, rank_specs, 2, 4, 0, aeha_result));
+  EXPECT_EQ("ranking/aeha-noisy-first", esp32irpk::IRProtocolID::AEHA, aeha_result.candidates[0].protocol_id);
+  EXPECT_EQ("ranking/aeha-noisy-bits", aeha.bits, aeha_result.candidates[0].decoded.bits);
+  EXPECT_TRUE("ranking/aeha-noisy-score-gap",
+              aeha_result.count == 1 || aeha_result.candidates[0].score > aeha_result.candidates[1].score);
+
+  EXPECT_TRUE("ranking/panasonic-encode", esp32irpk::codec::encodeBitsToRaw(panasonic, tx_panasonic_specs, 1, raw));
+  uint16_t noisy_panasonic_ticks[128]{};
+  esp32irpk::IRRawTickView noisy_panasonic{};
+  perturbRawTicks(raw, noisy_panasonic_ticks, sizeof(noisy_panasonic_ticks) / sizeof(noisy_panasonic_ticks[0]), noisy_panasonic);
+
+  esp32irpk::IRReceiveResult<4> panasonic_result{};
+  EXPECT_TRUE("ranking/panasonic-noisy-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_panasonic, rank_specs, 2, 4, 0, panasonic_result));
+  EXPECT_EQ("ranking/panasonic-noisy-first", esp32irpk::IRProtocolID::PANASONIC48, panasonic_result.candidates[0].protocol_id);
+  EXPECT_EQ("ranking/panasonic-noisy-bits", panasonic.bits, panasonic_result.candidates[0].decoded.bits);
+  EXPECT_TRUE("ranking/panasonic-noisy-score-gap",
+              panasonic_result.count == 1 || panasonic_result.candidates[0].score > panasonic_result.candidates[1].score);
+}
+
 void testSpaceEncodedDecodeAllowsClippedFinalSpace()
 {
   esp32irpk::frames::Sony12Frame sony12{};
@@ -952,6 +1031,7 @@ void setup()
   testSpaceEncodedAmbiguousSpaceRejects();
   testGeneratedProtocolRoundtrips();
   testBiphaseEncodeDecodeRoundtrips();
+  testSimilarSpaceEncodedRankingWithNoisyTiming();
   testSpaceEncodedDecodeAllowsClippedFinalSpace();
   testNecRepeatDecode();
   testNecRepeatEncode();
