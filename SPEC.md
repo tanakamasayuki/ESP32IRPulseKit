@@ -225,6 +225,47 @@ esp32irpk::specs::RC6_M6_32
 
 `IRProtocolID` is separated not only by waveform timing but also by the logical interpretation of `IRDecodedBits.bits`. For example, Samsung 32-bit and 36-bit use different IDs.
 
+### 3.1 Candidate Protocols (not yet implemented)
+
+The current 14 cover the large majority of remote-control use, so the following
+are **candidates**, not requirements. If the goal is only learn-and-replay (raw
+capture/replay), the raw-tick path already handles any protocol and no addition
+is needed; explicit support matters only when you need to decode into meaningful
+bits or generate codes. They are triaged into three tiers by practical value.
+
+**Tier A: effectively covered by existing decoders (only ID/label mapping)**
+
+| Candidate | Family | Notes |
+|---|---|---|
+| NEC extended / NEC2 | NEC_LIKE | 16-bit address; raw bits already obtainable via NEC |
+| Denon-/JVC-/Sharp-/Mitsubishi-Kaseikyo | AEHA | Only the vendor ID differs; the AEHA decoder returns correct bits |
+
+→ Mostly adding an `IRProtocolID` and labeling the decode result. No new decode logic.
+
+**Tier B: high value to add (real devices still exist; small/medium effort)**
+
+| Candidate | Family | Carrier | Notes |
+|---|---|---|---|
+| Pioneer | NEC_LIKE | 40kHz | Sends NEC twice. AV receivers |
+| Onkyo | NEC_LIKE | 38kHz | NEC-family parameter variant |
+| Sharp | custom (space-enc) | 38kHz | AQUOS etc.; needs the inverted expansion/check frame |
+| Denon | custom (space-enc) | 38kHz | Older Denon (Kaseikyo often suffices) |
+| RC6A (variable length) | BIPHASE | 36kHz | MCE/Windows remotes, Xbox 360 IR, some STBs |
+
+**Tier C: skip by default (implement only on a concrete need)**
+
+- RCMM, RECS80, Nokia NRC17, Grundig, Nubert, XMP, F12, G.I.Cable, Whynter
+- Lego Power Functions / MagiQuest (toys / venues)
+- Bang & Olufsen: **455kHz carrier** — cannot be received by a normal 38kHz TSOP,
+  hardware-wise a different beast. **Best left unsupported.**
+- Air-conditioner / heat-pump protocols (Daikin / Mitsubishi-AC / Panasonic-AC /
+  Gree / Coolix, …): a single button sends a whole multi-byte state — a separate
+  layer whose design differs from this library's generic decode/encode model, so
+  it is considered out of scope.
+
+Policy: if adding, cap at **Tier B**; revisit Tier C only when demand appears.
+Tier A can be added cheaply purely to grow the supported-protocol count.
+
 ## 4. Protocol Registration And Initialization
 
 `IRReceiver` and `IRSender` copy protocol specs internally.

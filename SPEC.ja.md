@@ -225,6 +225,44 @@ esp32irpk::specs::RC6_M6_32
 
 `IRProtocolID` は波形の近さだけでなく、`IRDecodedBits.bits` の論理解釈が互換かどうかで分けます。たとえばSamsung 32bitと36bitは別IDです。
 
+### 3.1 追加候補protocol（未実装）
+
+現状の14でリモコン用途の大半をカバーするため、以下は「必須」ではなく**候補**です。
+学習＆そのまま再送（raw capture/replay）だけが目的なら、生tick経路で任意protocolを
+扱えるので追加は不要です。意味のあるbitsへのdecode／コード生成が必要な場合にのみ
+価値があります。実用度で3段階に仕分けます。
+
+**Tier A: 既存decoderで実質対応済み（追加はID/ラベルのマップのみ）**
+
+| 候補 | 系統 | 備考 |
+|---|---|---|
+| NEC extended / NEC2 | NEC_LIKE | 16bitアドレス系。既存NECで生bitsは取得可 |
+| Denon-Kaseikyo / JVC-Kaseikyo / Sharp-Kaseikyo / Mitsubishi-Kaseikyo | AEHA | メーカIDが違うだけ。AEHA decoderが正しいbitsを返す |
+
+→ `IRProtocolID` の追加とdecode結果のラベル付けが中心。新規decode実装は不要。
+
+**Tier B: 追加の費用対効果が高い（実機が現存・小〜中の実装）**
+
+| 候補 | 系統 | キャリア | 備考 |
+|---|---|---|---|
+| Pioneer | NEC_LIKE | 40kHz | NECを2フレーム送出。AVアンプ |
+| Onkyo | NEC_LIKE | 38kHz | NEC系パラメータ違い |
+| Sharp | 独自(space-enc) | 38kHz | AQUOS等。expansion/checkの反転送出が要対応 |
+| Denon | 独自(space-enc) | 38kHz | 旧Denon系（Kaseikyo側で足りる場合も多い） |
+| RC6A（可変長） | BIPHASE | 36kHz | MCE/Windowsリモコン・Xbox360 IR・一部STB |
+
+**Tier C: 基本スキップ（特定ニーズが出てから個別対応）**
+
+- RCMM, RECS80, Nokia NRC17, Grundig, Nubert, XMP, F12, G.I.Cable, Whynter
+- Lego Power Functions / MagiQuest（玩具・施設系）
+- Bang & Olufsen: **455kHzキャリア**。一般的な38kHz TSOPでは受信できずハード的に別物。**非対応のままが無難**
+- エアコン／ヒートポンプ系（Daikin / Mitsubishi-AC / Panasonic-AC / Gree / Coolix 等）:
+  ボタン1つで数十〜数百bitの状態を丸ごと送る別レイヤの実装。本ライブラリの汎用
+  decode/encode方針とは設計が異なるため、対象外とする
+
+方針：追加するなら **Tier B まで**を上限とし、Tier C は需要が出た時点で個別に検討する。
+Tier A は「対応protocol数を増やす」目的に限り低コストで足せる。
+
 ## 4. Protocol登録と初期化
 
 `IRReceiver` と `IRSender` は、protocol specを内部にコピーして保持します。
