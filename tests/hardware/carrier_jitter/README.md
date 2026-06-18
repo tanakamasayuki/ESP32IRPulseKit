@@ -112,3 +112,17 @@ depend on the setup; the relative picture is the point. Graphs are in `data/`
   but the exact optimum width (offset a few us from the integer point by the
   TSOP's integration delay) and the amplitude depend on received strength, i.e.
   distance and angle.
+
+### Spec decision
+
+Optimizing mark width / carrier *could* squeeze out more transmit-edge precision,
+but the current design (RMT 10 us tick, protocol-standard timings, default
+carrier) is **already well within the demodulation tolerance** (NEC ±25% ≈
+±140 us). Chasing it only **adds complexity** for no real benefit — a 10 us tick
+cannot even represent integer-cycle widths, and deviating from the protocol value
+would hurt interop. So the library **keeps protocol-standard values**.
+
+Only the carrier duty is now user-adjustable for the deployment environment
+(distance / angle / ambient light) via `IRSender::setCarrierDuty(float)` (default
+33% unchanged; 0 < duty < 1, applied on the next send). Frequency stays on
+`setCarrierHz()`.

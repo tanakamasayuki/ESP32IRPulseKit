@@ -26,7 +26,6 @@ namespace esp32irpk::hal
     constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us (RMT resolution)
     constexpr uint32_t kRmtTickUs = 10;
     constexpr uint32_t kDefaultCarrierFrequencyHz = 38000;
-    constexpr float kDefaultCarrierDuty = 0.33f;
     constexpr size_t kMaxRxSymbols = 256;
     constexpr size_t kMaxQueuedFrames = 4;
     constexpr uint32_t kTickUs = 10; // library tick = 10us
@@ -133,7 +132,10 @@ namespace esp32irpk::hal
   {
     if (!tx_channel_)
       return false;
-    if (carrier_hz == carrier_hz_)
+    // Re-apply when the frequency changes, or when the duty changed while a
+    // carrier is active (same frequency but a new duty from setCarrierDuty()).
+    if (carrier_hz == carrier_hz_ &&
+        (carrier_hz == 0 || carrier_duty_ == applied_duty_))
       return true;
 
     rmt_carrier_config_t carrier_cfg = {};
@@ -141,7 +143,7 @@ namespace esp32irpk::hal
     if (carrier_hz != 0)
     {
       carrier_cfg.frequency_hz = carrier_hz;
-      carrier_cfg.duty_cycle = kDefaultCarrierDuty;
+      carrier_cfg.duty_cycle = carrier_duty_;
       carrier_cfg.flags.polarity_active_low = false;
       carrier_cfg.flags.always_on = false;
       cfg_ptr = &carrier_cfg;
@@ -152,6 +154,15 @@ namespace esp32irpk::hal
       return false;
 
     carrier_hz_ = carrier_hz;
+    applied_duty_ = (carrier_hz != 0) ? carrier_duty_ : -1.0f;
+    return true;
+  }
+
+  bool RmtTx::setCarrierDuty(float duty)
+  {
+    if (!(duty > 0.0f && duty < 1.0f))
+      return false;
+    carrier_duty_ = duty; // applied on the next applyCarrierHz() (i.e. next send)
     return true;
   }
 
@@ -463,6 +474,14 @@ namespace esp32irpk::hal
     if (!begun_)
       return false;
     carrier_hz_ = carrier_hz;
+    return true;
+  }
+
+  bool RmtTx::setCarrierDuty(float duty)
+  {
+    if (!(duty > 0.0f && duty < 1.0f))
+      return false;
+    carrier_duty_ = duty;
     return true;
   }
 

@@ -13,6 +13,7 @@ namespace esp32irpk
 
   inline constexpr size_t kDefaultMaxDecodeCandidates = 4;
   inline constexpr uint32_t kDefaultCarrierHz = 38000;
+  inline constexpr float kDefaultCarrierDuty = 0.33f; // carrier on-time fraction
 
   enum class IRProtocolScheme : uint8_t
   {
@@ -233,7 +234,8 @@ namespace esp32irpk
     bool setInverted(bool inverted);
     bool setCarrierHz(uint32_t hz);
     bool clearCarrierHz();
-    bool disableCarrier(); // send with no carrier modulation (solid marks)
+    bool disableCarrier();         // send with no carrier modulation (solid marks)
+    bool setCarrierDuty(float duty); // carrier on-time fraction (0 < duty < 1)
 
     bool addProtocol(const IRProtocolSpec &spec);
     bool clearProtocols();
@@ -254,6 +256,7 @@ namespace esp32irpk
     bool begun_ = false;                                   // begin() was called
     bool carrier_override_ = false;                        // true when carrier_hz_ is explicitly set
     uint32_t carrier_hz_ = kDefaultCarrierHz;               // explicit/default carrier frequency
+    float carrier_duty_ = kDefaultCarrierDuty;              // carrier on-time fraction
     uint8_t order_counter_ = 0;                            // running order for protocol registration
     std::vector<IRProtocolSpec> protocols_{};              // registered protocol list
     hal::RmtTx rmt_tx_{};                                  // HAL transmitter instance

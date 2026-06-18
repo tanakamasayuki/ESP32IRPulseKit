@@ -84,6 +84,18 @@ namespace esp32irpk
     return true;
   }
 
+  bool IRSender::setCarrierDuty(float duty)
+  {
+    if (!(duty > 0.0f && duty < 1.0f))
+      return false;
+    if (begun_ && rmt_tx_.isSending())
+      return false;
+    if (begun_ && !rmt_tx_.setCarrierDuty(duty))
+      return false;
+    carrier_duty_ = duty;
+    return true;
+  }
+
   bool IRSender::addProtocol(const IRProtocolSpec &spec)
   {
     if (begun_)
@@ -122,6 +134,7 @@ namespace esp32irpk
     }
     if (!rmt_tx_.begin(gpio_, inverted_))
       return false;
+    rmt_tx_.setCarrierDuty(carrier_duty_); // honor a duty set before begin()
     begun_ = true;
     return true;
   }

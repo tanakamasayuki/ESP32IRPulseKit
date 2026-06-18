@@ -26,6 +26,7 @@ namespace esp32irpk::hal
     bool begin(int gpio, bool inverted);
     void end();
     bool applyCarrierHz(uint32_t carrier_hz);
+    bool setCarrierDuty(float duty); // 0 < duty < 1; applied on next send
     bool send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count, uint32_t carrier_hz);
     bool isSending() const { return sending_; }
 
@@ -35,6 +36,8 @@ namespace esp32irpk::hal
     bool begun_ = false;
     bool sending_ = false;
     uint32_t carrier_hz_ = 0;
+    float carrier_duty_ = 0.33f;  // desired carrier duty (see kDefaultCarrierDuty)
+    float applied_duty_ = -1.0f;  // duty last pushed to the channel (-1 = none)
     void *tx_channel_ = nullptr;
     void *tx_encoder_ = nullptr;
   };
