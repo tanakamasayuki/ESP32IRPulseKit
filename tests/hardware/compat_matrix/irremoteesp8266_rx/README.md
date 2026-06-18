@@ -41,3 +41,16 @@ RX-observed protocol, bits, raw_len, and `bit_order` (same / reversed / other).
 Bit order and field interpretation can differ between implementations, so the
 test does **not** assert an exact bits match. It only requires that RX
 recognized a frame (`raw_len > 0`); the differences are recorded as observations.
+
+## Known Failures
+
+In the 2026-06-18 hardware log
+`/tmp/pytest-embedded/2026-06-18_07-31-59-959191`, these cases failed. They are
+kept as normal pytest failures; this section tracks whether the reason is an
+external-RX coverage limit or something PulseKit should adjust.
+
+| Case | Observation | Assessment |
+|---|---|---|
+| SAMSUNG36 | `RX_RAW len=76`; the frame is received but IRremoteESP8266 does not decode it | IRremoteESP8266 2.9.0 has `decodeSamsung36()`. PulseKit currently models SAMSUNG36 as a 36-bit Samsung32-style frame, while IRremoteESP8266's Samsung36 is a two-block 16-bit + 20-bit waveform. Treat as a PulseKit spec/encoder investigation item |
+| JVC24 | `RX_DECODE protocol=OTHER_64 len=24 bits=0x07B0300` | IRremoteESP8266's standard JVC decoder uses `kJvcBits = 16`. PulseKit JVC24 is outside that standard JVC RX coverage |
+| JVC32 | `RX_DECODE protocol=OTHER_26 len=32 bits=0x0B3D52C48` | The receiver sees a 32-bit waveform but does not classify it as JVC. Standard JVC RX coverage is 16-bit |

@@ -43,6 +43,8 @@ String protocolName(const decode_results &r)
     return "SONY" + String(r.bits);
   case SAMSUNG:
     return "SAMSUNG" + String(r.bits);
+  case SAMSUNG36:
+    return "SAMSUNG36";
   case JVC:
     return "JVC" + String(r.bits);
   default:

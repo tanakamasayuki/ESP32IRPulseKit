@@ -23,6 +23,38 @@ MSB/LSB-first の整数表現の違いだけ、というケースが多いため
 
 `compat_matrix` は任意実行です。score、raw_len、decode結果、raw timingのばらつきを観測し、bit orderやfield解釈の差分を記録する目的で使います。
 
+## プロトコルカバレッジ方針
+
+PulseKitの `protocol_matrix` は自前TX -> 自前RXで14プロトコルを確認します。
+`compat_matrix` は外部ライブラリとの共通範囲と仕様差を調べるため、外部側の標準decode/send
+があるものを優先して追加します。外部側に標準対応が無いものは、テストで失敗してよいですが、
+READMEに理由と観測ログを残します。
+
+2026-06-18時点でローカルに入っているライブラリ実装を見た整理:
+
+| PulseKit protocol | Arduino-IRremote 4.7.1 | IRremoteESP8266 2.9.0 | compat方針 |
+|---|---|---|---|
+| NEC | 送受信あり | 送受信あり | 通常互換対象 |
+| SONY12 | 送受信あり | 送受信あり | 通常互換対象 |
+| SONY15 | 送受信あり | 送受信あり | 通常互換対象 |
+| SONY20 | 送受信あり | 送受信あり | 通常互換対象 |
+| SAMSUNG32 | 送受信あり | 送受信あり | 通常互換対象 |
+| SAMSUNG36 | 専用decodeなし。raw送信APIでは36bit送信可能 | `sendSamsung36()` / `decodeSamsung36()` あり | IRremoteESP8266互換は修正候補。Arduino-IRremote RXは対応範囲外 |
+| JVC24 | 標準JVCは16bit | 標準JVCは16bit | 外部RXでは対応範囲外。外部TX -> PulseKit RXは観測対象 |
+| JVC32 | 標準JVCは16bit | 標準JVCは16bit | 外部RXでは対応範囲外。外部TX -> PulseKit RXは観測対象 |
+| AEHA | Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | Panasonic/Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | 次の調査候補 |
+| PANASONIC40 | Kaseikyo/Panasonic系あり。40bit形は未確認 | Panasonic/Kaseikyo系あり。40bit形は未確認 | 次の調査候補 |
+| PANASONIC48 | Kaseikyo/Panasonic系あり | Panasonic/Kaseikyo系あり | 次の追加候補 |
+| RC5 | 送受信あり | 送受信あり | 次の追加候補 |
+| RC6_M0_16 | RC6系あり | RC6系あり | 次の追加候補。ただし表現bit長差に注意 |
+| RC6_M6_32 | RC6A/RC6系あり | RC6系あり | 調査候補。mode 6A表現差に注意 |
+
+優先順位:
+
+1. `SAMSUNG36` をIRremoteESP8266の二分割Samsung36波形に合わせるか検討する。
+2. `PANASONIC48` / `RC5` / `RC6_M0_16` をcompat対象に追加できるか、外部APIの値表現を確認する。
+3. `AEHA` / `PANASONIC40` / `RC6_M6_32` は、外部ライブラリのprotocol名・bit構造とPulseKitの仕様が対応するかを先に調査する。
+
 ## 現時点の所見と仮説（NEC、2026-06-18時点）
 
 **TX↔RX を極端に近づけた（<10cm）**状態でNECを流すと、4方向のうち2方向が失敗、
@@ -72,4 +104,3 @@ MSB/LSB-first の整数表現の違いだけ、というケースが多いため
 - ライブラリ側の堅牢化案（失敗Aのみ解消）：NECビット判定を厳密な±25%帰属では
   なく「最近傍の期待スペース（閾値≈1125us）＋緩いマークチェック」にする（多くの
   NECデコーダの方式）。未実装。コミット済みの33%デフォルトduty決定には触れない。
-

@@ -24,6 +24,39 @@ implementations often differ only by MSB/LSB-first integer representation.
 
 `compat_matrix` is optional. Use it to observe score, raw_len, decode results, raw timing variation, and bit-order/field interpretation differences.
 
+## Protocol Coverage Policy
+
+PulseKit's `protocol_matrix` verifies 14 protocols with in-house TX -> in-house
+RX. `compat_matrix` compares that surface against external libraries, so cases
+with standard external decode/send support should be added first. If an external
+library does not have standard coverage for a PulseKit variant, the test may
+fail, but the README should record why and preserve the observed log.
+
+Local library coverage as of 2026-06-18:
+
+| PulseKit protocol | Arduino-IRremote 4.7.1 | IRremoteESP8266 2.9.0 | compat policy |
+|---|---|---|---|
+| NEC | TX/RX support | TX/RX support | Normal compatibility target |
+| SONY12 | TX/RX support | TX/RX support | Normal compatibility target |
+| SONY15 | TX/RX support | TX/RX support | Normal compatibility target |
+| SONY20 | TX/RX support | TX/RX support | Normal compatibility target |
+| SAMSUNG32 | TX/RX support | TX/RX support | Normal compatibility target |
+| SAMSUNG36 | No dedicated decoder; raw sender can emit 36 bits | `sendSamsung36()` / `decodeSamsung36()` exist | IRremoteESP8266 compatibility is a fix candidate. Arduino-IRremote RX is outside coverage |
+| JVC24 | Standard JVC is 16-bit | Standard JVC is 16-bit | Outside external RX coverage. External TX -> PulseKit RX remains useful |
+| JVC32 | Standard JVC is 16-bit | Standard JVC is 16-bit | Outside external RX coverage. External TX -> PulseKit RX remains useful |
+| AEHA | Kaseikyo family exists; relation to PulseKit AEHA not settled | Panasonic/Kaseikyo family exists; relation to PulseKit AEHA not settled | Investigation candidate |
+| PANASONIC40 | Kaseikyo/Panasonic family exists; 40-bit shape not confirmed | Panasonic/Kaseikyo family exists; 40-bit shape not confirmed | Investigation candidate |
+| PANASONIC48 | Kaseikyo/Panasonic family exists | Panasonic/Kaseikyo family exists | Next addition candidate |
+| RC5 | TX/RX support | TX/RX support | Next addition candidate |
+| RC6_M0_16 | RC6 family support | RC6 family support | Next addition candidate; watch bit representation |
+| RC6_M6_32 | RC6A/RC6 family support | RC6 family support | Investigation candidate; watch mode-6A representation |
+
+Priority:
+
+1. Decide whether PulseKit `SAMSUNG36` should match IRremoteESP8266's two-block Samsung36 waveform.
+2. Add `PANASONIC48`, `RC5`, and `RC6_M0_16` after confirming external API value representation.
+3. Investigate `AEHA`, `PANASONIC40`, and `RC6_M6_32` before adding them as required compatibility cases.
+
 ## Current findings & hypotheses (NEC, as of 2026-06-18)
 
 Running the NEC case at a **very short TX↔RX distance (<10 cm)** gives 2 of 4
@@ -79,4 +112,3 @@ in the wrong direction and pushes the zero-space past the decode tolerance.
   NEC bits by nearest expected space (threshold ≈1125 us) with a loose mark
   check, instead of strict ±25 % membership — how most NEC decoders work. Not
   yet implemented; it does not touch the committed 33 % default-duty decision.
-

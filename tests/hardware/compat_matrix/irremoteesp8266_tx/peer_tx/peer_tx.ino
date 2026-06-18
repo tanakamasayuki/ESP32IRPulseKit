@@ -119,7 +119,7 @@ void handleSend(const String &line)
   }
   else if (protocolText == "SAMSUNG36")
   {
-    irsend.sendSAMSUNG(bits, 36);
+    irsend.sendSamsung36(bits, 36);
   }
   else if (protocolText == "JVC24")
   {
