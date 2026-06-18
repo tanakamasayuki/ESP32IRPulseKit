@@ -262,6 +262,89 @@ void testToleranceBoundaries()
   EXPECT_EQ("tolerance/outside-count", 0, outside_result.count);
 }
 
+void testSpaceEncodedRelaxedCandidateScoring()
+{
+  esp32irpk::IRProtocolSpec spec{};
+  spec.protocol_id = esp32irpk::IRProtocolID::USER3;
+  spec.name[0] = 'R';
+  spec.scheme = esp32irpk::IRProtocolScheme::SPACE_ENC;
+  spec.family = esp32irpk::IRProtocolFamily::UNKNOWN;
+  spec.header = {.mark_us = 1000, .space_us = 1000};
+  spec.one = {.mark_us = 500, .space_us = 1500};
+  spec.zero = {.mark_us = 500, .space_us = 500};
+  spec.trailer = {.mark_us = 500, .space_us = 0};
+  spec.lsb_first = true;
+  spec.bit_length = 4;
+  spec.bit_tol_pct = 25;
+
+  const esp32irpk::IRProtocolSpec specs[] = {spec};
+
+  const uint16_t ideal_ticks[] = {
+      100, 100,
+      50, 50,
+      50, 150,
+      50, 50,
+      50, 150,
+      50};
+  esp32irpk::IRRawTickView ideal_view{};
+  ideal_view.ticks = ideal_ticks;
+  ideal_view.len = sizeof(ideal_ticks) / sizeof(ideal_ticks[0]);
+
+  esp32irpk::IRReceiveResult<4> ideal_result{};
+  EXPECT_TRUE("relaxed-space/ideal-decode",
+              esp32irpk::codec::decodeRawToBits(ideal_view, specs, 1, 4, 0, ideal_result));
+  EXPECT_EQ("relaxed-space/ideal-bits", 0x0aULL, ideal_result.candidates[0].decoded.bits);
+
+  const uint16_t noisy_ticks[] = {
+      100, 100,
+      70, 68,
+      50, 150,
+      50, 68,
+      50, 150,
+      50};
+  esp32irpk::IRRawTickView noisy_view{};
+  noisy_view.ticks = noisy_ticks;
+  noisy_view.len = sizeof(noisy_ticks) / sizeof(noisy_ticks[0]);
+
+  esp32irpk::IRReceiveResult<4> noisy_result{};
+  EXPECT_TRUE("relaxed-space/noisy-decode",
+              esp32irpk::codec::decodeRawToBits(noisy_view, specs, 1, 4, 0, noisy_result));
+  EXPECT_EQ("relaxed-space/noisy-bits", 0x0aULL, noisy_result.candidates[0].decoded.bits);
+  EXPECT_TRUE("relaxed-space/noisy-score-lower",
+              noisy_result.candidates[0].score < ideal_result.candidates[0].score);
+  EXPECT_TRUE("relaxed-space/noisy-score-accepted", noisy_result.candidates[0].score >= 0);
+}
+
+void testSpaceEncodedAmbiguousSpaceRejects()
+{
+  esp32irpk::IRProtocolSpec spec{};
+  spec.protocol_id = esp32irpk::IRProtocolID::USER4;
+  spec.name[0] = 'A';
+  spec.scheme = esp32irpk::IRProtocolScheme::SPACE_ENC;
+  spec.family = esp32irpk::IRProtocolFamily::UNKNOWN;
+  spec.header = {.mark_us = 1000, .space_us = 1000};
+  spec.one = {.mark_us = 500, .space_us = 1500};
+  spec.zero = {.mark_us = 500, .space_us = 500};
+  spec.trailer = {.mark_us = 500, .space_us = 0};
+  spec.lsb_first = true;
+  spec.bit_length = 1;
+  spec.bit_tol_pct = 25;
+
+  const uint16_t ambiguous_ticks[] = {
+      100, 100,
+      50, 100,
+      50};
+  esp32irpk::IRRawTickView view{};
+  view.ticks = ambiguous_ticks;
+  view.len = sizeof(ambiguous_ticks) / sizeof(ambiguous_ticks[0]);
+
+  const esp32irpk::IRProtocolSpec specs[] = {spec};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("relaxed-space/ambiguous-reject",
+              !esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("relaxed-space/ambiguous-count", 0, result.count);
+}
+
 void expectEncodeDecodeRoundtrip(const char *name,
                                  const esp32irpk::IRProtocolSpec &spec,
                                  const esp32irpk::IRDecodedBits &bits)
@@ -429,6 +512,30 @@ void testNecFixtureDecode()
       esp32irpk::frames::NECFrame::fromBits(result.candidates[0].decoded);
   EXPECT_EQ("nec-fixture/address", 0x00ff, frame.address);
   EXPECT_EQ("nec-fixture/command", 0x34, frame.command);
+}
+
+void testNecLikeScoresOutOfToleranceZeroSpaces()
+{
+  const uint16_t arduino_irremote_nec_ticks[] = {
+      892, 471, 51, 189, 53, 189, 51, 78, 51, 78, 53, 189, 51, 78,
+      51, 189, 53, 189, 53, 76, 53, 76, 53, 189, 51, 191, 51, 78,
+      51, 189, 53, 76, 53, 78, 51, 78, 51, 78, 51, 78, 51, 78,
+      51, 78, 54, 75, 53, 76, 53, 76, 53, 190, 53, 189, 50, 189,
+      53, 189, 54, 189, 50, 189, 53, 189, 54, 189, 50};
+
+  esp32irpk::IRRawTickView view{};
+  view.ticks = arduino_irremote_nec_ticks;
+  view.len = sizeof(arduino_irremote_nec_ticks) / sizeof(arduino_irremote_nec_ticks[0]);
+
+  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::NEC};
+  esp32irpk::IRReceiveResult<4> result{};
+  EXPECT_TRUE("nec-relaxed-zero/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
+  EXPECT_EQ("nec-relaxed-zero/candidates", 1, result.count);
+  EXPECT_EQ("nec-relaxed-zero/protocol", esp32irpk::IRProtocolID::NEC, result.candidates[0].protocol_id);
+  EXPECT_EQ("nec-relaxed-zero/bits", 0xff002cd3ULL, result.candidates[0].decoded.bits);
+  EXPECT_EQ("nec-relaxed-zero/length", 32, result.candidates[0].decoded.bit_length);
+  EXPECT_TRUE("nec-relaxed-zero/score-penalized", result.candidates[0].score < 900);
+  EXPECT_TRUE("nec-relaxed-zero/score-accepted", result.candidates[0].score >= 0);
 }
 
 void testSony12FixtureDecode()
@@ -778,12 +885,15 @@ void setup()
   testEncodeRejectsInvalidInputs();
   testMsbFirstVariableLengthDecode();
   testToleranceBoundaries();
+  testSpaceEncodedRelaxedCandidateScoring();
+  testSpaceEncodedAmbiguousSpaceRejects();
   testGeneratedProtocolRoundtrips();
   testSpaceEncodedDecodeAllowsClippedFinalSpace();
   testNecRepeatDecode();
   testNecRepeatEncode();
   testSenderEncodeLifecycle();
   testNecFixtureDecode();
+  testNecLikeScoresOutOfToleranceZeroSpaces();
   testSony12FixtureDecode();
   testSamsung32FixtureDecode();
   testAeha48FixtureDecode();

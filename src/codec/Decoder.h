@@ -51,6 +51,34 @@ namespace esp32irpk::codec
       return out;
     }
 
+    inline bool supportsNearestSpaceDecode(const IRProtocolSpec &spec)
+    {
+      return spec.scheme == IRProtocolScheme::SPACE_ENC &&
+             spec.zero.mark_us > 0 &&
+             spec.one.mark_us > 0 &&
+             spec.zero.space_us > 0 &&
+             spec.one.space_us > spec.zero.space_us;
+    }
+
+    inline uint16_t candidateTolPct(const IRProtocolSpec &spec)
+    {
+      uint32_t tol = static_cast<uint32_t>(spec.bit_tol_pct) * 2U;
+      if (tol < spec.bit_tol_pct)
+        tol = spec.bit_tol_pct;
+      if (tol > 60U)
+        tol = 60U;
+      return static_cast<uint16_t>(tol);
+    }
+
+    inline bool spaceIsAmbiguous(uint32_t space_us, uint32_t zero_us, uint32_t one_us)
+    {
+      uint32_t split_us = (zero_us + one_us) / 2U;
+      uint32_t deadband_us = (one_us - zero_us) / 20U; // 5% of the 0/1 separation
+      if (deadband_us < 20U)
+        deadband_us = 20U;
+      return absDiff(space_us, split_us) <= deadband_us;
+    }
+
     inline bool consumePulse(const IRRawTickView &raw,
                              size_t &idx,
                              uint32_t expected_us,
@@ -235,23 +263,36 @@ namespace esp32irpk::codec
 
         bool one_ok = one_mark.ok && one_space.ok;
         bool zero_ok = zero_mark.ok && zero_space.ok;
-        if (!one_ok && !zero_ok)
-          return false;
-
         uint32_t one_err = static_cast<uint32_t>(one_mark.error_pct + one_space.error_pct);
         uint32_t zero_err = static_cast<uint32_t>(zero_mark.error_pct + zero_space.error_pct);
         bool bit_is_one = false;
         uint32_t bit_err = 0;
 
-        if (one_ok && (!zero_ok || one_err <= zero_err))
+        uint16_t candidate_tol_pct = candidateTolPct(spec);
+        PulseMatch one_mark_candidate = matchPulse(mark_us, spec.one.mark_us, candidate_tol_pct);
+        PulseMatch zero_mark_candidate = matchPulse(mark_us, spec.zero.mark_us, candidate_tol_pct);
+        bool mark_candidate_ok = one_mark_candidate.ok || zero_mark_candidate.ok;
+
+        if (!one_ok && !zero_ok && !space_is_gap && supportsNearestSpaceDecode(spec) &&
+            mark_candidate_ok && !spaceIsAmbiguous(space_us, spec.zero.space_us, spec.one.space_us))
+        {
+          uint32_t split_us = (spec.zero.space_us + spec.one.space_us) / 2U;
+          bit_is_one = space_us >= split_us;
+          bit_err = bit_is_one ? one_err : zero_err;
+        }
+        else if (one_ok && (!zero_ok || one_err <= zero_err))
         {
           bit_is_one = true;
           bit_err = one_err;
         }
-        else
+        else if (zero_ok)
         {
           bit_is_one = false;
           bit_err = zero_err;
+        }
+        else
+        {
+          return false;
         }
 
         if (spec.lsb_first)
