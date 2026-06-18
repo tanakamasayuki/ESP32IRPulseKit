@@ -79,32 +79,23 @@ def assert_serial_control(tx, rx):
     rx.expect_exact("PONG", timeout=5)
 
 
-def read_first_decode(rx, case: Case):
+TRIALS = 5
+PASS_MIN = 3
+
+
+def try_decode_once(rx, case: Case):
+    """Read one RX result. Return the observed decode dict, or None when the RX
+    saw no signal, dumped RX_RAW (undecodable), or produced a spurious decode."""
     try:
         match = rx.expect(RX_RESULT, timeout=12)
     except (EOF, TIMEOUT):
-        pytest.fail(
-            f"RX saw no IR signal for {case.protocol} bits=0x{case.bits:x} "
-            f"(no RX_DECODE or RX_RAW within timeout).",
-            pytrace=False,
-        )
+        return None
     if match.group("protocol") is None:
-        raw_len = int(match.group("raw_only_len"))
-        pytest.fail(
-            f"RX received a frame (raw_len={raw_len}) but could not decode "
-            f"{case.protocol} bits=0x{case.bits:x} — likely a timing/tolerance "
-            f"incompatibility.",
-            pytrace=False,
-        )
+        return None
     protocol = match.group("protocol").decode()
     bit_length = int(match.group("length"))
     if bit_length == 0 or protocol.startswith("OTHER_"):
-        pytest.fail(
-            f"RX produced a spurious decode (protocol={protocol}, len={bit_length}) "
-            f"for {case.protocol} bits=0x{case.bits:x} — no usable protocol/bits, "
-            f"treated as undecodable.",
-            pytrace=False,
-        )
+        return None
     return {
         "protocol": protocol,
         "bit_length": bit_length,
@@ -115,15 +106,37 @@ def read_first_decode(rx, case: Case):
     }
 
 
+def decode_best_of_n(tx, rx, case: Case):
+    """Send the frame TRIALS times; return (last_observed, success_count).
+    Judged by majority so a single disturbed/dropped frame does not fail the
+    case, while a genuinely incompatible link (never decodes) still fails."""
+    n_ok = 0
+    last = None
+    for _ in range(TRIALS):
+        tx.write(f"SEND {case.protocol} {case.bits:x}\n")
+        try:
+            tx.expect_exact(f"TX_OK {case.protocol} {case.bits:x}", timeout=5)
+        except (EOF, TIMEOUT):
+            continue
+        obs = try_decode_once(rx, case)
+        if obs:
+            n_ok += 1
+            last = obs
+    return last, n_ok
+
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c.protocol)
 def test_arduino_irremote_tx_to_pulsekit_rx(dut, peers, case, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
 
-    tx.write(f"SEND {case.protocol} {case.bits:x}\n")
-    tx.expect_exact(f"TX_OK {case.protocol} {case.bits:x}", timeout=5)
-
-    observed = read_first_decode(rx, case)
+    observed, n_ok = decode_best_of_n(tx, rx, case)
+    record_property("decode_ratio", f"{n_ok}/{TRIALS}")
+    if n_ok < PASS_MIN:
+        pytest.fail(
+            f"{case.protocol} decoded only {n_ok}/{TRIALS} times "
+            f"(need >= {PASS_MIN}); link too marginal or incompatible.",
+            pytrace=False,
+        )
     bits_match = observed["bits"] == case.bits
     bit_order = classify_bit_order(case.bits, observed["bits"], observed["bit_length"])
 

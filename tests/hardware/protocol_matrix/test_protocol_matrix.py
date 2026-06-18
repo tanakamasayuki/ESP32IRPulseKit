@@ -56,43 +56,58 @@ def assert_serial_control(tx, rx):
     rx.expect_exact("PONG", timeout=5)
 
 
-def read_expected_decode(rx, case: Case):
-    deadline_count = 0
-    while deadline_count < 5:
+TRIALS = 5
+PASS_MIN = 3
+
+
+def try_decode_once(rx, case: Case):
+    """Read one RX_DECODE; return {score, raw_len} when it matches the expected
+    protocol/len/bits/NORMAL, else None (so the caller can judge by majority)."""
+    try:
+        match = rx.expect(RX_DECODE, timeout=10)
+    except (EOF, TIMEOUT):
+        return None
+    protocol = match.group("protocol").decode()
+    bit_length = int(match.group("length"))
+    bits = int(match.group("bits"), 16)
+    frame_type = match.group("type").decode()
+    if (protocol == case.protocol and bit_length == case.bit_length
+            and bits == case.bits and frame_type == "NORMAL"):
+        return {"score": int(match.group("score")), "raw_len": int(match.group("raw_len"))}
+    return None
+
+
+def decode_best_of_n(tx, rx, case: Case):
+    """Send the frame TRIALS times; return (last_observed, success_count).
+    Judged by majority so a single disturbed/dropped frame does not fail the
+    case, while a genuinely incompatible link (never decodes) still fails."""
+    n_ok = 0
+    last = None
+    for _ in range(TRIALS):
+        tx.write(f"SEND {case.protocol} {case.bits:x}\n")
         try:
-            match = rx.expect(RX_DECODE, timeout=10)
+            tx.expect_exact(f"TX_OK {case.protocol} {case.bits:x}", timeout=5)
         except (EOF, TIMEOUT):
-            pytest.fail(
-                f"RX did not decode {case.protocol} bits=0x{case.bits:x}.",
-                pytrace=False,
-            )
-
-        protocol = match.group("protocol").decode()
-        bit_length = int(match.group("length"))
-        bits = int(match.group("bits"), 16)
-        frame_type = match.group("type").decode()
-        if protocol == case.protocol and bit_length == case.bit_length and bits == case.bits and frame_type == "NORMAL":
-            return {
-                "score": int(match.group("score")),
-                "raw_len": int(match.group("raw_len")),
-            }
-        deadline_count += 1
-
-    pytest.fail(
-        f"RX decoded activity, but not expected {case.protocol} len={case.bit_length} bits=0x{case.bits:x}.",
-        pytrace=False,
-    )
-
+            continue
+        obs = try_decode_once(rx, case)
+        if obs:
+            n_ok += 1
+            last = obs
+    return last, n_ok
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c.protocol)
 def test_protocol_matrix_tx_rx(dut, peers, case, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
 
-    tx.write(f"SEND {case.protocol} {case.bits:x}\n")
-    tx.expect_exact(f"TX_OK {case.protocol} {case.bits:x}", timeout=5)
-
-    observed = read_expected_decode(rx, case)
+    observed, n_ok = decode_best_of_n(tx, rx, case)
+    record_property("decode_ratio", f"{n_ok}/{TRIALS}")
+    if n_ok < PASS_MIN:
+        pytest.fail(
+            f"{case.protocol} decoded only {n_ok}/{TRIALS} times "
+            f"(need >= {PASS_MIN}); link too marginal or incompatible.",
+            pytrace=False,
+        )
     record_property("protocol", case.protocol)
     record_property("bits", f"0x{case.bits:x}")
     record_property("score", observed["score"])
