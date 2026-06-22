@@ -1152,7 +1152,8 @@ void testFrameConversions()
   samsung36.command = 0x1abcde;
   esp32irpk::IRDecodedBits samsung36_bits = samsung36.toBits();
   EXPECT_EQ("frame/samsung36-length", 36, samsung36_bits.bit_length);
-  EXPECT_EQ("frame/samsung36-bits", 0xabcdeabcdULL, samsung36_bits.bits);
+  // MSB-first layout: address in the top 16 bits, command in the low 20 bits.
+  EXPECT_EQ("frame/samsung36-bits", 0xabcdabcdeULL, samsung36_bits.bits);
   esp32irpk::frames::Samsung36Frame samsung36_roundtrip =
       esp32irpk::frames::Samsung36Frame::fromBits(samsung36_bits);
   EXPECT_EQ("frame/samsung36-address", 0xabcdu, samsung36_roundtrip.address);

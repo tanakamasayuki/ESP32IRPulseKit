@@ -67,7 +67,20 @@ struct IRDecodedBits {
 - `bit_length` is `0..64`.
 - Normal frames use `frame_type == NORMAL`.
 - Repeat frames use `frame_type == REPEAT`. The default repeat representation is `bit_length == 0` and `bits == 0xffffffffffffffff`.
-- Bit order follows `IRProtocolSpec::lsb_first`.
+- Bit order follows `IRProtocolSpec::lsb_first`, which maps the on-air bit order
+  onto `bits`:
+  - `true`: the first transmitted bit is `bits` bit 0 (LSB).
+  - `false`: the first transmitted bit is the most significant bit of
+    `bit_length` (`bits` bit `bit_length - 1`).
+  This mirrors each protocol's on-air transmission order — NEC, Sony, JVC, Samsung
+  (SAMSUNG32), and AEHA/Panasonic send LSB-first; RC5/RC6 and SAMSUNG36 send
+  MSB-first. The encoder and decoder honor the flag symmetrically, so an
+  in-library TX → RX round-trip always recovers the same `bits`.
+  - Other libraries may index the *same* on-air signal from the opposite end
+    (for example IRremoteESP8266 stores the NEC first-sent bit at the MSB of its
+    integer), so their value can appear bit-reversed even though the waveform is
+    identical. This is a representation difference, not an incompatibility; the
+    `compat_matrix` tests record it as `bit_order = reversed`.
 
 ### 2.3 Protocol Spec
 

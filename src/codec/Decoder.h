@@ -340,6 +340,133 @@ namespace esp32irpk::codec
       return true;
     }
 
+    // Decode `nbits` consecutive space-encoded bits (MSB-first) starting at
+    // raw.ticks[idx]. Bit k (0..nbits-1) occupies bit position (start_pos - k).
+    // Mirrors decodeNormal's per-bit decision, including the nearest-space
+    // fallback that keeps decoding robust when 0/1 spaces are well separated.
+    inline bool decodeSpaceBitsMsbFirst(const IRRawTickView &raw,
+                                        size_t &idx,
+                                        const IRProtocolSpec &spec,
+                                        uint16_t nbits,
+                                        int start_pos,
+                                        uint64_t &bits,
+                                        uint32_t &body_err)
+    {
+      for (uint16_t k = 0; k < nbits; ++k)
+      {
+        if (idx + 1 >= raw.len)
+          return false;
+        uint32_t mark_us = ticksToUs(raw.ticks[idx]);
+        uint32_t space_us = ticksToUs(raw.ticks[idx + 1]);
+
+        PulseMatch one_mark = matchPulse(mark_us, spec.one.mark_us, spec.bit_tol_pct);
+        PulseMatch one_space = matchPulse(space_us, spec.one.space_us, spec.bit_tol_pct);
+        PulseMatch zero_mark = matchPulse(mark_us, spec.zero.mark_us, spec.bit_tol_pct);
+        PulseMatch zero_space = matchPulse(space_us, spec.zero.space_us, spec.bit_tol_pct);
+
+        bool one_ok = one_mark.ok && one_space.ok;
+        bool zero_ok = zero_mark.ok && zero_space.ok;
+        uint32_t one_err = static_cast<uint32_t>(one_mark.error_pct + one_space.error_pct);
+        uint32_t zero_err = static_cast<uint32_t>(zero_mark.error_pct + zero_space.error_pct);
+
+        bool bit_is_one = false;
+        uint32_t bit_err = 0;
+
+        if (!one_ok && !zero_ok && supportsNearestSpaceDecode(spec) &&
+            !spaceIsAmbiguous(space_us, spec.zero.space_us, spec.one.space_us))
+        {
+          uint16_t cand_tol = candidateTolPct(spec);
+          bool mark_ok = matchPulse(mark_us, spec.one.mark_us, cand_tol).ok ||
+                         matchPulse(mark_us, spec.zero.mark_us, cand_tol).ok;
+          if (!mark_ok)
+            return false;
+          uint32_t split_us = (spec.zero.space_us + spec.one.space_us) / 2U;
+          bit_is_one = space_us >= split_us;
+          bit_err = bit_is_one ? one_err : zero_err;
+        }
+        else if (one_ok && (!zero_ok || one_err <= zero_err))
+        {
+          bit_is_one = true;
+          bit_err = one_err;
+        }
+        else if (zero_ok)
+        {
+          bit_is_one = false;
+          bit_err = zero_err;
+        }
+        else
+        {
+          return false;
+        }
+
+        if (bit_is_one)
+          bits |= (1ULL << (start_pos - k));
+        body_err += bit_err;
+        idx += 2;
+      }
+      return true;
+    }
+
+    // SAMSUNG36: two MSB-first blocks (16 + 20 bits) separated by a
+    // header-length space, each block ending on a footer mark. The recovered
+    // 36-bit value is MSB-first: bits[35..20] = block1 (address), bits[19..0] =
+    // block2 (command). See src/protocols/Samsung.h.
+    inline bool decodeSamsung36(const IRRawTickView &raw,
+                                const IRProtocolSpec &spec,
+                                IRDecodedBits &decoded,
+                                int16_t &score_out)
+    {
+      constexpr uint16_t kBlock1Bits = 16;
+      constexpr uint16_t kBlock2Bits = 20;
+      constexpr uint16_t kTotalBits = kBlock1Bits + kBlock2Bits;
+
+      // header(2) + block1(32) + separator mark+space(2) + block2(40) + trailer mark(1)
+      if (raw.len < 2 + kBlock1Bits * 2 + 2 + kBlock2Bits * 2 + 1)
+        return false;
+
+      size_t idx = 0;
+      uint32_t header_err = 0;
+      uint32_t body_err = 0;
+
+      // Header.
+      if (!consumePulse(raw, idx, spec.header.mark_us, spec.bit_tol_pct, header_err) ||
+          !consumePulse(raw, idx, spec.header.space_us, spec.bit_tol_pct, header_err))
+        return false;
+
+      uint64_t bits = 0;
+
+      // Block 1: top 16 bits (positions 35..20).
+      if (!decodeSpaceBitsMsbFirst(raw, idx, spec, kBlock1Bits, kTotalBits - 1, bits, body_err))
+        return false;
+
+      // Block 1 footer mark + inter-block separator space (= header space).
+      if (!consumePulse(raw, idx, spec.trailer.mark_us, spec.bit_tol_pct, header_err) ||
+          !consumePulse(raw, idx, spec.header.space_us, spec.bit_tol_pct, header_err))
+        return false;
+
+      // Block 2: low 20 bits (positions 19..0).
+      if (!decodeSpaceBitsMsbFirst(raw, idx, spec, kBlock2Bits, kBlock2Bits - 1, bits, body_err))
+        return false;
+
+      // Trailer mark, then an optional trailing gap space.
+      if (!consumePulse(raw, idx, spec.trailer.mark_us, spec.bit_tol_pct, header_err))
+        return false;
+      if (idx < raw.len)
+      {
+        if (raw.len - idx == 1)
+          ++idx; // trailing gap: ignore without penalty
+        else
+          return false;
+      }
+
+      decoded.protocol_id = spec.protocol_id;
+      decoded.frame_type = IRFrameType::NORMAL;
+      decoded.bit_length = kTotalBits;
+      decoded.bits = bits;
+      score_out = finalizeWeightedScore(header_err, body_err);
+      return true;
+    }
+
     inline bool decodeRepeat(const IRRawTickView &raw,
                              const IRProtocolSpec &spec,
                              IRDecodedBits &decoded,
@@ -695,7 +822,16 @@ namespace esp32irpk::codec
       size_t effective_len = raw.len;
       bool ok = false;
 
-      if (spec.scheme == IRProtocolScheme::SPACE_ENC)
+      if (spec.scheme == IRProtocolScheme::SPACE_ENC &&
+          spec.protocol_id == IRProtocolID::SAMSUNG36)
+      {
+        // Two-block waveform; not expressible by the generic SPACE_ENC decoder.
+        effective_len = detail::maybeTrimByGap(raw, spec);
+        IRRawTickView sub_raw = raw;
+        sub_raw.len = effective_len;
+        ok = detail::decodeSamsung36(sub_raw, spec, decoded, score);
+      }
+      else if (spec.scheme == IRProtocolScheme::SPACE_ENC)
       {
         effective_len = detail::maybeTrimByGap(raw, spec);
         size_t decode_len = effective_len;

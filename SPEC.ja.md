@@ -67,7 +67,18 @@ struct IRDecodedBits {
 - `bit_length` は `0..64` です。
 - 通常フレームは `frame_type == NORMAL` です。
 - repeatフレームは `frame_type == REPEAT` です。repeat時は `bit_length == 0`、`bits == 0xffffffffffffffff` を基本表現とします。
-- `bits` のビット順は `IRProtocolSpec::lsb_first` に従います。
+- `bits` のビット順は `IRProtocolSpec::lsb_first` に従います。これは空中のビット送出順を
+  `bits` のどのビット位置へ対応づけるかを表します。
+  - `true`: 最初に送信するビットが `bits` の bit 0（LSB）。
+  - `false`: 最初に送信するビットが `bit_length` の最上位ビット（`bits` の bit `bit_length - 1`）。
+  これは各プロトコルの実際の送出順を反映します。NEC・Sony・JVC・Samsung（SAMSUNG32）・
+  AEHA/Panasonic は LSB-first、RC5/RC6 と SAMSUNG36 は MSB-first で送出します。
+  エンコーダとデコーダは対称にこのフラグを扱うため、自前TX→自前RX のラウンドトリップは
+  常に同じ `bits` を復元します。
+  - 他ライブラリは同じ空中信号を逆端からインデックスすることがあり（例：IRremoteESP8266 は
+    NEC の最初に送るビットを整数の MSB 側へ格納）、波形が同一でも整数値はビット反転して見え
+    ます。これは非互換ではなく表現差で、`compat_matrix` テストでは `bit_order = reversed`
+    として記録します。
 
 ### 2.3 Protocol Spec
 

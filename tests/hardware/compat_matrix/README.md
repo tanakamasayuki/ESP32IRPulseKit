@@ -41,7 +41,7 @@ Local library coverage as of 2026-06-18:
 | SONY15 | TX/RX support | TX/RX support | Normal compatibility target |
 | SONY20 | TX/RX support | TX/RX support | Normal compatibility target |
 | SAMSUNG32 | TX/RX support | TX/RX support | Normal compatibility target |
-| SAMSUNG36 | No dedicated decoder; raw sender can emit 36 bits | `sendSamsung36()` / `decodeSamsung36()` exist | IRremoteESP8266 compatibility is a fix candidate. Arduino-IRremote RX is outside coverage |
+| SAMSUNG36 | Does not support Samsung36 | `sendSamsung36()` / `decodeSamsung36()` exist | Normal compatibility target for IRremoteESP8266. Arduino-IRremote does not support Samsung36, so it is out of scope |
 | JVC | TX/RX support (16-bit) | TX/RX support (16-bit) | Normal compatibility target |
 | AEHA | Kaseikyo family exists; relation to PulseKit AEHA not settled | Panasonic/Kaseikyo family exists; relation to PulseKit AEHA not settled | Investigation candidate |
 | PANASONIC40 | Kaseikyo/Panasonic family exists; 40-bit shape not confirmed | Panasonic/Kaseikyo family exists; 40-bit shape not confirmed | Investigation candidate |
@@ -52,9 +52,20 @@ Local library coverage as of 2026-06-18:
 
 Priority:
 
-1. Decide whether PulseKit `SAMSUNG36` should match IRremoteESP8266's two-block Samsung36 waveform.
-2. Add `PANASONIC48`, `RC5`, and `RC6_M0_16` after confirming external API value representation.
-3. Investigate `AEHA`, `PANASONIC40`, and `RC6_M6_32` before adding them as required compatibility cases.
+1. `PANASONIC48`, `RC5`, and `RC6_M0_16`: add after confirming external API value representation.
+2. Investigate `AEHA`, `PANASONIC40`, and `RC6_M6_32` before adding them as required compatibility cases.
+
+### SAMSUNG36 (two-block)
+
+The Samsung36 format is a **two-block** waveform: header, the top 16 bits, an
+inter-block separator space, then the low 20 bits, sent **MSB-first**, with bit
+timings `512 / 1468 / 490 µs` and header `4515 / 4438 µs`. PulseKit follows that
+format, encoded/decoded via a protocol-specific path (`encodeSamsung36` /
+`decodeSamsung36`), the same way RC5/RC6 use dedicated paths. The value is stored
+MSB-first (`bits[35..20]` = address/block 1, `bits[19..0]` = command/block 2).
+Against an external library that also implements Samsung36 (IRremoteESP8266) the
+cross-test observes `bit_order = same`. Arduino-IRremote does not support Samsung36,
+so it is not part of this cross-test.
 
 ## Current findings & hypotheses (NEC, as of 2026-06-18)
 

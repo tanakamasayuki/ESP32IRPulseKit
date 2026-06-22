@@ -24,8 +24,10 @@ inverted-output option, so `IR_TX_INVERTED` is reported but not applied.
 - SONY15
 - SONY20
 - SAMSUNG32
-- SAMSUNG36
 - JVC
+
+(SAMSUNG36 is excluded — Arduino-IRremote does not support Samsung36; it is
+cross-tested only against IRremoteESP8266.)
 
 ## Run
 

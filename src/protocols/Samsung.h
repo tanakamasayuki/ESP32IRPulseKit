@@ -25,20 +25,30 @@ namespace esp32irpk::specs
   };
   // clang-format on
 
+  // SAMSUNG36 is a two-block waveform, sent MSB-first:
+  //   header(4515/4438) | block1: top 16 bits | block1 footer mark(512) +
+  //   separator space(4438) | block2: low 20 bits | trailer mark(512) [+ gap]
+  // The 36-bit value is laid out MSB-first: bits[35..20] = block1 (address,
+  // 16 bits), bits[19..0] = block2 (command, 20 bits). The block split and the
+  // mid-frame separator are not expressible by the generic SPACE_ENC
+  // encoder/decoder, so SAMSUNG36 uses a protocol-specific encode/decode path
+  // (dispatched by protocol_id), the same way RC5/RC6 do within BIPHASE.
+  // `header.space_us` doubles as the inter-block separator space; `trailer.mark_us`
+  // doubles as each block's footer mark.
   // clang-format off
   inline constexpr IRProtocolSpec SAMSUNG36 = {
       .protocol_id      = IRProtocolID::SAMSUNG36,
       .name             = "SAMSUNG36",
       .scheme           = IRProtocolScheme::SPACE_ENC,
       .family           = IRProtocolFamily::NEC_LIKE,
-      .header           = {.mark_us = 4500, .space_us = 4500},
-      .one              = {.mark_us =  560, .space_us = 1690},
-      .zero             = {.mark_us =  560, .space_us =  560},
-      .trailer          = {.mark_us =  560, .space_us =    0},
+      .header           = {.mark_us = 4515, .space_us = 4438},
+      .one              = {.mark_us =  512, .space_us = 1468},
+      .zero             = {.mark_us =  512, .space_us =  490},
+      .trailer          = {.mark_us =  512, .space_us =    0},
       .gap_threshold_us = 30000,
       .idle_threshold_us= 30000,
       .carrier_hz       = kDefaultCarrierHz,
-      .lsb_first        = true,
+      .lsb_first        = false, // MSB-first (two-block)
       .bit_length       = 36,
       .default_repeat_count = 0,
   };
@@ -108,9 +118,11 @@ namespace esp32irpk::frames
         return out;
       }
 
+      // MSB-first 36-bit value: bits[35..20] = address (block 1, 16 bits),
+      // bits[19..0] = command (block 2, 20 bits).
       uint64_t bits = in.bits;
-      out.address = static_cast<uint16_t>(bits & 0xFFFFULL);
-      out.command = static_cast<uint32_t>((bits >> 16) & 0xFFFFFULL);
+      out.address = static_cast<uint16_t>((bits >> 20) & 0xFFFFULL);
+      out.command = static_cast<uint32_t>(bits & 0xFFFFFULL);
       return out;
     }
 
@@ -126,9 +138,10 @@ namespace esp32irpk::frames
         return out;
       }
 
-      uint64_t bits = 0;
-      bits |= static_cast<uint64_t>(address);
-      bits |= (static_cast<uint64_t>(command & 0xFFFFFULL) << 16);
+      // MSB-first 36-bit value: address occupies the top 16 bits (block 1),
+      // command the low 20 bits (block 2).
+      uint64_t bits = (static_cast<uint64_t>(address) << 20) |
+                      static_cast<uint64_t>(command & 0xFFFFFULL);
 
       out.frame_type = esp32irpk::IRFrameType::NORMAL;
       out.bit_length = 36;

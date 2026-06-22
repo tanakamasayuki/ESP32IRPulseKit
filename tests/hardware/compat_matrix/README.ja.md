@@ -39,7 +39,7 @@ READMEに理由と観測ログを残します。
 | SONY15 | 送受信あり | 送受信あり | 通常互換対象 |
 | SONY20 | 送受信あり | 送受信あり | 通常互換対象 |
 | SAMSUNG32 | 送受信あり | 送受信あり | 通常互換対象 |
-| SAMSUNG36 | 専用decodeなし。raw送信APIでは36bit送信可能 | `sendSamsung36()` / `decodeSamsung36()` あり | IRremoteESP8266互換は修正候補。Arduino-IRremote RXは対応範囲外 |
+| SAMSUNG36 | Samsung36 非対応 | `sendSamsung36()` / `decodeSamsung36()` あり | IRremoteESP8266 は通常互換対象。Arduino-IRremote は Samsung36 非対応のため対象外 |
 | JVC | 送受信あり（16bit） | 送受信あり（16bit） | 通常互換対象 |
 | AEHA | Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | Panasonic/Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | 次の調査候補 |
 | PANASONIC40 | Kaseikyo/Panasonic系あり。40bit形は未確認 | Panasonic/Kaseikyo系あり。40bit形は未確認 | 次の調査候補 |
@@ -50,9 +50,19 @@ READMEに理由と観測ログを残します。
 
 優先順位:
 
-1. `SAMSUNG36` をIRremoteESP8266の二分割Samsung36波形に合わせるか検討する。
-2. `PANASONIC48` / `RC5` / `RC6_M0_16` をcompat対象に追加できるか、外部APIの値表現を確認する。
-3. `AEHA` / `PANASONIC40` / `RC6_M6_32` は、外部ライブラリのprotocol名・bit構造とPulseKitの仕様が対応するかを先に調査する。
+1. `PANASONIC48` / `RC5` / `RC6_M0_16` をcompat対象に追加できるか、外部APIの値表現を確認する。
+2. `AEHA` / `PANASONIC40` / `RC6_M6_32` は、外部ライブラリのprotocol名・bit構造とPulseKitの仕様が対応するかを先に調査する。
+
+### SAMSUNG36（2ブロック）
+
+Samsung36 のフォーマットは **2ブロック**波形：header → 上位16bit → ブロック間セパレータ
+スペース → 下位20bit を **MSB-first** で送り、bitタイミングは `512 / 1468 / 490 µs`、
+header は `4515 / 4438 µs`。PulseKit はこのフォーマットに従い、専用パス
+（`encodeSamsung36` / `decodeSamsung36`、RC5/RC6と同じ方式）で符号化/復号する。値は
+MSB-first格納（`bits[35..20]`=address/ブロック1、`bits[19..0]`=command/ブロック2）。
+同じく Samsung36 を実装する外部ライブラリ（IRremoteESP8266）に対しては、クロステストで
+`bit_order = same` を観測する。Arduino-IRremote は Samsung36 非対応のため、本クロステスト
+の対象外。
 
 ## 現時点の所見と仮説（NEC、2026-06-18時点）
 

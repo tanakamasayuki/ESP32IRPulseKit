@@ -24,8 +24,10 @@ Arduino-IRremote の新しい送信APIは address/command 指向のため、任�
 - SONY15
 - SONY20
 - SAMSUNG32
-- SAMSUNG36
 - JVC
+
+（SAMSUNG36 は除外 — Arduino-IRremote は Samsung36 非対応のため、
+IRremoteESP8266 とのみクロステストする。）
 
 ## 実行
 

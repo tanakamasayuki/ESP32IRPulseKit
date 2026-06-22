@@ -57,7 +57,9 @@ CASES = [
     Case("SONY15", 0x3456),
     Case("SONY20", 0xABCDE),
     Case("SAMSUNG32", 0x40BFE0E0),
-    Case("SAMSUNG36", 0xABCDEABCD),
+    # SAMSUNG36 is intentionally omitted: Arduino-IRremote has no real
+    # (two-block) Samsung36, so this cross-test is only meaningful against
+    # IRremoteESP8266. See compat_matrix/README.md.
     Case("JVC", 0xC0DE),
 ]
 

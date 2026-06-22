@@ -166,6 +166,50 @@ namespace esp32irpk::codec
       }
       return finishBiphase(out, current_ticks);
     }
+
+    // SAMSUNG36: two blocks (16 + 20 bits) sent MSB-first, separated by a
+    // header-length space (with each block ending on a footer mark). The 36-bit
+    // value is MSB-first: bits[35..20] = block1, bits[19..0] = block2. See
+    // src/protocols/Samsung.h.
+    bool encodeSamsung36(uint64_t bits, const IRProtocolSpec &spec, IRRawTickBuffer &out)
+    {
+      constexpr uint16_t kBlock1Bits = 16;
+      constexpr uint16_t kBlock2Bits = 20;
+
+      // Header.
+      if (!appendPulse(out, spec.header.mark_us) || !appendPulse(out, spec.header.space_us))
+        return false;
+
+      // Block 1: top 16 bits (positions 35..20), MSB-first.
+      for (uint16_t k = 0; k < kBlock1Bits; ++k)
+      {
+        int bit_index = 35 - k;
+        bool bit = ((bits >> bit_index) & 0x1ULL) != 0;
+        const IRPulseUs &pulse = bit ? spec.one : spec.zero;
+        if (!appendPulse(out, pulse.mark_us) || !appendPulse(out, pulse.space_us))
+          return false;
+      }
+
+      // Block 1 footer mark + inter-block separator space (= header space).
+      if (!appendPulse(out, spec.trailer.mark_us) || !appendPulse(out, spec.header.space_us))
+        return false;
+
+      // Block 2: low 20 bits (positions 19..0), MSB-first.
+      for (uint16_t k = 0; k < kBlock2Bits; ++k)
+      {
+        int bit_index = 19 - k;
+        bool bit = ((bits >> bit_index) & 0x1ULL) != 0;
+        const IRPulseUs &pulse = bit ? spec.one : spec.zero;
+        if (!appendPulse(out, pulse.mark_us) || !appendPulse(out, pulse.space_us))
+          return false;
+      }
+
+      // Trailer mark (frame end; the RX detects the gap via idle threshold).
+      if (!appendPulse(out, spec.trailer.mark_us) || !appendPulse(out, spec.trailer.space_us))
+        return false;
+
+      return true;
+    }
   } // namespace
 
   bool encodeBitsToRaw(const IRDecodedBits &decoded,
@@ -224,6 +268,16 @@ namespace esp32irpk::codec
 
     if (spec->scheme != IRProtocolScheme::SPACE_ENC)
       return false;
+
+    // SAMSUNG36 has a two-block waveform that the generic SPACE_ENC loop below
+    // cannot express, so it uses a protocol-specific encoder.
+    if (spec->protocol_id == IRProtocolID::SAMSUNG36)
+    {
+      bool ok = decoded.bit_length == 36 && encodeSamsung36(decoded.bits, *spec, out_raw);
+      if (!ok)
+        out_raw.len = 0;
+      return ok;
+    }
 
     if (!appendPulse(out_raw, spec->header.mark_us) ||
         !appendPulse(out_raw, spec->header.space_us))

@@ -37,15 +37,3 @@ pytestは送信protocol/bitsと、RXが観測したprotocol・bits・raw_len・`
 （same / reversed / other）を `COMPAT_MATRIX_OBSERVED` として出力します。
 実装間でbit orderやfield解釈が異なる場合があるため、bitsの完全一致は**assertしません**。
 フレームを認識できたこと (`raw_len > 0`) のみを必須とし、差分は観測ログとして記録します。
-
-## 既知の失敗
-
-2026-06-18 の実機ログ
-`/tmp/pytest-embedded/2026-06-18_07-31-59-959191` では、以下が失敗しました。
-失敗は通常のpytest失敗として残し、外部RXの対応範囲外なのか、PulseKit側の仕様差なのかを
-このREADMEで追跡します。
-
-| ケース | 観測 | 判定 |
-|---|---|---|
-| SAMSUNG36 | `RX_RAW len=76`。フレームは受信しているがIRremoteESP8266がdecodeしない | IRremoteESP8266 2.9.0 には `decodeSamsung36()` がある。PulseKitの現行SAMSUNG36はSamsung32の36bit拡張だが、IRremoteESP8266のSamsung36は16bitブロック + 20bitブロックの二分割波形なので、PulseKit側の仕様差を修正候補として調査する |
-| JVC | （再測定待ち） | 標準の16bit JVCフレームになったため、外部ライブラリの16bit JVCと相互運用できる見込み。要再測定で確認。 |
