@@ -128,6 +128,18 @@ void handleSend(const String &line)
   {
     ok = sendBits(esp32irpk::IRProtocolID::JVC, 16, bits);
   }
+  else if (protocolText == "PANASONIC48")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::PANASONIC48, 48, bits);
+  }
+  else if (protocolText == "RC5")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::RC5, 14, bits);
+  }
+  else if (protocolText == "RC6_M0_16")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::RC6_M0_16, 21, bits);
+  }
   else
   {
     Serial.println("TX_ERROR unsupported_protocol");

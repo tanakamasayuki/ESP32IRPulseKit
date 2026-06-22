@@ -25,6 +25,8 @@ IRremoteESP8266 には score 指標が無いため `score=0` を出力します�
 - SAMSUNG32
 - SAMSUNG36
 - JVC
+- RC5
+- RC6_M0_16
 
 ## 実行
 

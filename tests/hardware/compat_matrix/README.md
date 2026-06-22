@@ -45,15 +45,39 @@ Local library coverage as of 2026-06-18:
 | JVC | TX/RX support (16-bit) | TX/RX support (16-bit) | Normal compatibility target |
 | AEHA | Kaseikyo family exists; relation to PulseKit AEHA not settled | Panasonic/Kaseikyo family exists; relation to PulseKit AEHA not settled | Investigation candidate |
 | PANASONIC40 | Kaseikyo/Panasonic family exists; 40-bit shape not confirmed | Panasonic/Kaseikyo family exists; 40-bit shape not confirmed | Investigation candidate |
-| PANASONIC48 | Kaseikyo/Panasonic family exists | Panasonic/Kaseikyo family exists | Next addition candidate |
-| RC5 | TX/RX support | TX/RX support | Next addition candidate |
-| RC6_M0_16 | RC6 family support | RC6 family support | Next addition candidate; watch bit representation |
+| PANASONIC48 | Kaseikyo/Panasonic family exists | Panasonic/Kaseikyo family exists | Under investigation (shares a waveform with PulseKit AEHA) |
+| RC5 | TX/RX support | TX/RX support | IRremoteESP8266 cross-test (rx + tx) |
+| RC6_M0_16 | RC6 family support | RC6 family support | IRremoteESP8266 cross-test (rx + tx) |
 | RC6_M6_32 | RC6A/RC6 family support | RC6 family support | Investigation candidate; watch mode-6A representation |
 
 Priority:
 
-1. `PANASONIC48`, `RC5`, and `RC6_M0_16`: add after confirming external API value representation.
-2. Investigate `AEHA`, `PANASONIC40`, and `RC6_M6_32` before adding them as required compatibility cases.
+1. `RC5` and `RC6_M0_16`: in the IRremoteESP8266 cross-tests (rx + tx). See
+   "RC5 / RC6 biphase convention" below.
+2. Investigate `AEHA`, `PANASONIC40`, `PANASONIC48`, and `RC6_M6_32` before adding
+   them as required compatibility cases.
+
+### RC5 / RC6 biphase convention
+
+RC5 and RC6 are biphase (Manchester) and use **opposite** half-bit polarity:
+
+- **RC5**: a `1` is space→mark, a `0` is mark→space. The leading idle space of the
+  first start bit is not part of the captured RAW (which begins on the first mark).
+- **RC6**: a `1` is mark→space, a `0` is space→mark, after a `2666 / 889 µs` leader.
+  The start bit is single-width; only the toggle (4th) bit is double-width.
+
+The integer representations still differ from IRremoteESP8266 (PulseKit counts the
+start/mode/toggle bits — 14 bits for RC5, 21 for RC6 mode 0 — while IRremoteESP8266
+reports 12-13 / 20 with those stripped), so the cross-test records `bit_order`
+rather than asserting a value match.
+
+### Panasonic48 (under investigation)
+
+PulseKit's `AEHA` and `PANASONIC48` share a waveform, so an IRremoteESP8266
+Panasonic frame decodes on PulseKit as `AEHA` (e.g. `0xBD3D802002`), and the
+PulseKit → IRremoteESP8266 direction does not decode. Resolving this is part of the
+AEHA/Panasonic field-mapping work (item 2), so PANASONIC48 is not in the cross-test
+yet.
 
 ### SAMSUNG36 (two-block)
 

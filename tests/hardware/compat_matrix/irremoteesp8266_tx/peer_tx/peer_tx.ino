@@ -125,6 +125,18 @@ void handleSend(const String &line)
   {
     irsend.sendJVC(bits, 16);
   }
+  else if (protocolText == "PANASONIC48")
+  {
+    irsend.sendPanasonic64(bits, 48);
+  }
+  else if (protocolText == "RC5")
+  {
+    irsend.sendRC5(bits, 13); // kRC5XBits
+  }
+  else if (protocolText == "RC6_M0_16")
+  {
+    irsend.sendRC6(bits, 20); // kRC6Mode0Bits
+  }
   else
   {
     Serial.println("TX_ERROR unsupported_protocol");

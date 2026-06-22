@@ -59,6 +59,10 @@ CASES = [
     Case("SAMSUNG32", 0x40BFE0E0),
     Case("SAMSUNG36", 0xABCDEABCD),
     Case("JVC", 0xC0DE),
+    Case("RC5", 0x102B),  # 13-bit RC5X value (IRremoteESP8266 representation)
+    Case("RC6_M0_16", 0x11234),  # 20-bit RC6 mode-0 value
+    # PANASONIC48 is omitted: PulseKit's AEHA and Panasonic48 share a waveform,
+    # which needs its own field-mapping investigation. See compat_matrix/README.md.
 ]
 
 

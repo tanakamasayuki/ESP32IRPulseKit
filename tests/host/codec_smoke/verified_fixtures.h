@@ -67,9 +67,9 @@ inline constexpr size_t panasonic48_40040100bcbd_raw_len = sizeof(panasonic48_40
 inline constexpr uint64_t rc5_300f_bits = 0x300fULL;
 inline constexpr size_t rc5_300f_bit_length = 14;
 inline constexpr uint16_t rc5_300f_raw_ticks[] = {
-    89, 89, 89, 178, 89, 89, 89, 89, 89, 89, 89, 89,
-    89, 89, 89, 89, 89, 89, 178, 89, 89, 89, 89, 89,
-    89, 89
+    89, 89, 178, 89, 89, 89, 89, 89, 89, 89, 89, 89,
+    89, 89, 89, 89, 89, 178, 89, 89, 89, 89, 89, 89,
+    89
 };
 inline constexpr size_t rc5_300f_raw_len = sizeof(rc5_300f_raw_ticks) / sizeof(rc5_300f_raw_ticks[0]);
 
@@ -78,14 +78,14 @@ inline constexpr size_t rc5_3fff_bit_length = 14;
 inline constexpr uint16_t rc5_3fff_raw_ticks[] = {
     89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89,
     89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89,
-    89, 89, 89, 89
+    89, 89, 89
 };
 inline constexpr size_t rc5_3fff_raw_len = sizeof(rc5_3fff_raw_ticks) / sizeof(rc5_3fff_raw_ticks[0]);
 
 inline constexpr uint64_t rc6_m0_11234_bits = 0x111234ULL;
 inline constexpr size_t rc6_m0_11234_bit_length = 21;
 inline constexpr uint16_t rc6_m0_11234_raw_ticks[] = {
-    266, 89, 88, 132, 44, 44, 44, 44, 132, 132, 44, 44,
+    266, 89, 44, 88, 44, 44, 44, 44, 132, 132, 44, 44,
     44, 44, 88, 88, 44, 44, 88, 88, 44, 44, 44, 44,
     88, 44, 44, 88, 88, 88, 44, 44, 44
 };
@@ -94,7 +94,7 @@ inline constexpr size_t rc6_m0_11234_raw_len = sizeof(rc6_m0_11234_raw_ticks) / 
 inline constexpr uint64_t rc6_m6_689abcdef_bits = 0xe89abcdefULL;
 inline constexpr size_t rc6_m6_689abcdef_bit_length = 36;
 inline constexpr uint16_t rc6_m6_689abcdef_raw_ticks[] = {
-    266, 89, 88, 88, 44, 44, 44, 88, 88, 88, 44, 44,
+    266, 89, 44, 44, 44, 44, 44, 88, 88, 88, 44, 44,
     44, 44, 88, 88, 44, 44, 88, 44, 44, 88, 88, 88,
     88, 88, 88, 44, 44, 44, 44, 44, 44, 88, 44, 44,
     88, 44, 44, 88, 88, 44, 44, 44, 44, 44, 44, 88,

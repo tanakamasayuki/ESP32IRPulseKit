@@ -643,6 +643,9 @@ namespace esp32irpk::codec
       uint32_t err_sum = 0;
       if (!buildHalves(raw, 0, unit_us, spec.bit_tol_pct, halves, err_sum))
         return false;
+      // Standard RC5 '1' = space then mark, so the first half-bit (the leading
+      // idle space) is not in the captured RAW. Re-insert it to align pairing.
+      halves.insert(halves.begin(), false);
       if (halves.size() + 1 < bits * 2)
         return false;
       if (halves.size() == bits * 2 - 1)
@@ -653,9 +656,12 @@ namespace esp32irpk::codec
       uint64_t bits_out = 0;
       for (size_t i = 0; i < bits; ++i)
       {
-        bool bit = false;
-        if (!decodeManBit(halves, i * 2, 2, bit))
+        bool first = false;
+        if (!decodeManBit(halves, i * 2, 2, first))
           return false;
+        // decodeManBit returns the first half level (mark=true). Standard RC5
+        // encodes '1' as space->mark, so the logical bit is the inverse.
+        bool bit = !first;
         size_t pos = spec.lsb_first ? i : (bits - 1 - i);
         if (bit)
           bits_out |= (1ULL << pos);
@@ -703,7 +709,7 @@ namespace esp32irpk::codec
       if (!buildHalves(raw, idx, unit_us, spec.bit_tol_pct, halves, body_err))
         return false;
 
-      size_t start_bit_halves = 4; // double width
+      size_t start_bit_halves = 2; // single width (only the toggle bit is double)
       size_t toggle_halves = has_toggle ? 4 : 0;
       size_t total_bits = 1 + 3 + (has_toggle ? 1 : 0) + payload_bits;
       size_t expected_halves = start_bit_halves + toggle_halves + (total_bits - 1 - (has_toggle ? 1 : 0)) * 2 + (has_toggle ? 0 : 0);

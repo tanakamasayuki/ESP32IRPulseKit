@@ -21,6 +21,8 @@ sketchのみです。
 - SAMSUNG32
 - SAMSUNG36
 - JVC
+- RC5
+- RC6_M0_16
 
 ## 実行
 

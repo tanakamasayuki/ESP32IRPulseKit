@@ -979,30 +979,47 @@ void testRc6M6FixtureDecode()
 
 void testBiphaseDecodeAllowsClippedFinalHalf()
 {
-  const uint16_t rc5_clipped_ticks[] = {
-      84, 94, 84, 183, 86, 93, 85, 93, 84, 94, 84, 93, 84,
-      94, 84, 94, 84, 94, 175, 93, 84, 94, 84, 94, 84};
-  esp32irpk::IRRawTickView rc5_view{};
-  rc5_view.ticks = rc5_clipped_ticks;
-  rc5_view.len = sizeof(rc5_clipped_ticks) / sizeof(rc5_clipped_ticks[0]);
-
+  // Encode a frame, then drop the final tick to simulate the last half-bit being
+  // clipped/absorbed into idle. The decoder's trailing-half padding should still
+  // recover the value.
+  uint16_t rc5_buf[64]{};
+  esp32irpk::IRRawTickBuffer rc5_raw{};
+  rc5_raw.ticks = rc5_buf;
+  rc5_raw.capacity = 64;
+  esp32irpk::IRDecodedBits rc5_bits{};
+  rc5_bits.protocol_id = esp32irpk::IRProtocolID::RC5;
+  rc5_bits.frame_type = esp32irpk::IRFrameType::NORMAL;
+  rc5_bits.bit_length = 14;
+  rc5_bits.bits = 0x300fULL;
   const esp32irpk::IRProtocolSpec rc5_specs[] = {esp32irpk::specs::RC5};
+  EXPECT_TRUE("rc5-clipped-final-half/encode",
+              esp32irpk::codec::encodeBitsToRaw(rc5_bits, rc5_specs, 1, rc5_raw));
+  esp32irpk::IRRawTickView rc5_view{};
+  rc5_view.ticks = rc5_raw.ticks;
+  rc5_view.len = rc5_raw.len - 1; // clip the final half
+
   esp32irpk::IRReceiveResult<4> rc5_result{};
   EXPECT_TRUE("rc5-clipped-final-half/decode",
               esp32irpk::codec::decodeRawToBits(rc5_view, rc5_specs, 1, 4, 0, rc5_result));
   EXPECT_EQ("rc5-clipped-final-half/protocol", esp32irpk::IRProtocolID::RC5, rc5_result.candidates[0].protocol_id);
   EXPECT_EQ("rc5-clipped-final-half/bits", 0x300fULL, rc5_result.candidates[0].decoded.bits);
 
-  const uint16_t rc6_m6_clipped_ticks[] = {
-      259, 96, 81, 94, 39, 50, 39, 91, 84, 93, 38, 49, 39, 49,
-      85, 93, 37, 49, 84, 49, 40, 91, 84, 93, 84, 91, 84, 49,
-      40, 47, 39, 49, 40, 93, 40, 47, 84, 49, 39, 94, 81, 49,
-      40, 49, 40, 48, 37, 94, 84, 49, 40, 47, 39, 49, 40};
-  esp32irpk::IRRawTickView rc6_view{};
-  rc6_view.ticks = rc6_m6_clipped_ticks;
-  rc6_view.len = sizeof(rc6_m6_clipped_ticks) / sizeof(rc6_m6_clipped_ticks[0]);
-
+  uint16_t rc6_buf[128]{};
+  esp32irpk::IRRawTickBuffer rc6_raw{};
+  rc6_raw.ticks = rc6_buf;
+  rc6_raw.capacity = 128;
+  esp32irpk::IRDecodedBits rc6_bits{};
+  rc6_bits.protocol_id = esp32irpk::IRProtocolID::RC6_M6_32;
+  rc6_bits.frame_type = esp32irpk::IRFrameType::NORMAL;
+  rc6_bits.bit_length = 36;
+  rc6_bits.bits = 0xe89abcdefULL;
   const esp32irpk::IRProtocolSpec rc6_specs[] = {esp32irpk::specs::RC6_M0_16, esp32irpk::specs::RC6_M6_32};
+  EXPECT_TRUE("rc6-m6-clipped-final-half/encode",
+              esp32irpk::codec::encodeBitsToRaw(rc6_bits, rc6_specs, 2, rc6_raw));
+  esp32irpk::IRRawTickView rc6_view{};
+  rc6_view.ticks = rc6_raw.ticks;
+  rc6_view.len = rc6_raw.len - 1; // clip the final half
+
   esp32irpk::IRReceiveResult<4> rc6_result{};
   EXPECT_TRUE("rc6-m6-clipped-final-half/decode",
               esp32irpk::codec::decodeRawToBits(rc6_view, rc6_specs, 2, 4, 0, rc6_result));

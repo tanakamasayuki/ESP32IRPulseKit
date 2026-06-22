@@ -47,6 +47,12 @@ String protocolName(const decode_results &r)
     return "SAMSUNG36";
   case JVC:
     return "JVC" + String(r.bits);
+  case PANASONIC:
+    return "PANASONIC" + String(r.bits);
+  case RC5:
+    return "RC5";
+  case RC6:
+    return "RC6";
   default:
     return "OTHER_" + String((int)r.decode_type);
   }

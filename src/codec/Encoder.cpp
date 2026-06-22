@@ -105,15 +105,38 @@ namespace esp32irpk::codec
 
     bool encodeRC5(uint64_t bits, IRRawTickBuffer &out)
     {
-      bool level = true;
-      uint16_t current_ticks = 0;
-      for (int bit_index = 13; bit_index >= 0; --bit_index)
+      // Standard RC5: MSB-first, 14 bits, '1' = space then mark, '0' = mark then
+      // space. The first half-bit is a space when the leading start bit is '1'
+      // (RC5 S1 is always '1'); that space is the idle gap and is not part of the
+      // captured RAW, so emission begins at the first mark.
+      constexpr uint16_t kUnitTicks = 89; // ~890 us half-bit
+      bool halves[28];
+      for (int i = 0; i < 14; ++i)
       {
-        bool bit = ((bits >> bit_index) & 0x1ULL) != 0;
-        if (!appendBiphaseBit(out, bit, 2, 89, level, current_ticks))
-          return false;
+        bool bit = ((bits >> (13 - i)) & 0x1ULL) != 0;
+        halves[2 * i] = !bit;    // first half: space for '1', mark for '0'
+        halves[2 * i + 1] = bit; // second half: mark for '1', space for '0'
       }
-      return finishBiphase(out, current_ticks);
+      size_t i = 0;
+      while (i < 28 && !halves[i]) // drop leading idle space half-bit(s)
+        ++i;
+      bool level = true; // RAW begins with a mark
+      uint16_t run_ticks = 0;
+      for (; i < 28; ++i)
+      {
+        if (halves[i] == level)
+        {
+          run_ticks = static_cast<uint16_t>(run_ticks + kUnitTicks);
+        }
+        else
+        {
+          if (!appendTicks(out, run_ticks))
+            return false;
+          run_ticks = kUnitTicks;
+          level = halves[i];
+        }
+      }
+      return finishBiphase(out, run_ticks);
     }
 
     bool encodeRC6M0(uint64_t bits, IRRawTickBuffer &out)
@@ -123,7 +146,9 @@ namespace esp32irpk::codec
       bool level = true;
       uint16_t current_ticks = 0;
 
-      if (!appendBiphaseBit(out, true, 4, 44, level, current_ticks))
+      // Start bit: single-width '1' (mark then space). Only the toggle bit below
+      // is double-width.
+      if (!appendBiphaseBit(out, true, 2, 44, level, current_ticks))
         return false;
       for (int bit_index = 19; bit_index >= 17; --bit_index)
       {
@@ -150,7 +175,8 @@ namespace esp32irpk::codec
       bool level = true;
       uint16_t current_ticks = 0;
 
-      if (!appendBiphaseBit(out, true, 4, 44, level, current_ticks))
+      // Start bit: single-width '1' (mark then space).
+      if (!appendBiphaseBit(out, true, 2, 44, level, current_ticks))
         return false;
       for (int bit_index = 34; bit_index >= 32; --bit_index)
       {

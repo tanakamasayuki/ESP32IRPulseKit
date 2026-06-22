@@ -43,15 +43,37 @@ READMEに理由と観測ログを残します。
 | JVC | 送受信あり（16bit） | 送受信あり（16bit） | 通常互換対象 |
 | AEHA | Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | Panasonic/Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | 次の調査候補 |
 | PANASONIC40 | Kaseikyo/Panasonic系あり。40bit形は未確認 | Panasonic/Kaseikyo系あり。40bit形は未確認 | 次の調査候補 |
-| PANASONIC48 | Kaseikyo/Panasonic系あり | Panasonic/Kaseikyo系あり | 次の追加候補 |
-| RC5 | 送受信あり | 送受信あり | 次の追加候補 |
-| RC6_M0_16 | RC6系あり | RC6系あり | 次の追加候補。ただし表現bit長差に注意 |
+| PANASONIC48 | Kaseikyo/Panasonic系あり | Panasonic/Kaseikyo系あり | 調査中（PulseKit AEHA と波形が同じ） |
+| RC5 | 送受信あり | 送受信あり | IRremoteESP8266 クロステスト（rx + tx） |
+| RC6_M0_16 | RC6系あり | RC6系あり | IRremoteESP8266 クロステスト（rx + tx） |
 | RC6_M6_32 | RC6A/RC6系あり | RC6系あり | 調査候補。mode 6A表現差に注意 |
 
 優先順位:
 
-1. `PANASONIC48` / `RC5` / `RC6_M0_16` をcompat対象に追加できるか、外部APIの値表現を確認する。
-2. `AEHA` / `PANASONIC40` / `RC6_M6_32` は、外部ライブラリのprotocol名・bit構造とPulseKitの仕様が対応するかを先に調査する。
+1. `RC5` / `RC6_M0_16` を IRremoteESP8266 クロステスト（rx + tx）に追加。
+   下記「RC5 / RC6 のバイフェーズ規約」参照。
+2. `AEHA` / `PANASONIC40` / `PANASONIC48` / `RC6_M6_32` は、外部ライブラリのprotocol名・
+   bit構造とPulseKitの仕様が対応するかを先に調査する。
+
+### RC5 / RC6 のバイフェーズ規約
+
+RC5 と RC6 はバイフェーズ（Manchester）で、ハーフビット極性が **互いに逆**：
+
+- **RC5**：`1` は space→mark、`0` は mark→space。先頭スタートビットの先頭スペースは
+  アイドルギャップで、捕捉RAWには含まれない（RAWは最初のmarkから始まる）。
+- **RC6**：`2666 / 889 µs` リーダーの後、`1` は mark→space、`0` は space→mark。
+  スタートビットは単幅で、倍幅なのはトグル（4番目）ビットのみ。
+
+整数表現は IRremoteESP8266 と異なる（PulseKit は start/mode/toggle を含めて RC5=14bit、
+RC6 mode0=21bit と数え、IRremoteESP8266 はそれらを除いて 12-13 / 20bit）。よって
+クロステストは値一致をassertせず `bit_order` を記録する。
+
+### Panasonic48（調査中）
+
+PulseKit の `AEHA` と `PANASONIC48` は波形が同じため、IRremoteESP8266 の Panasonic
+フレームは PulseKit で `AEHA`（例 `0xBD3D802002`）として復号され、PulseKit → IRremoteESP8266
+方向は decode しない。これは AEHA/Panasonic のフィールド対応整理（項目2）の一部なので、
+PANASONIC48 はまだクロステストに入れていない。
 
 ### SAMSUNG36（2ブロック）
 
