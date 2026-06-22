@@ -72,7 +72,7 @@ struct IRDecodedBits {
   - `true`: 最初に送信するビットが `bits` の bit 0（LSB）。
   - `false`: 最初に送信するビットが `bit_length` の最上位ビット（`bits` の bit `bit_length - 1`）。
   これは各プロトコルの実際の送出順を反映します。NEC・Sony・JVC・Samsung（SAMSUNG32）・
-  AEHA/Panasonic は LSB-first、RC5/RC6 と SAMSUNG36 は MSB-first で送出します。
+  AEHA（Kaseikyo/Panasonic を含む）は LSB-first、RC5/RC6 と SAMSUNG36 は MSB-first で送出します。
   エンコーダとデコーダは対称にこのフラグを扱うため、自前TX→自前RX のラウンドトリップは
   常に同じ `bits` を復元します。
   - 他ライブラリは同じ空中信号を逆端からインデックスすることがあり（例：IRremoteESP8266 は
@@ -100,10 +100,9 @@ enum class IRProtocolFamily : uint8_t {
   UNKNOWN = 0,
   NEC_LIKE = 1,
   AEHA = 2,
-  PANASONIC = 3,
-  SONY = 4,
-  RC5 = 5,
-  RC6 = 6,
+  SONY = 3,
+  RC5 = 4,
+  RC6 = 5,
 };
 
 struct IRProtocolSpec {
@@ -220,8 +219,6 @@ decodeは、完全一致だけを受け入れる判定ではありません。�
 ```cpp
 esp32irpk::specs::NEC
 esp32irpk::specs::AEHA
-esp32irpk::specs::PANASONIC40
-esp32irpk::specs::PANASONIC48
 esp32irpk::specs::SONY12
 esp32irpk::specs::SONY15
 esp32irpk::specs::SONY20
@@ -237,7 +234,7 @@ esp32irpk::specs::RC6_M6_32
 
 ### 3.1 追加候補protocol（未実装）
 
-現状の14でリモコン用途の大半をカバーするため、以下は「必須」ではなく**候補**です。
+現状の11でリモコン用途の大半をカバーするため、以下は「必須」ではなく**候補**です。
 学習＆そのまま再送（raw capture/replay）だけが目的なら、生tick経路で任意protocolを
 扱えるので追加は不要です。意味のあるbitsへのdecode／コード生成が必要な場合にのみ
 価値があります。実用度で3段階に仕分けます。
@@ -424,7 +421,7 @@ public:
 - `repeat_count < 0` の場合は `spec.default_repeat_count` を使います。
 - `repeat_count >= 0` の場合は呼び出し値を使います。
 - carrierは `setCarrierHz()` の明示固定値、`spec.carrier_hz`、ライブラリ既定値 `38000` の順で解決します。
-- 標準protocolの推奨値: NEC/AEHA/Panasonic/Samsungは38kHz、JVCは37.9kHz、Sony SIRCは40kHz、RC5/RC6は36kHzです。
+- 標準protocolの推奨値: NEC/AEHA/Samsungは38kHz、JVCは37.9kHz、Sony SIRCは40kHz、RC5/RC6は36kHzです。
 
 ### 6.3 carrier設定
 

@@ -31,8 +31,6 @@ CASES = [
     Case("SAMSUNG36", 36, 0xABCDEABCD),
     Case("JVC", 16, 0xC0DE),
     Case("AEHA", 48, 0x123456749ABC),
-    Case("PANASONIC40", 40, 0x123456789A),
-    Case("PANASONIC48", 48, 0x40040100BCBD),
     Case("RC5", 14, 0x300F),
     Case("RC6_M0_16", 21, 0x111234),
     Case("RC6_M6_32", 36, 0xE89ABCDEF),

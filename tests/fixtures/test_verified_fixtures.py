@@ -75,15 +75,6 @@ def aeha_raw_ticks(data: int, bit_length: int) -> list[int]:
     return raw
 
 
-def panasonic_raw_ticks(data: int, bit_length: int) -> list[int]:
-    raw = [350, 175]
-    for bit_index in range(bit_length):
-        raw.append(43)
-        raw.append(130 if ((data >> bit_index) & 0x1) else 43)
-    raw.append(43)
-    return raw
-
-
 def jvc_raw_ticks(data: int) -> list[int]:
     raw = [840, 420]
     for bit_index in range(16):
@@ -102,19 +93,26 @@ def sony_raw_ticks(data: int, bit_length: int) -> list[int]:
 
 
 def rc5_raw_ticks(data: int) -> list[int]:
+    # Standard RC5: MSB-first, '1' = space->mark, '0' = mark->space. The leading
+    # idle space of the first '1' bit is absorbed (RAW begins on the first mark).
+    halves: list[bool] = []
+    for i in range(14):
+        bit = (data >> (13 - i)) & 0x1
+        halves.append(not bit)  # first half: space(False) for '1', mark(True) for '0'
+        halves.append(bool(bit))  # second half: mark for '1'
+    idx = 0
+    while idx < len(halves) and not halves[idx]:  # drop leading idle space
+        idx += 1
     ticks: list[int] = []
     level = True
     current_ticks = 0
-    for bit_index in range(13, -1, -1):
-        bit = (data >> bit_index) & 0x1
-        halves = [True, False] if bit else [False, True]
-        for half in halves:
-            if half == level:
-                current_ticks += 89
-            else:
-                ticks.append(current_ticks)
-                current_ticks = 89
-                level = half
+    for half in halves[idx:]:
+        if half == level:
+            current_ticks += 89
+        else:
+            ticks.append(current_ticks)
+            current_ticks = 89
+            level = half
     ticks.append(current_ticks)
     return ticks
 
@@ -143,7 +141,8 @@ def rc6_m0_bits(payload: int, toggle: int = 1) -> int:
 
 
 def rc6_m0_raw_ticks(payload: int, toggle: int = 1) -> list[int]:
-    bits: list[tuple[int, int]] = [(1, 4), (0, 2), (0, 2), (0, 2), (toggle, 4)]
+    # Start bit single-width (1, 2); only the toggle bit is double-width (toggle, 4).
+    bits: list[tuple[int, int]] = [(1, 2), (0, 2), (0, 2), (0, 2), (toggle, 4)]
     bits.extend(((payload >> bit_index) & 0x1, 2) for bit_index in range(15, -1, -1))
     return rc_biphase_ticks(bits, unit_ticks=44, prefix=[266, 89])
 
@@ -153,7 +152,8 @@ def rc6_m6_bits(payload: int) -> int:
 
 
 def rc6_m6_raw_ticks(payload: int) -> list[int]:
-    bits: list[tuple[int, int]] = [(1, 4), (1, 2), (1, 2), (0, 2)]
+    # Start bit single-width (1, 2).
+    bits: list[tuple[int, int]] = [(1, 2), (1, 2), (1, 2), (0, 2)]
     bits.extend(((payload >> bit_index) & 0x1, 2) for bit_index in range(31, -1, -1))
     return rc_biphase_ticks(bits, unit_ticks=44, prefix=[266, 89])
 
@@ -232,17 +232,6 @@ def test_aeha48_fixture_matches_reviewed_fields():
     assert data["raw_ticks"] == aeha_raw_ticks(frame_data, data["bit_length"])
 
 
-def test_panasonic48_fixture_matches_reviewed_fields():
-    data = load_fixture("panasonic48_40040100bcbd.yaml")
-    frame_data = data["fields"]["data"]
-
-    assert data["protocol"] == "PANASONIC48"
-    assert data["frame_type"] == "NORMAL"
-    assert data["bit_length"] == 48
-    assert data["bits"] == frame_data
-    assert data["raw_ticks"] == panasonic_raw_ticks(frame_data, data["bit_length"])
-
-
 def test_jvc_fixture_matches_reviewed_fields():
     data = load_fixture("jvc_c0de.yaml")
 
@@ -262,7 +251,6 @@ def test_jvc_fixture_matches_reviewed_fields():
         ("sony20_abcde", 0xABCDE, 20, sony_raw_ticks(0xABCDE, 20), False),
         ("samsung36_1234_abcde", samsung36_bits(0x1234, 0xABCDE), 36, samsung36_raw_ticks(0x1234, 0xABCDE), True),
         ("jvc_c0de", 0xC0DE, 16, jvc_raw_ticks(0xC0DE), True),
-        ("panasonic40_123456789a", 0x123456789A, 40, panasonic_raw_ticks(0x123456789A, 40), True),
     ],
 )
 def test_generated_fixture_candidates_match_reviewed_formulas(name, bits, bit_length, raw_ticks, has_trailer_mark):

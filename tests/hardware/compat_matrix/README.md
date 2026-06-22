@@ -26,7 +26,7 @@ implementations often differ only by MSB/LSB-first integer representation.
 
 ## Protocol Coverage Policy
 
-PulseKit's `protocol_matrix` verifies 14 protocols with in-house TX -> in-house
+PulseKit's `protocol_matrix` verifies 11 protocols with in-house TX -> in-house
 RX. `compat_matrix` compares that surface against external libraries, so cases
 with standard external decode/send support should be added first. If an external
 library does not have standard coverage for a PulseKit variant, the test may
@@ -43,9 +43,7 @@ Local library coverage as of 2026-06-18:
 | SAMSUNG32 | TX/RX support | TX/RX support | Normal compatibility target |
 | SAMSUNG36 | Does not support Samsung36 | `sendSamsung36()` / `decodeSamsung36()` exist | Normal compatibility target for IRremoteESP8266. Arduino-IRremote does not support Samsung36, so it is out of scope |
 | JVC | TX/RX support (16-bit) | TX/RX support (16-bit) | Normal compatibility target |
-| AEHA | Kaseikyo family exists; relation to PulseKit AEHA not settled | Panasonic/Kaseikyo family exists; relation to PulseKit AEHA not settled | Investigation candidate |
-| PANASONIC40 | Kaseikyo/Panasonic family exists; 40-bit shape not confirmed | Panasonic/Kaseikyo family exists; 40-bit shape not confirmed | Investigation candidate |
-| PANASONIC48 | Kaseikyo/Panasonic family exists | Panasonic/Kaseikyo family exists | Under investigation (shares a waveform with PulseKit AEHA) |
+| AEHA | Kaseikyo family exists | Panasonic/Kaseikyo family exists | Canonical decoder for AEHA/Kaseikyo/Panasonic; investigation candidate |
 | RC5 | TX/RX support | TX/RX support | IRremoteESP8266 cross-test (rx + tx) |
 | RC6_M0_16 | RC6 family support | RC6 family support | IRremoteESP8266 cross-test (rx + tx) |
 | RC6_M6_32 | RC6A/RC6 family support | RC6 family support | Investigation candidate; watch mode-6A representation |
@@ -54,7 +52,7 @@ Priority:
 
 1. `RC5` and `RC6_M0_16`: in the IRremoteESP8266 cross-tests (rx + tx). See
    "RC5 / RC6 biphase convention" below.
-2. Investigate `AEHA`, `PANASONIC40`, `PANASONIC48`, and `RC6_M6_32` before adding
+2. Investigate `AEHA` (incl. Kaseikyo/Panasonic) and `RC6_M6_32` before adding
    them as required compatibility cases.
 
 ### RC5 / RC6 biphase convention
@@ -71,13 +69,18 @@ start/mode/toggle bits — 14 bits for RC5, 21 for RC6 mode 0 — while IRremote
 reports 12-13 / 20 with those stripped), so the cross-test records `bit_order`
 rather than asserting a value match.
 
-### Panasonic48 (under investigation)
+### AEHA / Kaseikyo / Panasonic
 
-PulseKit's `AEHA` and `PANASONIC48` share a waveform, so an IRremoteESP8266
-Panasonic frame decodes on PulseKit as `AEHA` (e.g. `0xBD3D802002`), and the
-PulseKit → IRremoteESP8266 direction does not decode. Resolving this is part of the
-AEHA/Panasonic field-mapping work (item 2), so PANASONIC48 is not in the cross-test
-yet.
+`AEHA` is the canonical decoder for the AEHA (家製協) family. Kaseikyo — and
+Panasonic, which is Kaseikyo with a specific manufacturer code — is a 48-bit AEHA
+frame, so an IRremoteESP8266 Panasonic frame decodes on PulseKit as `AEHA`
+(e.g. `0xBD3D802002`). PulseKit's AEHA decoder validates the customer-code parity
+nibble, which is what distinguishes a real家製協 frame.
+
+Bit order: PulseKit stores LSB-first, IRremoteESP8266 MSB-first, so the same 48-bit
+waveform reads bit-reversed between them (the Panasonic manufacturer code is
+`0x2002` in PulseKit's low 16 bits and `0x4004` in IRremoteESP8266's high 16 bits).
+A dedicated AEHA cross-test (with the field/parity layout) is a future addition.
 
 ### SAMSUNG36 (two-block)
 

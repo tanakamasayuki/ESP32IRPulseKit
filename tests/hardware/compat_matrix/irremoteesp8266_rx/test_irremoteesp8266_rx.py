@@ -60,8 +60,6 @@ CASES = [
     Case("JVC", 0xC0DE),
     Case("RC5", 0x300F),
     Case("RC6_M0_16", 0x11234),
-    # PANASONIC48 is omitted: PulseKit's AEHA and Panasonic48 share a waveform,
-    # which needs its own field-mapping investigation. See compat_matrix/README.md.
 ]
 
 

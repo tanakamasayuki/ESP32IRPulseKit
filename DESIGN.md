@@ -82,8 +82,7 @@ Score internals are not exposed in the public API. Normal users should inspect `
 Examples:
 
 - Samsung 32-bit and 36-bit use different IDs
-- Panasonic 40-bit and 48-bit use different IDs
-- AEHA can use one ID when the same Frame interpretation can handle variable length
+- AEHA uses one ID for the whole家製協 family (variable length), including Kaseikyo/Panasonic frames
 
 ## 7. repeat_count
 
@@ -104,7 +103,7 @@ RMT TX enables carrier modulation so common IR receiver modules can receive the 
 - The library default is 38kHz
 - `IRProtocolSpec::carrier_hz` is the protocol preferred value. `0` uses the default
 - Built-in protocols keep `0` when their preferred carrier has not been verified; 38kHz is not stamped on every protocol
-- Current built-in preferred values are NEC/AEHA/Panasonic/Samsung=38kHz, JVC=37.9kHz, Sony=40kHz, and RC5/RC6=36kHz
+- Current built-in preferred values are NEC/AEHA/Samsung=38kHz, JVC=37.9kHz, Sony=40kHz, and RC5/RC6=36kHz
 - `IRSender::setCarrierHz()` is a sender-level explicit override and takes precedence over protocol preferences
 - `clearCarrierHz()` removes the explicit override
 - Duty cycle is not public API; the implementation uses an internal fixed duty of about 1/3

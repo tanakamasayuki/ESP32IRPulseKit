@@ -27,46 +27,6 @@ namespace esp32irpk::specs
   };
   // clang-format on
 
-  // clang-format off
-  inline constexpr IRProtocolSpec PANASONIC40 = {
-      .protocol_id      = IRProtocolID::PANASONIC40,
-      .name             = "PANASONIC40",
-      .scheme           = IRProtocolScheme::SPACE_ENC,
-      .family           = IRProtocolFamily::PANASONIC,
-      .header           = {.mark_us = 3500, .space_us = 1750},
-      .one              = {.mark_us =  430, .space_us = 1300},
-      .zero             = {.mark_us =  430, .space_us =  430},
-      .trailer          = {.mark_us =  430, .space_us =    0},
-      .gap_threshold_us = 40000,
-      .idle_threshold_us= 54000,
-      .carrier_hz       = kDefaultCarrierHz,
-      .lsb_first        = true,
-      .bit_length       = 40,
-      .default_repeat_count = 0,
-      .bit_tol_pct      = 30,
-  };
-  // clang-format on
-
-  // clang-format off
-  inline constexpr IRProtocolSpec PANASONIC48 = {
-      .protocol_id      = IRProtocolID::PANASONIC48,
-      .name             = "PANASONIC48",
-      .scheme           = IRProtocolScheme::SPACE_ENC,
-      .family           = IRProtocolFamily::PANASONIC,
-      .header           = {.mark_us = 3500, .space_us = 1750},
-      .one              = {.mark_us =  430, .space_us = 1300},
-      .zero             = {.mark_us =  430, .space_us =  430},
-      .trailer          = {.mark_us =  430, .space_us =    0},
-      .gap_threshold_us = 40000,
-      .idle_threshold_us= 54000,
-      .carrier_hz       = kDefaultCarrierHz,
-      .lsb_first        = true,
-      .bit_length       = 48,
-      .default_repeat_count = 0,
-      .bit_tol_pct      = 30,
-  };
-  // clang-format on
-
 } // namespace esp32irpk::specs
 
 namespace esp32irpk::frames
@@ -104,76 +64,6 @@ namespace esp32irpk::frames
       }
       out.frame_type = esp32irpk::IRFrameType::NORMAL;
       out.bit_length = bit_length;
-      out.bits = data;
-      return out;
-    }
-  };
-
-  struct Panasonic40Frame
-  {
-    uint64_t data = 0;
-    bool is_repeat = false;
-
-    static Panasonic40Frame fromBits(const esp32irpk::IRDecodedBits &in)
-    {
-      Panasonic40Frame out{};
-      if (in.frame_type == esp32irpk::IRFrameType::REPEAT)
-      {
-        out.is_repeat = true;
-        return out;
-      }
-      out.data = in.bits;
-      return out;
-    }
-
-    esp32irpk::IRDecodedBits toBits() const
-    {
-      esp32irpk::IRDecodedBits out{};
-      out.protocol_id = esp32irpk::IRProtocolID::PANASONIC40;
-      if (is_repeat)
-      {
-        out.frame_type = esp32irpk::IRFrameType::REPEAT;
-        out.bit_length = 0;
-        out.bits = 0xFFFFFFFFFFFFFFFFULL;
-        return out;
-      }
-      out.frame_type = esp32irpk::IRFrameType::NORMAL;
-      out.bit_length = 40;
-      out.bits = data;
-      return out;
-    }
-  };
-
-  struct Panasonic48Frame
-  {
-    uint64_t data = 0;
-    bool is_repeat = false;
-
-    static Panasonic48Frame fromBits(const esp32irpk::IRDecodedBits &in)
-    {
-      Panasonic48Frame out{};
-      if (in.frame_type == esp32irpk::IRFrameType::REPEAT)
-      {
-        out.is_repeat = true;
-        return out;
-      }
-      out.data = in.bits;
-      return out;
-    }
-
-    esp32irpk::IRDecodedBits toBits() const
-    {
-      esp32irpk::IRDecodedBits out{};
-      out.protocol_id = esp32irpk::IRProtocolID::PANASONIC48;
-      if (is_repeat)
-      {
-        out.frame_type = esp32irpk::IRFrameType::REPEAT;
-        out.bit_length = 0;
-        out.bits = 0xFFFFFFFFFFFFFFFFULL;
-        return out;
-      }
-      out.frame_type = esp32irpk::IRFrameType::NORMAL;
-      out.bit_length = 48;
       out.bits = data;
       return out;
     }

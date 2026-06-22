@@ -144,11 +144,6 @@ namespace esp32irpk::codec
         }
         break;
       }
-      case IRProtocolFamily::PANASONIC:
-      {
-        // No special check for now
-        break;
-      }
       default:
         break;
       }

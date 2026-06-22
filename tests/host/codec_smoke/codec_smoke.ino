@@ -69,8 +69,6 @@ void testProtocolCarrierPreferences()
 {
   EXPECT_EQ("carrier/nec", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::NEC.carrier_hz);
   EXPECT_EQ("carrier/aeha", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::AEHA.carrier_hz);
-  EXPECT_EQ("carrier/panasonic40", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::PANASONIC40.carrier_hz);
-  EXPECT_EQ("carrier/panasonic48", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::PANASONIC48.carrier_hz);
   EXPECT_EQ("carrier/samsung32", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::SAMSUNG32.carrier_hz);
   EXPECT_EQ("carrier/samsung36", esp32irpk::kDefaultCarrierHz, esp32irpk::specs::SAMSUNG36.carrier_hz);
   EXPECT_EQ("carrier/jvc", 37900, esp32irpk::specs::JVC.carrier_hz);
@@ -395,12 +393,6 @@ void testGeneratedProtocolRoundtrips()
   expectEncodeDecodeRoundtrip("generated/jvc",
                               esp32irpk::specs::JVC,
                               jvc.toBits());
-
-  esp32irpk::frames::Panasonic40Frame panasonic40{};
-  panasonic40.data = 0x123456789aULL;
-  expectEncodeDecodeRoundtrip("generated/panasonic40",
-                              esp32irpk::specs::PANASONIC40,
-                              panasonic40.toBits());
 }
 
 void testBiphaseEncodeDecodeRoundtrips()
@@ -467,17 +459,10 @@ void testSimilarSpaceEncodedRankingWithNoisyTiming()
   aeha.bit_length = 48;
   aeha.bits = 0x123456749abcULL; // AEHA parity nibble matches low16 customer code.
 
-  esp32irpk::IRDecodedBits panasonic{};
-  panasonic.protocol_id = esp32irpk::IRProtocolID::PANASONIC48;
-  panasonic.frame_type = esp32irpk::IRFrameType::NORMAL;
-  panasonic.bit_length = 48;
-  panasonic.bits = 0x40040100bcbdULL;
-
   const esp32irpk::IRProtocolSpec tx_aeha_specs[] = {esp32irpk::specs::AEHA};
-  const esp32irpk::IRProtocolSpec tx_panasonic_specs[] = {esp32irpk::specs::PANASONIC48};
   const esp32irpk::IRProtocolSpec rank_specs[] = {
-      esp32irpk::specs::PANASONIC48,
       esp32irpk::specs::AEHA,
+      esp32irpk::specs::NEC,
   };
 
   uint16_t raw_ticks[128]{};
@@ -495,21 +480,6 @@ void testSimilarSpaceEncodedRankingWithNoisyTiming()
               esp32irpk::codec::decodeRawToBits(noisy_aeha, rank_specs, 2, 4, 0, aeha_result));
   EXPECT_EQ("ranking/aeha-noisy-first", esp32irpk::IRProtocolID::AEHA, aeha_result.candidates[0].protocol_id);
   EXPECT_EQ("ranking/aeha-noisy-bits", aeha.bits, aeha_result.candidates[0].decoded.bits);
-  EXPECT_TRUE("ranking/aeha-noisy-score-gap",
-              aeha_result.count == 1 || aeha_result.candidates[0].score > aeha_result.candidates[1].score);
-
-  EXPECT_TRUE("ranking/panasonic-encode", esp32irpk::codec::encodeBitsToRaw(panasonic, tx_panasonic_specs, 1, raw));
-  uint16_t noisy_panasonic_ticks[128]{};
-  esp32irpk::IRRawTickView noisy_panasonic{};
-  perturbRawTicks(raw, noisy_panasonic_ticks, sizeof(noisy_panasonic_ticks) / sizeof(noisy_panasonic_ticks[0]), noisy_panasonic);
-
-  esp32irpk::IRReceiveResult<4> panasonic_result{};
-  EXPECT_TRUE("ranking/panasonic-noisy-decode",
-              esp32irpk::codec::decodeRawToBits(noisy_panasonic, rank_specs, 2, 4, 0, panasonic_result));
-  EXPECT_EQ("ranking/panasonic-noisy-first", esp32irpk::IRProtocolID::PANASONIC48, panasonic_result.candidates[0].protocol_id);
-  EXPECT_EQ("ranking/panasonic-noisy-bits", panasonic.bits, panasonic_result.candidates[0].decoded.bits);
-  EXPECT_TRUE("ranking/panasonic-noisy-score-gap",
-              panasonic_result.count == 1 || panasonic_result.candidates[0].score > panasonic_result.candidates[1].score);
 }
 
 void testNecLikeRankingWithNoisyTiming()
@@ -863,25 +833,6 @@ void testAeha48FixtureDecode()
   EXPECT_EQ("aeha48-fixture/frame-length", 48, frame.bit_length);
 }
 
-void testPanasonic48FixtureDecode()
-{
-  esp32irpk::IRRawTickView view{};
-  view.ticks = test_fixtures::panasonic48_40040100bcbd_raw_ticks;
-  view.len = test_fixtures::panasonic48_40040100bcbd_raw_len;
-
-  const esp32irpk::IRProtocolSpec specs[] = {esp32irpk::specs::PANASONIC48};
-  esp32irpk::IRReceiveResult<4> result{};
-  EXPECT_TRUE("panasonic48-fixture/decode", esp32irpk::codec::decodeRawToBits(view, specs, 1, 4, 0, result));
-  EXPECT_EQ("panasonic48-fixture/candidates", 1, result.count);
-  EXPECT_EQ("panasonic48-fixture/protocol", esp32irpk::IRProtocolID::PANASONIC48, result.candidates[0].protocol_id);
-  EXPECT_EQ("panasonic48-fixture/bits", test_fixtures::panasonic48_40040100bcbd_bits, result.candidates[0].decoded.bits);
-  EXPECT_EQ("panasonic48-fixture/length", test_fixtures::panasonic48_40040100bcbd_bit_length, result.candidates[0].decoded.bit_length);
-
-  esp32irpk::frames::Panasonic48Frame frame =
-      esp32irpk::frames::Panasonic48Frame::fromBits(result.candidates[0].decoded);
-  EXPECT_EQ("panasonic48-fixture/data", 0x40040100bcbdULL, frame.data);
-}
-
 void testJvcFixtureDecode()
 {
   esp32irpk::IRRawTickView view{};
@@ -1182,13 +1133,6 @@ void testFrameConversions()
   esp32irpk::IRDecodedBits jvc_bits = jvc.toBits();
   EXPECT_EQ("frame/jvc-length", 16, jvc_bits.bit_length);
   EXPECT_EQ("frame/jvc-mask", 0xc0deULL, jvc_bits.bits);
-
-  esp32irpk::frames::Panasonic48Frame panasonic48{};
-  panasonic48.data = 0x123456789abcULL;
-  esp32irpk::IRDecodedBits panasonic48_bits = panasonic48.toBits();
-  EXPECT_EQ("frame/panasonic48-protocol", esp32irpk::IRProtocolID::PANASONIC48, panasonic48_bits.protocol_id);
-  EXPECT_EQ("frame/panasonic48-length", 48, panasonic48_bits.bit_length);
-  EXPECT_EQ("frame/panasonic48-bits", 0x123456789abcULL, panasonic48_bits.bits);
 }
 } // namespace
 
@@ -1221,7 +1165,6 @@ void setup()
   testSony12FixtureDecode();
   testSamsung32FixtureDecode();
   testAeha48FixtureDecode();
-  testPanasonic48FixtureDecode();
   testJvcFixtureDecode();
   testRc5FixtureDecode();
   testRc6M0FixtureDecode();

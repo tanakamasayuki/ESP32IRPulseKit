@@ -16,8 +16,6 @@ The primary sketch is RX and `peer_tx/` is TX. The peer name stays fixed as `tx`
 - SAMSUNG36
 - JVC
 - AEHA
-- PANASONIC40
-- PANASONIC48
 - RC5
 - RC6_M0_16
 - RC6_M6_32

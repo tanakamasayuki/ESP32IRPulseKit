@@ -25,7 +25,7 @@ MSB/LSB-first の整数表現の違いだけ、というケースが多いため
 
 ## プロトコルカバレッジ方針
 
-PulseKitの `protocol_matrix` は自前TX -> 自前RXで14プロトコルを確認します。
+PulseKitの `protocol_matrix` は自前TX -> 自前RXで11プロトコルを確認します。
 `compat_matrix` は外部ライブラリとの共通範囲と仕様差を調べるため、外部側の標準decode/send
 があるものを優先して追加します。外部側に標準対応が無いものは、テストで失敗してよいですが、
 READMEに理由と観測ログを残します。
@@ -41,9 +41,7 @@ READMEに理由と観測ログを残します。
 | SAMSUNG32 | 送受信あり | 送受信あり | 通常互換対象 |
 | SAMSUNG36 | Samsung36 非対応 | `sendSamsung36()` / `decodeSamsung36()` あり | IRremoteESP8266 は通常互換対象。Arduino-IRremote は Samsung36 非対応のため対象外 |
 | JVC | 送受信あり（16bit） | 送受信あり（16bit） | 通常互換対象 |
-| AEHA | Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | Panasonic/Kaseikyo系あり。PulseKit AEHAとの対応関係は未整理 | 次の調査候補 |
-| PANASONIC40 | Kaseikyo/Panasonic系あり。40bit形は未確認 | Panasonic/Kaseikyo系あり。40bit形は未確認 | 次の調査候補 |
-| PANASONIC48 | Kaseikyo/Panasonic系あり | Panasonic/Kaseikyo系あり | 調査中（PulseKit AEHA と波形が同じ） |
+| AEHA | Kaseikyo系あり | Panasonic/Kaseikyo系あり | AEHA/Kaseikyo/Panasonic の正準デコーダ。調査候補 |
 | RC5 | 送受信あり | 送受信あり | IRremoteESP8266 クロステスト（rx + tx） |
 | RC6_M0_16 | RC6系あり | RC6系あり | IRremoteESP8266 クロステスト（rx + tx） |
 | RC6_M6_32 | RC6A/RC6系あり | RC6系あり | 調査候補。mode 6A表現差に注意 |
@@ -52,8 +50,7 @@ READMEに理由と観測ログを残します。
 
 1. `RC5` / `RC6_M0_16` を IRremoteESP8266 クロステスト（rx + tx）に追加。
    下記「RC5 / RC6 のバイフェーズ規約」参照。
-2. `AEHA` / `PANASONIC40` / `PANASONIC48` / `RC6_M6_32` は、外部ライブラリのprotocol名・
-   bit構造とPulseKitの仕様が対応するかを先に調査する。
+2. `AEHA`（Kaseikyo/Panasonic を含む）と `RC6_M6_32` を、外部ライブラリとの対応を先に調査する。
 
 ### RC5 / RC6 のバイフェーズ規約
 
@@ -68,12 +65,17 @@ RC5 と RC6 はバイフェーズ（Manchester）で、ハーフビット極性�
 RC6 mode0=21bit と数え、IRremoteESP8266 はそれらを除いて 12-13 / 20bit）。よって
 クロステストは値一致をassertせず `bit_order` を記録する。
 
-### Panasonic48（調査中）
+### AEHA / Kaseikyo / Panasonic
 
-PulseKit の `AEHA` と `PANASONIC48` は波形が同じため、IRremoteESP8266 の Panasonic
-フレームは PulseKit で `AEHA`（例 `0xBD3D802002`）として復号され、PulseKit → IRremoteESP8266
-方向は decode しない。これは AEHA/Panasonic のフィールド対応整理（項目2）の一部なので、
-PANASONIC48 はまだクロステストに入れていない。
+`AEHA` が家製協ファミリの正準デコーダ。Kaseikyo（および特定メーカーコードを持つ
+Panasonic）は 48bit の AEHA フレームなので、IRremoteESP8266 の Panasonic フレームは
+PulseKit では `AEHA`（例 `0xBD3D802002`）として復号される。PulseKit の AEHA デコーダは
+customer-code のパリティニブルを検証し、これが本物の家製協フレームの判別になる。
+
+ビット順：PulseKit は LSB-first、IRremoteESP8266 は MSB-first 格納なので、同じ48bit波形でも
+両者でビット反転して読める（Panasonic のメーカーコードは PulseKit 下位16bit で `0x2002`、
+IRremoteESP8266 上位16bit で `0x4004`）。フィールド/パリティ構造を含む専用 AEHA クロステストは
+将来追加。
 
 ### SAMSUNG36（2ブロック）
 

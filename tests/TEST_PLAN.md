@@ -34,8 +34,7 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | SONY decode | ✅ | | ⬜ | | Sony12 fixture host test; SONY15/20 generated roundtrips and formula checks exist |
 | Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test; SAMSUNG36 generated roundtrip and formula check exist |
 | JVC decode | ✅ | | ⬜ | | JVC fixture host test; encode/decode roundtrip and formula check exist |
-| Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test; PANASONIC40 generated roundtrip and formula check exist |
-| AEHA variable-length encode/decode | ✅ | | ⬜ | | Host smoke + MSB-first variable test |
+| AEHA variable-length encode/decode | ✅ | | ⬜ | | Host smoke + MSB-first variable test (covers Kaseikyo/Panasonic) |
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5, RC6_M0, RC6_M6 fixture host tests |
 | Protocol carrier preferences | ✅ | ✅ | ✅ NEC smoke | | Built-in values and sender override range checked in host |
 | Candidate ordering and score threshold | ✅ | | | | Host smoke test exists |

@@ -34,8 +34,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | SONY decode | ✅ | | ⬜ | | Sony12 fixture host test。SONY15/20はgenerated roundtrip + 生成式確認済み |
 | Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test。SAMSUNG36はgenerated roundtrip + 生成式確認済み |
 | JVC decode | ✅ | | ⬜ | | JVC fixture host test。encode/decode roundtrip + 生成式確認済み |
-| Panasonic decode | ✅ | | ⬜ | | Panasonic48 fixture host test。PANASONIC40はgenerated roundtrip + 生成式確認済み |
-| AEHA可変長encode/decode | ✅ | | ⬜ | | host smoke + MSB-first可変長test |
+| AEHA可変長encode/decode | ✅ | | ⬜ | | host smoke + MSB-first可変長test（Kaseikyo/Panasonic を含む） |
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5・RC6_M0・RC6_M6 fixture host test |
 | protocol carrier推奨値 | ✅ | ✅ | ✅ NEC smoke | | 標準protocol値とsender override範囲をhostで確認 |
 | 候補順位・score threshold | ✅ | | | | host smoke追加済み |

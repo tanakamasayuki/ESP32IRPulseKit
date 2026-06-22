@@ -27,10 +27,9 @@ namespace esp32irpk
     UNKNOWN = 0,
     NEC_LIKE = 1,
     AEHA = 2,
-    PANASONIC = 3,
-    SONY = 4,
-    RC5 = 5,
-    RC6 = 6,
+    SONY = 3,
+    RC5 = 4,
+    RC6 = 5,
   };
 
   enum class IRProtocolID : uint16_t
@@ -38,17 +37,15 @@ namespace esp32irpk
     UNKNOWN = 0,
     NEC = 1,
     AEHA = 2,
-    PANASONIC40 = 3,
-    PANASONIC48 = 4,
-    SONY12 = 5,
-    SONY15 = 6,
-    SONY20 = 7,
-    SAMSUNG32 = 8,
-    SAMSUNG36 = 9,
-    JVC = 10,
-    RC5 = 11,
-    RC6_M0_16 = 12,
-    RC6_M6_32 = 13,
+    SONY12 = 3,
+    SONY15 = 4,
+    SONY20 = 5,
+    SAMSUNG32 = 6,
+    SAMSUNG36 = 7,
+    JVC = 8,
+    RC5 = 9,
+    RC6_M0_16 = 10,
+    RC6_M6_32 = 11,
     USER1 = 1000,
     USER2 = 1001,
     USER3 = 1002,
@@ -286,10 +283,6 @@ namespace esp32irpk::detail
       out.push_back(specs::NEC);
     if (!has(specs::AEHA.protocol_id))
       out.push_back(specs::AEHA);
-    if (!has(specs::PANASONIC40.protocol_id))
-      out.push_back(specs::PANASONIC40);
-    if (!has(specs::PANASONIC48.protocol_id))
-      out.push_back(specs::PANASONIC48);
     if (!has(specs::SONY12.protocol_id))
       out.push_back(specs::SONY12);
     if (!has(specs::SONY15.protocol_id))

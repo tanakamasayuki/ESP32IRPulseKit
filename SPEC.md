@@ -73,8 +73,8 @@ struct IRDecodedBits {
   - `false`: the first transmitted bit is the most significant bit of
     `bit_length` (`bits` bit `bit_length - 1`).
   This mirrors each protocol's on-air transmission order — NEC, Sony, JVC, Samsung
-  (SAMSUNG32), and AEHA/Panasonic send LSB-first; RC5/RC6 and SAMSUNG36 send
-  MSB-first. The encoder and decoder honor the flag symmetrically, so an
+  (SAMSUNG32), and AEHA (including Kaseikyo/Panasonic) send LSB-first; RC5/RC6 and
+  SAMSUNG36 send MSB-first. The encoder and decoder honor the flag symmetrically, so an
   in-library TX → RX round-trip always recovers the same `bits`.
   - Other libraries may index the *same* on-air signal from the opposite end
     (for example IRremoteESP8266 stores the NEC first-sent bit at the MSB of its
@@ -102,10 +102,9 @@ enum class IRProtocolFamily : uint8_t {
   UNKNOWN = 0,
   NEC_LIKE = 1,
   AEHA = 2,
-  PANASONIC = 3,
-  SONY = 4,
-  RC5 = 5,
-  RC6 = 6,
+  SONY = 3,
+  RC5 = 4,
+  RC6 = 5,
 };
 
 struct IRProtocolSpec {
@@ -222,8 +221,6 @@ Built-in protocol specs are available under `esp32irpk::specs`.
 ```cpp
 esp32irpk::specs::NEC
 esp32irpk::specs::AEHA
-esp32irpk::specs::PANASONIC40
-esp32irpk::specs::PANASONIC48
 esp32irpk::specs::SONY12
 esp32irpk::specs::SONY15
 esp32irpk::specs::SONY20
@@ -239,7 +236,7 @@ esp32irpk::specs::RC6_M6_32
 
 ### 3.1 Candidate Protocols (not yet implemented)
 
-The current 14 cover the large majority of remote-control use, so the following
+The current 11 cover the large majority of remote-control use, so the following
 are **candidates**, not requirements. If the goal is only learn-and-replay (raw
 capture/replay), the raw-tick path already handles any protocol and no addition
 is needed; explicit support matters only when you need to decode into meaningful
@@ -429,7 +426,7 @@ public:
 - `repeat_count < 0` uses `spec.default_repeat_count`.
 - `repeat_count >= 0` uses the provided value.
 - Carrier is resolved in this order: explicit `setCarrierHz()` override, `spec.carrier_hz`, then the library default `38000`.
-- Built-in preferred values: NEC/AEHA/Panasonic/Samsung use 38kHz, JVC uses 37.9kHz, Sony SIRC uses 40kHz, and RC5/RC6 use 36kHz.
+- Built-in preferred values: NEC/AEHA/Samsung use 38kHz, JVC uses 37.9kHz, Sony SIRC uses 40kHz, and RC5/RC6 use 36kHz.
 
 ### 6.3 Carrier Configuration
 

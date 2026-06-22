@@ -98,32 +98,6 @@ static void printFrame(const esp32irpk::IRDecodedBits &b)
     Serial.println((uint32_t)(f.data & 0xFFFFFFFFu), HEX);
     break;
   }
-  case esp32irpk::IRProtocolID::PANASONIC40:
-  {
-    esp32irpk::frames::Panasonic40Frame f = esp32irpk::frames::Panasonic40Frame::fromBits(b);
-    if (f.is_repeat)
-    {
-      Serial.println("  frame: PANASONIC40 REPEAT");
-      break;
-    }
-    Serial.print("  frame: PANASONIC40 data=0x");
-    Serial.println((uint32_t)(f.data & 0xFFFFFFFFu), HEX);
-    break;
-  }
-  case esp32irpk::IRProtocolID::PANASONIC48:
-  {
-    esp32irpk::frames::Panasonic48Frame f = esp32irpk::frames::Panasonic48Frame::fromBits(b);
-    if (f.is_repeat)
-    {
-      Serial.println("  frame: PANASONIC48 REPEAT");
-      break;
-    }
-    Serial.print("  frame: PANASONIC48 data=0x");
-    Serial.print((uint32_t)((f.data >> 32) & 0xFFFFu), HEX);
-    Serial.print("_");
-    Serial.println((uint32_t)(f.data & 0xFFFFFFFFu), HEX);
-    break;
-  }
   case esp32irpk::IRProtocolID::SONY12:
   {
     esp32irpk::frames::Sony12Frame f = esp32irpk::frames::Sony12Frame::fromBits(b);
