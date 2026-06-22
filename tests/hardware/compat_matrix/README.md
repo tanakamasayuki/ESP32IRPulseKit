@@ -125,3 +125,10 @@ zero-spaces cross IRremoteESP8266's tight ~594 µs JVC window. See
 [carrier_loopback/README.md](../carrier_loopback/README.md) for the data and the
 candidate fix (per-mark carrier phase alignment, likely via a symbol-encoded
 carrier at ~1 µs resolution).
+
+**Adopted mitigation:** the library now emits a detuned **480 µs JVC zero-space**
+(spec is 525 µs) to move the received zero-space clear of the 594 µs window — a
+transmit-margin workaround, not a root fix. Validated on hardware: our TX → 
+IRremoteESP8266 JVC now decodes (was ~1/5), Arduino-IRremote stays 15/15
+([jvc_verify_arduino/](../jvc_verify_arduino/)), and our RX still decodes external
+standard 525 µs JVC (score ~920). See the note in `src/protocols/JVC.h`.

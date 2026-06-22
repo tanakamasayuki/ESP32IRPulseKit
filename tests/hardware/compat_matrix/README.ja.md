@@ -115,3 +115,9 @@ RMTで生キャリアを捕捉）で確定：キャリア周期は綺麗だが�
 IRremoteESP8266の狭い~594µs JVC窓を越える。データと対策候補（マーク毎のキャリア
 位相整合、おそらく~1µs解像度でのシンボルエンコードキャリア）は
 [carrier_loopback/README.md](../carrier_loopback/README.md) 参照。
+
+**採用した緩和策:** ライブラリは JVC ゼロ空白を仕様の525µsではなく**480µsで送出**し、
+受信ゼロ空白を594µs窓から離す（送信マージンの回避策で根本対策ではない）。実機検証済み：
+当方TX→IRremoteESP8266 のJVCがデコード可に（従来~1/5）、Arduino-IRremoteは15/15維持
+（[jvc_verify_arduino/](../jvc_verify_arduino/)）、当方RXは外部の標準525µs JVCもデコード可
+（score~920）。詳細は `src/protocols/JVC.h` のコメント。
