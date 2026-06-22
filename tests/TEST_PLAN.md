@@ -8,26 +8,28 @@ Tests are grouped into four levels.
 
 | Type | Purpose | Environment |
 | --- | --- | --- |
-| host | Runtime assertions for codec, protocol specs, and frame conversion | Arduino host + pytest on a PC |
-| build | ESP32 build checks for examples and minimal sketches | pytest + Arduino CLI on a PC |
-| hardware | RMT TX/RX, GPIO inversion, idle threshold, queue/stat behavior | ESP32 boards + pytest-embedded |
+| pc/fixtures | Signal-data schema and formula checks | pytest on a PC |
+| pc/codec_smoke | Runtime assertions for codec, protocol specs, and frame conversion | Arduino host + pytest on a PC |
+| pc/compile | ESP32 build-only checks for examples and minimal sketches | pytest + Arduino CLI on a PC |
+| hardware | RMT TX/RX pass/fail regression on two boards | ESP32 boards + pytest-embedded |
+| studies | On-demand board investigations that record observation logs | ESP32 boards + pytest (human analysis) |
 | manual | Real remotes, distance/angle, ambient light, and human-observed behavior | Manual setup |
 
-IR behavior is affected by the physical environment, so host tests assert RAW/BITS/Frame logic in an Arduino host environment. Build tests verify examples and public headers compile for ESP32. RMT-dependent behavior is verified by hardware tests.
+IR behavior is affected by the physical environment, so `pc/codec_smoke` asserts RAW/BITS/Frame logic in an Arduino host environment. `pc/compile` verifies examples and public headers compile for ESP32. RMT-dependent behavior is verified by hardware tests.
 
 ## Run Policy
 
 | Environment | Tests |
 | --- | --- |
-| Local development | host, hardware/link_smoke, hardware/protocol_matrix |
-| GitHub Actions | host, build, fixtures |
-| As needed | hardware/compat_matrix, manual |
+| Local development | pc, hardware/link_smoke, hardware/protocol_matrix |
+| GitHub Actions | pc (fixtures, codec_smoke, compile) |
+| As needed | studies, manual |
 
-Do not run bare `pytest`. Always select a parent directory such as `host`, `build`, `fixtures`, or `hardware/link_smoke`. The `hardware/` tree depends on physical boards and local serial ports, so it is not part of CI.
+Select a top-level folder such as `pc` or `hardware/link_smoke`. Files under `studies/` are named `study_*.py`, so they are never auto-collected; run a study on demand with `-o python_files="study_*.py"`. The `hardware/` and `studies/` trees depend on physical boards and local serial ports, so they are not part of CI.
 
 ## Initial Coverage
 
-| Feature | host | build | hardware | manual | Status |
+| Feature | codec_smoke | compile | hardware | manual | Status |
 | --- | --- | --- | --- | --- | --- |
 | NEC encode/decode roundtrip | ✅ | ✅ | ✅ NEC smoke | | Host/build/two-board smoke exist |
 | NEC repeat encode/decode | ✅ | | ⬜ | | Host smoke tests exist |
@@ -38,7 +40,7 @@ Do not run bare `pytest`. Always select a parent directory such as `host`, `buil
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5, RC6_M0, RC6_M6 fixture host tests |
 | Protocol carrier preferences | ✅ | ✅ | ✅ NEC smoke | | Built-in values and sender override range checked in host |
 | Candidate ordering and score threshold | ✅ | | | | Host smoke test exists |
-| Relaxed candidate matching and score degradation | ⬜ | | ⬜ compat | | RAW slightly beyond tolerance should remain a candidate and score lower than ideal timing |
+| Relaxed candidate matching and score degradation | ⬜ | | ⬜ studies | | RAW slightly beyond tolerance should remain a candidate and score lower than ideal timing |
 | Encode rejection / invalid inputs | ✅ | | | | Undersized buffer, unknown id, bad length |
 | RAW-only mode (0 candidates) | ✅ | | | | Host smoke test exists |
 | Tolerance boundaries | ✅ | | | | SPACE_ENC ±25% boundaries checked in host smoke |
@@ -63,7 +65,7 @@ The standard hardware test setup uses two boards.
 
 `hardware/protocol_matrix/` is the multi-protocol ESP32IRPulseKit TX -> ESP32IRPulseKit RX hardware check. It is broader than `link_smoke` and is part of normal release verification.
 
-`hardware/compat_matrix/` is optional compatibility and investigation coverage. Each test directory keeps the primary sketch as RX and `peer_tx/` as TX. Keeping the peer name fixed as `tx` lets external-library variants reuse `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`. The matrix records score, raw_len, and decode results as observations so physical setup and external-library timer variation can be evaluated.
+`studies/compat_matrix/` is optional compatibility and investigation coverage. Each test directory keeps the primary sketch as RX and `peer_tx/` as TX. Keeping the peer name fixed as `tx` lets external-library variants reuse `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`. The matrix records score, raw_len, and decode results as observations so physical setup and external-library timer variation can be evaluated.
 
 The standard automated hardware target is a **two-board ESP32-S3 setup** for now. ESP32 classic, ESP32-C3/C6, and other SoCs are checked first with `examples/` and manual runs. If a SoC-specific difference or bug appears, it can be promoted to an optional profile or manual test.
 
@@ -78,7 +80,7 @@ The peer board does not initially use a separate reference IR library. Baselines
 
 ## Signal Data
 
-IR signal data lives under `tests/fixtures/`.
+IR signal data lives under `tests/pc/fixtures/`.
 
 - `generated/`: ideal waveforms generated from protocol specs and BITS
 - `verified/`: hand-written or reviewed fixed RAW data
@@ -98,7 +100,7 @@ Decode tests cover candidate formation and score ranking, not only strict pass/f
 - Clearly broken waveforms should produce no candidate, or be dropped by score threshold
 - For SPACE_ENC, classifiable jitter stays sufficiently far from the 0/1 space midpoint; ambiguous midpoint cases are rejection cases
 - For BIPHASE, jitter that preserves the half-bit/grid structure is a candidate case; broken grid structure is a rejection case
-- `hardware/compat_matrix` observes timing variation from external libraries and physical setup; reproducible cases should be promoted into host fixtures
+- `studies/compat_matrix` observes timing variation from external libraries and physical setup; reproducible cases should be promoted into `pc/fixtures`
 
 ## Priority
 
@@ -106,4 +108,4 @@ Decode tests cover candidate formation and score ranking, not only strict pass/f
 2. Add build tests for examples and minimal sketches.
 3. Add two-board TX/RX hardware tests.
 4. Add host tests for noisy RAW fixtures that verify candidate retention and score degradation.
-5. Promote captured real remote RAW fixtures into host/hardware tests.
+5. Promote captured real remote RAW fixtures into `pc` and `hardware` tests.

@@ -1,0 +1,302 @@
+from pathlib import Path
+import subprocess
+import sys
+
+import pytest
+import yaml
+
+
+FIXTURE_DIR = Path(__file__).with_name("verified")
+CPP_HEADER = Path(__file__).resolve().parents[1] / "codec_smoke" / "verified_fixtures.h"
+CPP_EXPORTER = Path(__file__).with_name("export_cpp_fixtures.py")
+
+
+def load_fixture(name: str):
+    with (FIXTURE_DIR / name).open(encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
+
+
+def nec_bits(address: int, command: int) -> int:
+    return address | (command << 16) | (((~command) & 0xFF) << 24)
+
+
+def nec_raw_ticks(address: int, command: int) -> list[int]:
+    bits = nec_bits(address, command)
+    raw = [900, 450]
+    for bit_index in range(32):
+        raw.append(56)
+        raw.append(169 if ((bits >> bit_index) & 0x1) else 56)
+    raw.append(56)
+    return raw
+
+
+def sony12_raw_ticks(data: int) -> list[int]:
+    raw = [240, 60]
+    for bit_index in range(12):
+        raw.append(120 if ((data >> bit_index) & 0x1) else 60)
+        raw.append(60)
+    return raw
+
+
+def samsung32_bits(address: int, command: int) -> int:
+    return address | (command << 16)
+
+
+def samsung32_raw_ticks(address: int, command: int) -> list[int]:
+    bits = samsung32_bits(address, command)
+    raw = [450, 450]
+    for bit_index in range(32):
+        raw.append(56)
+        raw.append(169 if ((bits >> bit_index) & 0x1) else 56)
+    raw.append(56)
+    return raw
+
+
+def samsung36_bits(address: int, command: int) -> int:
+    return address | ((command & 0xFFFFF) << 16)
+
+
+def samsung36_raw_ticks(address: int, command: int) -> list[int]:
+    bits = samsung36_bits(address, command)
+    raw = [450, 450]
+    for bit_index in range(36):
+        raw.append(56)
+        raw.append(169 if ((bits >> bit_index) & 0x1) else 56)
+    raw.append(56)
+    return raw
+
+
+def aeha_raw_ticks(data: int, bit_length: int) -> list[int]:
+    raw = [340, 170]
+    for bit_index in range(bit_length):
+        raw.append(43)
+        raw.append(128 if ((data >> bit_index) & 0x1) else 43)
+    raw.append(43)
+    return raw
+
+
+def jvc_raw_ticks(data: int) -> list[int]:
+    raw = [840, 420]
+    for bit_index in range(16):
+        raw.append(53)
+        raw.append(158 if ((data >> bit_index) & 0x1) else 53)
+    raw.append(53)
+    return raw
+
+
+def sony_raw_ticks(data: int, bit_length: int) -> list[int]:
+    raw = [240, 60]
+    for bit_index in range(bit_length):
+        raw.append(120 if ((data >> bit_index) & 0x1) else 60)
+        raw.append(60)
+    return raw
+
+
+def rc5_raw_ticks(data: int) -> list[int]:
+    # Standard RC5: MSB-first, '1' = space->mark, '0' = mark->space. The leading
+    # idle space of the first '1' bit is absorbed (RAW begins on the first mark).
+    halves: list[bool] = []
+    for i in range(14):
+        bit = (data >> (13 - i)) & 0x1
+        halves.append(not bit)  # first half: space(False) for '1', mark(True) for '0'
+        halves.append(bool(bit))  # second half: mark for '1'
+    idx = 0
+    while idx < len(halves) and not halves[idx]:  # drop leading idle space
+        idx += 1
+    ticks: list[int] = []
+    level = True
+    current_ticks = 0
+    for half in halves[idx:]:
+        if half == level:
+            current_ticks += 89
+        else:
+            ticks.append(current_ticks)
+            current_ticks = 89
+            level = half
+    ticks.append(current_ticks)
+    return ticks
+
+
+def rc_biphase_ticks(bits: list[tuple[int, int]], unit_ticks: int, prefix: list[int] | None = None) -> list[int]:
+    raw = list(prefix or [])
+    level = True
+    current_ticks = 0
+    for bit, width_halves in bits:
+        half_count = width_halves // 2
+        halves = ([True] * half_count + [False] * half_count) if bit else ([False] * half_count + [True] * half_count)
+        for half in halves:
+            if half == level:
+                current_ticks += unit_ticks
+            else:
+                if current_ticks:
+                    raw.append(current_ticks)
+                current_ticks = unit_ticks
+                level = half
+    raw.append(current_ticks)
+    return raw
+
+
+def rc6_m0_bits(payload: int, toggle: int = 1) -> int:
+    return (1 << 20) | ((toggle & 0x1) << 16) | payload
+
+
+def rc6_m0_raw_ticks(payload: int, toggle: int = 1) -> list[int]:
+    # Start bit single-width (1, 2); only the toggle bit is double-width (toggle, 4).
+    bits: list[tuple[int, int]] = [(1, 2), (0, 2), (0, 2), (0, 2), (toggle, 4)]
+    bits.extend(((payload >> bit_index) & 0x1, 2) for bit_index in range(15, -1, -1))
+    return rc_biphase_ticks(bits, unit_ticks=44, prefix=[266, 89])
+
+
+def rc6_m6_bits(payload: int) -> int:
+    return (1 << 35) | (6 << 32) | payload
+
+
+def rc6_m6_raw_ticks(payload: int) -> list[int]:
+    # Start bit single-width (1, 2).
+    bits: list[tuple[int, int]] = [(1, 2), (1, 2), (1, 2), (0, 2)]
+    bits.extend(((payload >> bit_index) & 0x1, 2) for bit_index in range(31, -1, -1))
+    return rc_biphase_ticks(bits, unit_ticks=44, prefix=[266, 89])
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted(FIXTURE_DIR.glob("*.yaml")),
+    ids=lambda p: p.name,
+)
+def test_verified_fixture_schema(path):
+    with path.open(encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+
+    assert data["name"] == path.stem
+    assert data["source"] == "reviewed"
+    assert data["tick_us"] == 10
+    assert isinstance(data["raw_ticks"], list)
+    assert data["raw_ticks"]
+    assert all(isinstance(tick, int) for tick in data["raw_ticks"])
+    assert all(0 < tick <= 0xFFFF for tick in data["raw_ticks"])
+
+
+def test_nec_normal_fixture_matches_reviewed_fields():
+    data = load_fixture("nec_normal_00ff_34.yaml")
+    address = data["fields"]["address"]
+    command = data["fields"]["command"]
+
+    assert data["protocol"] == "NEC"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 32
+    assert data["bits"] == nec_bits(address, command)
+    assert data["raw_ticks"] == nec_raw_ticks(address, command)
+
+
+def test_nec_repeat_fixture_matches_reviewed_timing():
+    data = load_fixture("nec_repeat.yaml")
+
+    assert data["protocol"] == "NEC"
+    assert data["frame_type"] == "REPEAT"
+    assert data["bit_length"] == 0
+    assert data["bits"] == 0xFFFFFFFFFFFFFFFF
+    assert data["raw_ticks"] == [900, 225, 56]
+
+
+def test_sony12_fixture_matches_reviewed_timing():
+    data = load_fixture("sony12_0a90.yaml")
+    frame_data = data["fields"]["data"]
+
+    assert data["protocol"] == "SONY12"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 12
+    assert data["bits"] == frame_data
+    assert data["raw_ticks"] == sony12_raw_ticks(frame_data)
+
+
+def test_samsung32_fixture_matches_reviewed_fields():
+    data = load_fixture("samsung32_e0e0_40bf.yaml")
+    address = data["fields"]["address"]
+    command = data["fields"]["command"]
+
+    assert data["protocol"] == "SAMSUNG32"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 32
+    assert data["bits"] == samsung32_bits(address, command)
+    assert data["raw_ticks"] == samsung32_raw_ticks(address, command)
+
+
+def test_aeha48_fixture_matches_reviewed_fields():
+    data = load_fixture("aeha48_123456789abc.yaml")
+    frame_data = data["fields"]["data"]
+
+    assert data["protocol"] == "AEHA"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 48
+    assert data["bits"] == frame_data
+    assert data["raw_ticks"] == aeha_raw_ticks(frame_data, data["bit_length"])
+
+
+def test_jvc_fixture_matches_reviewed_fields():
+    data = load_fixture("jvc_c0de.yaml")
+
+    assert data["protocol"] == "JVC"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 16
+    assert data["bits"] == 0xC0DE
+    assert data["fields"]["address"] == 0xDE
+    assert data["fields"]["command"] == 0xC0
+    assert data["raw_ticks"] == jvc_raw_ticks(data["bits"])
+
+
+@pytest.mark.parametrize(
+    ("name", "bits", "bit_length", "raw_ticks", "has_trailer_mark"),
+    [
+        ("sony15_3456", 0x3456, 15, sony_raw_ticks(0x3456, 15), False),
+        ("sony20_abcde", 0xABCDE, 20, sony_raw_ticks(0xABCDE, 20), False),
+        ("samsung36_1234_abcde", samsung36_bits(0x1234, 0xABCDE), 36, samsung36_raw_ticks(0x1234, 0xABCDE), True),
+        ("jvc_c0de", 0xC0DE, 16, jvc_raw_ticks(0xC0DE), True),
+    ],
+)
+def test_generated_fixture_candidates_match_reviewed_formulas(name, bits, bit_length, raw_ticks, has_trailer_mark):
+    assert name
+    assert bits > 0
+    assert bits < (1 << bit_length)
+    assert raw_ticks
+    assert len(raw_ticks) == 2 + bit_length * 2 + (1 if has_trailer_mark else 0)
+    assert all(isinstance(tick, int) for tick in raw_ticks)
+    assert all(0 < tick <= 0xFFFF for tick in raw_ticks)
+
+
+@pytest.mark.parametrize("name", ["rc5_3fff.yaml", "rc5_300f.yaml"])
+def test_rc5_fixture_matches_reviewed_fields(name):
+    data = load_fixture(name)
+    frame_data = data["fields"]["data"]
+
+    assert data["protocol"] == "RC5"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 14
+    assert data["bits"] == frame_data
+    assert data["raw_ticks"] == rc5_raw_ticks(frame_data)
+
+
+def test_rc6_m0_fixture_matches_reviewed_fields():
+    data = load_fixture("rc6_m0_11234.yaml")
+    payload = data["fields"]["payload"]
+
+    assert data["protocol"] == "RC6_M0_16"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 21
+    assert data["bits"] == rc6_m0_bits(payload, toggle=1)
+    assert data["raw_ticks"] == rc6_m0_raw_ticks(payload, toggle=1)
+
+
+def test_rc6_m6_fixture_matches_reviewed_fields():
+    data = load_fixture("rc6_m6_689abcdef.yaml")
+    payload = data["fields"]["payload"]
+
+    assert data["protocol"] == "RC6_M6_32"
+    assert data["frame_type"] == "NORMAL"
+    assert data["bit_length"] == 36
+    assert data["bits"] == rc6_m6_bits(payload)
+    assert data["raw_ticks"] == rc6_m6_raw_ticks(payload)
+
+
+def test_cpp_fixture_header_is_current():
+    generated = subprocess.check_output([sys.executable, str(CPP_EXPORTER)], text=True)
+    assert CPP_HEADER.read_text(encoding="utf-8") == generated

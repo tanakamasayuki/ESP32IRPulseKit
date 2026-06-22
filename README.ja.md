@@ -22,12 +22,11 @@ ESP32 Arduino Core 3.x / ESP-IDF 5.x の新RMTドライバを使うIRリモコ�
 cd tests
 cp .env.example .env
 # Edit .env for your local serial ports and GPIOs.
-uv run --env-file .env pytest host
-uv run --env-file .env pytest build
-uv run pytest fixtures
+uv run --env-file .env pytest pc
+uv run --env-file .env pytest hardware/link_smoke
 ```
 
-無指定の `pytest` は使わず、`host`、`build`、`fixtures`、`hardware/link_smoke` のように対象を指定します。`host/` はArduino host実行テスト、`build/` はArduino CLIビルドテスト、`hardware/` はESP32実機テストです。詳細は [tests/README.ja.md](tests/README.ja.md) を参照してください。
+`pytest pc` はPCテスト一式（`fixtures`、`codec_smoke`、`compile`）を実行します。`hardware/` は2台構成の合否回帰テスト、`studies/` 配下の実機調査は自動収集されません（`study_*.py`）。詳細は [tests/README.ja.md](tests/README.ja.md) を参照してください。
 
 ## 開発メモ
 

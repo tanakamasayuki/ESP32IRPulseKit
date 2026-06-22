@@ -133,9 +133,9 @@ On ESP32 hardware, use ESP-IDF `ESP_LOGx`.
 
 The full test strategy is in [tests/TEST_PLAN.md](tests/TEST_PLAN.md).
 
-- host: Arduino host runtime assertions for codec, Frame, and fixtures
-- build: compile examples and minimal sketches for ESP32
-- hardware: verify RMT TX/RX paths with two ESP32 boards
+- pc: PC-only automatic tests — `fixtures` (signal data + checks), `codec_smoke` (Arduino host run), `compile` (ESP32 build-only)
+- hardware: two-board RMT TX/RX pass/fail regression
+- studies: on-demand board investigations that record observation logs (not auto-collected)
 - manual: real remotes, distance, ambient light, and other checks that need human observation
 
 ## 12. Timing model: RMT vs timer, and the carrier-phase limit
@@ -178,7 +178,7 @@ to one carrier period.
   transmit-margin workaround, documented in `src/protocols/JVC.h`; all other
   protocols use spec-standard timing. The proper fix would be a phase-aligned,
   symbol-encoded carrier at ~1 µs resolution — a much larger change, deferred.
-  Evidence: `tests/hardware/{carrier_loopback,jvc_timing_sweep,jvc_verify_arduino}`.
+  Evidence: `tests/studies/{carrier_loopback,jvc_timing_sweep,jvc_verify_arduino}`.
 
 ### Why timer-based libraries do not need the JVC tweak
 

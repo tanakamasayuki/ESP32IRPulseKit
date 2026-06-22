@@ -8,26 +8,28 @@
 
 | 種別 | 目的 | 実行環境 |
 | --- | --- | --- |
-| host | codec、protocol spec、frame変換の実行assert | PC上のArduino host + pytest |
-| build | examplesと最小sketchのESP32向けビルド確認 | PC上のpytest + Arduino CLI |
-| hardware | RMT TX/RX、GPIO反転、idle threshold、queue/statの検証 | ESP32実機 + pytest-embedded |
+| pc/fixtures | 信号データのスキーマ・生成式検査 | PC上のpytest |
+| pc/codec_smoke | codec、protocol spec、frame変換の実行assert | PC上のArduino host + pytest |
+| pc/compile | examplesと最小sketchのESP32向けビルド確認 | PC上のpytest + Arduino CLI |
+| hardware | RMT TX/RXの合否回帰（2台構成） | ESP32実機 + pytest-embedded |
+| studies | 観測ログを取るオンデマンドの実機調査 | ESP32実機 + pytest（人が解析） |
 | manual | 市販リモコン、距離/角度、外乱光などの確認 | 人が条件を確認 |
 
-IRは物理環境の影響を受けやすいため、まずhostテストでArduino API前提のままRAW/BITS/Frameのロジックをassertします。buildテストではexamplesや公開ヘッダのESP32向けコンパイルを確認します。RMT依存部分はhardwareで検証します。
+IRは物理環境の影響を受けやすいため、`pc/codec_smoke` でArduino API前提のままRAW/BITS/Frameのロジックをassertします。`pc/compile` ではexamplesや公開ヘッダのESP32向けコンパイルを確認します。RMT依存部分はhardwareで検証します。
 
 ## 実行方針
 
 | 環境 | 実行するテスト |
 | --- | --- |
-| ローカル開発 | host、hardware/link_smoke、hardware/protocol_matrix |
-| GitHub Actions | host、build、fixtures |
-| 必要時 | hardware/compat_matrix、manual |
+| ローカル開発 | pc、hardware/link_smoke、hardware/protocol_matrix |
+| GitHub Actions | pc（fixtures、codec_smoke、compile） |
+| 必要時 | studies、manual |
 
-無指定の `pytest` は使わず、必ず `host`、`build`、`fixtures`、`hardware/link_smoke` のように対象の親ディレクトリを指定します。`hardware/` は実機とローカルSerialポートに依存するため、CI対象にはしません。
+`pc` や `hardware/link_smoke` のようにトップレベルのフォルダを指定します。`studies/` のファイルは `study_*.py` 命名なので自動収集されません。必要時は `-o python_files="study_*.py"` を付けて実行します。`hardware/` と `studies/` は実機とローカルSerialポートに依存するため、CI対象にはしません。
 
 ## 初期カバレッジ
 
-| 機能 | host | build | hardware | manual | 状態 |
+| 機能 | codec_smoke | compile | hardware | manual | 状態 |
 | --- | --- | --- | --- | --- | --- |
 | NEC encode/decode roundtrip | ✅ | ✅ | ✅ NEC smoke | | host/build/2台smoke追加済み |
 | NEC repeat encode/decode | ✅ | | ⬜ | | host smoke追加済み |
@@ -38,7 +40,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 | RC5/RC6 decode | ✅ | | ⬜ | | RC5・RC6_M0・RC6_M6 fixture host test |
 | protocol carrier推奨値 | ✅ | ✅ | ✅ NEC smoke | | 標準protocol値とsender override範囲をhostで確認 |
 | 候補順位・score threshold | ✅ | | | | host smoke追加済み |
-| 緩め候補化とscore劣化 | ⬜ | | ⬜ compat | | ±toleranceを少し超えるRAWを候補に残し、理想波形より低scoreになることを確認する |
+| 緩め候補化とscore劣化 | ⬜ | | ⬜ studies | | ±toleranceを少し超えるRAWを候補に残し、理想波形より低scoreになることを確認する |
 | encode拒否・不正入力 | ✅ | | | | バッファ不足・未知ID・bit長不一致 |
 | RAWのみモード(候補0) | ✅ | | | | host smoke追加済み |
 | tolerance境界 | ✅ | | | | SPACE_ENCの±25%境界をhost smokeで確認 |
@@ -63,7 +65,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 
 `hardware/protocol_matrix/` は自前TX -> 自前RXの複数protocol実機確認です。`link_smoke` より広くprotocol差分を見ます。通常のリリース前確認で実行します。
 
-`hardware/compat_matrix/` は任意の互換性・差分調査用です。親sketchをRX、`peer_tx/` をTXに固定します。peer名を `tx` に固定することで、外部ライブラリ比較を増やしても `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3` を使い回します。`compat_matrix` ではscore、raw_len、decode結果を観測ログとして残し、物理条件や外部ライブラリのtimerばらつきを評価します。
+`studies/compat_matrix/` は任意の互換性・差分調査用です。親sketchをRX、`peer_tx/` をTXに固定します。peer名を `tx` に固定することで、外部ライブラリ比較を増やしても `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3` を使い回します。`compat_matrix` ではscore、raw_len、decode結果を観測ログとして残し、物理条件や外部ライブラリのtimerばらつきを評価します。
 
 標準の自動hardware対象は当面 **ESP32-S3 2台構成** とします。ESP32 classic、ESP32-C3/C6など他SoCは、まず `examples/` とmanual確認で動作を見ます。特定SoCで差分や不具合が見つかった場合に、optional profileまたはmanual testとして昇格します。
 
@@ -78,7 +80,7 @@ IRは物理環境の影響を受けやすいため、まずhostテストでArdui
 
 ## 信号データ
 
-IR信号データは `tests/fixtures/` に置きます。
+IR信号データは `tests/pc/fixtures/` に置きます。
 
 - `generated/`: protocol specとBITSから生成した理想波形
 - `verified/`: 手書きまたはレビュー済みの固定RAW
@@ -98,7 +100,7 @@ decodeはstrictな合否だけでなく、候補化とscore順位を検証しま
 - 明らかに壊れた波形は候補なし、またはscore thresholdで落ちることをassertする
 - SPACE_ENCでは0/1 spaceの中間から十分離れた揺らぎを候補化対象にし、中間付近の曖昧な波形は除外対象にする
 - BIPHASEではhalf-bit/grid構造を保つ揺らぎを候補化対象にし、gridが破綻した波形は除外対象にする
-- hardware/compat_matrixでは外部ライブラリや物理条件で発生した揺らぎを観測し、再現性のあるものはhost fixtureへ昇格する
+- studies/compat_matrixでは外部ライブラリや物理条件で発生した揺らぎを観測し、再現性のあるものは pc/fixtures へ昇格する
 
 ## 優先順
 

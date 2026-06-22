@@ -22,9 +22,8 @@ Tests live under `tests/`.
 cd tests
 cp .env.example .env
 # Edit .env for your local serial ports and GPIOs.
-uv run --env-file .env pytest host
-uv run --env-file .env pytest build
-uv run pytest fixtures
+uv run --env-file .env pytest pc
+uv run --env-file .env pytest hardware/link_smoke
 ```
 
-Do not run bare `pytest`; select `host`, `build`, `fixtures`, or `hardware/link_smoke` explicitly. `host/` is for Arduino host runtime tests, `build/` is for Arduino CLI build tests, and `hardware/` is for ESP32 hardware tests. See [tests/README.md](tests/README.md) for details.
+`pytest pc` runs all PC tests (`fixtures`, `codec_smoke`, `compile`); `hardware/` holds the two-board pass/fail regression tests. Board investigations under `studies/` are not auto-collected (`study_*.py`). See [tests/README.md](tests/README.md) for details.

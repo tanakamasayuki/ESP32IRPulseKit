@@ -133,9 +133,9 @@ ESP32実機ではESP-IDFの `ESP_LOGx` 系を使います。
 
 テスト全体の方針は [tests/TEST_PLAN.ja.md](tests/TEST_PLAN.ja.md) に置きます。
 
-- host: Arduino hostでcodec/Frame/fixtureを実行assert
-- build: examplesと最小sketchをESP32向けにcompile
-- hardware: ESP32実機2台でRMT TX/RX経路を検証
+- pc: 実機なしでPC上で動く自動テスト — `fixtures`（信号データ+検査）、`codec_smoke`（Arduino host実行）、`compile`（ESP32コンパイルのみ）
+- hardware: ESP32実機2台でRMT TX/RXの合否回帰
+- studies: 観測ログを取るオンデマンドの実機調査（自動収集されない）
 - manual: 市販リモコン、距離、外乱光など人手が必要な確認
 
 ## 12. タイミングモデル：RMT vs タイマー と キャリア位相の限界
@@ -169,7 +169,7 @@ ESP32実機ではESP-IDFの `ESP_LOGx` 系を使います。
   （仕様525µs）を送出して受信スペースを窓から離す。これは送信マージンの回避策で、
   `src/protocols/JVC.h` に明記。他プロトコルは仕様標準値を使う。本来の対策は ~1µs
   解像度の位相整合シンボルエンコードキャリアだが大改修のため先送り。根拠は
-  `tests/hardware/{carrier_loopback,jvc_timing_sweep,jvc_verify_arduino}`。
+  `tests/studies/{carrier_loopback,jvc_timing_sweep,jvc_verify_arduino}`。
 
 ### なぜタイマー系ライブラリはJVC調整が要らないか
 
