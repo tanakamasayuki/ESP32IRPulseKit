@@ -61,6 +61,10 @@ CASES = [
     Case("JVC", 0xC0DE),
     Case("RC5", 0x102B),  # 13-bit RC5X value (IRremoteESP8266 representation)
     Case("RC6_M0_16", 0x11234),  # 20-bit RC6 mode-0 value
+    # IRremoteESP8266 transmits a 48-bit Panasonic (Kaseikyo) frame; PulseKit RX
+    # decodes it as AEHA. 0x40040100BCBD is the MSB-first Panasonic value, so the
+    # PulseKit-observed value is the bit-reversed LSB-first form.
+    Case("AEHA", 0x40040100BCBD),
 ]
 
 

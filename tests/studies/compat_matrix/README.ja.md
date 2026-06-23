@@ -41,7 +41,7 @@ READMEに理由と観測ログを残します。
 | SAMSUNG32 | 送受信あり | 送受信あり | 通常互換対象 |
 | SAMSUNG36 | Samsung36 非対応 | `sendSamsung36()` / `decodeSamsung36()` あり | IRremoteESP8266 は通常互換対象。Arduino-IRremote は Samsung36 非対応のため対象外 |
 | JVC | 送受信あり（16bit） | 送受信あり（16bit） | 通常互換対象 |
-| AEHA | Kaseikyo系あり | Panasonic/Kaseikyo系あり | AEHA/Kaseikyo/Panasonic の正準デコーダ。調査候補 |
+| AEHA | Kaseikyo系あり | Panasonic/Kaseikyo系あり | AEHA/Kaseikyo/Panasonic の正準デコーダ。IRremoteESP8266 クロステスト: tx成功、rxはマージナル（マーク幅、下記参照）、selfベースライン |
 | RC5 | 送受信あり | 送受信あり | IRremoteESP8266 クロステスト（rx + tx） |
 | RC6_M0_16 | RC6系あり | RC6系あり | IRremoteESP8266 クロステスト（rx + tx） |
 | RC6_M6_32 | RC6A/RC6系あり | RC6系あり | 調査候補。mode 6A表現差に注意 |
@@ -50,7 +50,9 @@ READMEに理由と観測ログを残します。
 
 1. `RC5` / `RC6_M0_16` を IRremoteESP8266 クロステスト（rx + tx）に追加。
    下記「RC5 / RC6 のバイフェーズ規約」参照。
-2. `AEHA`（Kaseikyo/Panasonic を含む）と `RC6_M6_32` を、外部ライブラリとの対応を先に調査する。
+2. `AEHA`（Kaseikyo/Panasonic）を IRremoteESP8266 クロステスト（rx + tx + self）に追加。
+   下記「AEHA / Kaseikyo / Panasonic」参照。
+3. `RC6_M6_32` を、外部ライブラリとの対応を先に調査する。
 
 ### RC5 / RC6 のバイフェーズ規約
 
@@ -74,8 +76,27 @@ customer-code のパリティニブルを検証し、これが本物の家製協
 
 ビット順：PulseKit は LSB-first、IRremoteESP8266 は MSB-first 格納なので、同じ48bit波形でも
 両者でビット反転して読める（Panasonic のメーカーコードは PulseKit 下位16bit で `0x2002`、
-IRremoteESP8266 上位16bit で `0x4004`）。フィールド/パリティ構造を含む専用 AEHA クロステストは
-将来追加。
+IRremoteESP8266 上位16bit で `0x4004`）。クロステストは同一の物理フレームを、各ライブラリ自身の表現で名付けて送る：tx/self は
+IRremoteESP8266 の Panasonic 値 `0x40040100BCBD`（`sendPanasonic64`）、rx は PulseKit ネイティブ表現
+`0xBD3D802002`（AEHA）= その波形を PulseKit が復号した値そのもの。
+
+観測結果:
+
+- **tx（IRremoteESP8266 → PulseKit）: 成功。** PulseKit が Panasonic フレームを
+  `AEHA len=48 bits=0xBD3D802002`（score ~800）で復号。
+- **rx（PulseKit → IRremoteESP8266）: マージナル／復号せず。** PulseKit は正しい AEHA 波形を
+  送出し IRremoteESP8266 も RX_RAW で捕捉するが、Panasonic として復号されない。原因は
+  ビット順でもチェックサムでもなく**マーク幅**（`decodePanasonic` は非strictでメーカー
+  コード/チェックサムを見ない）。AEHA の仕様マークは 425 µs だが、PulseKit の RMT
+  フリーランキャリアが切り詰め、受信側では平均 ~385 µs・約5%が ~348 µs 未満になる。
+  IRremoteESP8266 の Panasonic は `432 + 50 µs` 付近のマークを期待し ~362 µs 未満を弾くため、
+  48bit 全マーク一致が必要なフレームはほぼ毎回失敗する。DESIGN §12 のキャリア位相による
+  マーク幅問題が別の短マークprotocolで顕在化した形。相互運用のために AEHA 仕様マークは
+  短くしないので、これは記録された非互換のまま（NEC は 560 µs で窓が広く無影響）。
+- **self（IRremoteESP8266 → IRremoteESP8266）: ベースライン**（環境が許せば。48bit フレームは
+  本マトリクスで最も配置に敏感）。
+
+フィールド/パリティ構造を含む専用 AEHA テストは将来追加。
 
 ### SAMSUNG36（2ブロック）
 

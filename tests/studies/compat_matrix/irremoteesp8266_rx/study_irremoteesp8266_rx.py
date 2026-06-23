@@ -60,6 +60,12 @@ CASES = [
     Case("JVC", 0xC0DE),
     Case("RC5", 0x300F),
     Case("RC6_M0_16", 0x11234),
+    # AEHA (家製協) 48-bit frame. PulseKit sends this LSB-first value; it is the
+    # PulseKit-native form of the IRremoteESP8266 Panasonic frame 0x40040100BCBD
+    # (the tx-direction test confirms IRremoteESP8266's sendPanasonic64(0x40040100BCBD)
+    # decodes on PulseKit as 0xBD3D802002). Sending it here reproduces that waveform,
+    # so IRremoteESP8266 reads a valid Panasonic and decodes it as PANASONIC.
+    Case("AEHA", 0xBD3D802002),
 ]
 
 

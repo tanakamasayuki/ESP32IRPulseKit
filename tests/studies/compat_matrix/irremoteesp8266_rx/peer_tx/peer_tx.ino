@@ -136,6 +136,10 @@ void handleSend(const String &line)
   {
     ok = sendBits(esp32irpk::IRProtocolID::RC6_M0_16, 21, bits);
   }
+  else if (protocolText == "AEHA")
+  {
+    ok = sendBits(esp32irpk::IRProtocolID::AEHA, 48, bits);
+  }
   else
   {
     Serial.println("TX_ERROR unsupported_protocol");

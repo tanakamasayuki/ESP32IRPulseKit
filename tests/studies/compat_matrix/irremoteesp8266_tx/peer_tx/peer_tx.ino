@@ -133,6 +133,10 @@ void handleSend(const String &line)
   {
     irsend.sendRC6(bits, 20); // kRC6Mode0Bits
   }
+  else if (protocolText == "AEHA")
+  {
+    irsend.sendPanasonic64(bits, 48); // Kaseikyo/Panasonic 48-bit frame
+  }
   else
   {
     Serial.println("TX_ERROR unsupported_protocol");

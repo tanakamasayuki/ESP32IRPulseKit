@@ -43,7 +43,7 @@ Local library coverage as of 2026-06-18:
 | SAMSUNG32 | TX/RX support | TX/RX support | Normal compatibility target |
 | SAMSUNG36 | Does not support Samsung36 | `sendSamsung36()` / `decodeSamsung36()` exist | Normal compatibility target for IRremoteESP8266. Arduino-IRremote does not support Samsung36, so it is out of scope |
 | JVC | TX/RX support (16-bit) | TX/RX support (16-bit) | Normal compatibility target |
-| AEHA | Kaseikyo family exists | Panasonic/Kaseikyo family exists | Canonical decoder for AEHA/Kaseikyo/Panasonic; investigation candidate |
+| AEHA | Kaseikyo family exists | Panasonic/Kaseikyo family exists | Canonical decoder for AEHA/Kaseikyo/Panasonic; IRremoteESP8266 cross-test: tx works, rx marginal (mark width, see below), self baseline |
 | RC5 | TX/RX support | TX/RX support | IRremoteESP8266 cross-test (rx + tx) |
 | RC6_M0_16 | RC6 family support | RC6 family support | IRremoteESP8266 cross-test (rx + tx) |
 | RC6_M6_32 | RC6A/RC6 family support | RC6 family support | Investigation candidate; watch mode-6A representation |
@@ -52,8 +52,9 @@ Priority:
 
 1. `RC5` and `RC6_M0_16`: in the IRremoteESP8266 cross-tests (rx + tx). See
    "RC5 / RC6 biphase convention" below.
-2. Investigate `AEHA` (incl. Kaseikyo/Panasonic) and `RC6_M6_32` before adding
-   them as required compatibility cases.
+2. `AEHA` (Kaseikyo/Panasonic): in the IRremoteESP8266 cross-tests (rx + tx + self).
+   See "AEHA / Kaseikyo / Panasonic" below.
+3. Investigate `RC6_M6_32` before adding it as a required compatibility case.
 
 ### RC5 / RC6 biphase convention
 
@@ -80,7 +81,31 @@ nibble, which is what distinguishes a real家製協 frame.
 Bit order: PulseKit stores LSB-first, IRremoteESP8266 MSB-first, so the same 48-bit
 waveform reads bit-reversed between them (the Panasonic manufacturer code is
 `0x2002` in PulseKit's low 16 bits and `0x4004` in IRremoteESP8266's high 16 bits).
-A dedicated AEHA cross-test (with the field/parity layout) is a future addition.
+The cross-tests use the same physical frame from both ends, named per each library's
+own representation: tx/self send the IRremoteESP8266 Panasonic value `0x40040100BCBD`
+(via `sendPanasonic64`), and rx sends its PulseKit-native form `0xBD3D802002` (AEHA),
+which is exactly what PulseKit decodes that waveform as.
+
+Observed results:
+
+- **tx (IRremoteESP8266 -> PulseKit): works.** PulseKit decodes the Panasonic frame
+  as `AEHA len=48 bits=0xBD3D802002` (score ~800).
+- **rx (PulseKit -> IRremoteESP8266): marginal / does not decode.** PulseKit emits a
+  correct AEHA waveform (IRremoteESP8266 captures it as RX_RAW), but it is not
+  decoded as Panasonic. Root cause is mark width, not bit order or checksum
+  (`decodePanasonic` runs non-strict, so manufacturer/checksum are not checked):
+  AEHA's spec mark is 425 µs, and PulseKit's RMT free-running carrier truncates it
+  so the receiver measures ~385 µs on average with ~5 % of marks below ~348 µs.
+  IRremoteESP8266's Panasonic decoder expects marks near `432 + 50 µs` excess and
+  rejects anything below ~362 µs; a 48-bit frame needs every mark in range, so it
+  almost always fails. This is the carrier-phase mark-width limitation from
+  DESIGN §12 surfacing on another short-mark protocol. We do not shorten AEHA's
+  spec mark for interop, so this stays a recorded incompatibility (NEC at 560 µs
+  has a wide enough window and is unaffected).
+- **self (IRremoteESP8266 -> IRremoteESP8266): baseline**, environment permitting
+  (the 48-bit frame is the most placement-sensitive case in the matrix).
+
+A dedicated AEHA test of the field/parity layout is still a future addition.
 
 ### SAMSUNG36 (two-block)
 

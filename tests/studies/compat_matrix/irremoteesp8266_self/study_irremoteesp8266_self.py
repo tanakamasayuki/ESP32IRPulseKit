@@ -55,6 +55,9 @@ CASES = [
     Case("SAMSUNG32", 0x40BFE0E0),
     Case("SAMSUNG36", 0xABCDEABCD),
     Case("JVC", 0xC0DE),
+    # IRremoteESP8266 -> IRremoteESP8266 baseline for the 48-bit Panasonic
+    # (Kaseikyo) frame; same-endian, so bits should match and bit_order=same.
+    Case("AEHA", 0x40040100BCBD),
 ]
 
 
