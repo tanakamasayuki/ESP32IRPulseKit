@@ -13,10 +13,10 @@ const bool kIrTxInverted = atoi(IR_TX_INVERTED) != 0;
 
 esp32irpk::IRSender tx(kIrTxGpio, kIrTxInverted);
 
-// Carrier generation mode. Default false = hardware (free-running) carrier,
-// i.e. unchanged behavior. "CARRIER pa" flips to the experimental phase-aligned
-// path to re-measure interop (see studies/phase_aligned_carrier).
-bool g_phaseAligned = false;
+// Carrier generation mode. Default true = phase-aligned, matching the library
+// default. "CARRIER hw" flips to the free-running hardware-carrier fallback to
+// re-measure interop (see studies/phase_aligned_carrier).
+bool g_phaseAligned = true;
 bool g_begun = false;
 
 namespace
@@ -219,7 +219,7 @@ void setup()
 {
   Serial.begin(115200);
   delay(5000);
-  if (!ensureMode(false)) // default: hardware carrier (unchanged behavior)
+  if (!ensureMode(true)) // default: phase-aligned carrier (matches library default)
   {
     Serial.println("TX_ERROR begin_failed");
     return;

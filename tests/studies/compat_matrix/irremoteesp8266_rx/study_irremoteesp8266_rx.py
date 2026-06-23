@@ -6,10 +6,10 @@ import pytest
 from pexpect import EOF, TIMEOUT
 
 
-# PulseKit TX carrier mode for this run: "hw" (default, free-running hardware
-# carrier) or "pa" (experimental phase-aligned). Set PULSEKIT_CARRIER=pa to
-# re-measure interop with the phase-aligned path (see studies/phase_aligned_carrier).
-CARRIER_MODE = os.environ.get("PULSEKIT_CARRIER", "hw")
+# PulseKit TX carrier mode for this run. Default "pa" matches the library default
+# (phase-aligned). Set PULSEKIT_CARRIER=hw to re-measure interop with the
+# free-running hardware-carrier fallback (see studies/phase_aligned_carrier).
+CARRIER_MODE = os.environ.get("PULSEKIT_CARRIER", "pa")
 
 
 def bit_reverse(value: int, bit_length: int) -> int:
