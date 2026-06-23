@@ -1,4 +1,5 @@
 import re
+import time
 from dataclasses import dataclass
 
 import pytest
@@ -13,6 +14,12 @@ IMPL = "Arduino-IRremote"
 
 TRIALS = 5
 PASS_MIN = 3
+
+# Gap between trials. Arduino-IRremote flags an identical frame that arrives within
+# the NEC repeat window (~110ms) as a repeat (protocol OTHER_8, type=REPEAT), which
+# try_decode_once discards -- making a perfectly received NEC frame look like a
+# decode miss. Spacing trials past that window keeps each send an independent frame.
+INTER_TRIAL_GAP_S = 0.5
 
 
 def bit_reverse(value: int, bit_length: int) -> int:
@@ -104,7 +111,9 @@ def decode_best_of_n(tx, rx, case: Case):
     case, while a genuinely unusable link (never decodes) still fails."""
     n_ok = 0
     last = None
-    for _ in range(TRIALS):
+    for i in range(TRIALS):
+        if i:
+            time.sleep(INTER_TRIAL_GAP_S)
         tx.write(f"SEND {case.protocol} {case.bits:x}\n")
         try:
             tx.expect_exact(f"TX_OK {case.protocol} {case.bits:x}", timeout=5)
