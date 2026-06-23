@@ -22,8 +22,8 @@ namespace esp32irpk::hal
   // TX carrier generation method.
   enum class TxCarrierMode
   {
-    Hardware,     // rmt_apply_carrier(): free-running HW carrier gated onto marks (default)
-    PhaseAligned, // carrier encoded as phase-aligned symbols (experimental); see DESIGN §12
+    PhaseAligned, // carrier encoded as phase-aligned symbols (default); see DESIGN §12
+    Hardware,     // rmt_apply_carrier(): free-running HW carrier gated onto marks
   };
 
   // Internal RMT TX/RX wrapper. Public encoding/decoding stays in codec/.
@@ -46,7 +46,7 @@ namespace esp32irpk::hal
     bool isSending() const { return sending_; }
 
   private:
-    TxCarrierMode carrier_mode_ = TxCarrierMode::Hardware;
+    TxCarrierMode carrier_mode_ = TxCarrierMode::PhaseAligned;
     uint8_t tx_mem_blocks_ = 0; // 0 = library default; else RMT blocks for TX
     int gpio_ = -1;
     bool inverted_ = false;

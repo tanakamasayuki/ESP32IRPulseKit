@@ -223,7 +223,7 @@ void setup()
 {
   Serial.begin(115200);
   delay(5000);
-  if (!ensureMode(false)) // default: hardware carrier (unchanged behavior)
+  if (!ensureMode(true)) // default: phase-aligned carrier (matches library default)
   {
     Serial.println("TX_ERROR begin_failed");
     return;
