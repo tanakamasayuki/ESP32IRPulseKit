@@ -182,14 +182,17 @@ namespace esp32irpk::hal
     const bool phase_aligned = (carrier_mode_ == TxCarrierMode::PhaseAligned);
 
     // One RMT block = SOC_RMT_MEM_WORDS_PER_CHANNEL symbols (64 on ESP32/S2,
-    // 48 elsewhere). PhaseAligned streams ~1 symbol per carrier cycle, so it
-    // wants more blocks for refill headroom; the hardware path keeps one block.
-    // setTxMemBlocks() overrides the default but stays within the shared TX pool.
+    // 48 elsewhere). Default is a single block for both paths: even PhaseAligned
+    // (which streams ~1 symbol per carrier cycle) transmits cleanly on one block
+    // under normal interrupt load — the refill ISR runs in ~µs, well inside the
+    // ~0.6-0.8ms drain. setTxMemBlocks() adds refill headroom for applications
+    // with heavy ISR contention (flash writes, WiFi/BT), at the cost of the
+    // shared RMT TX memory pool.
     uint32_t mem_words;
     if (tx_mem_blocks_ > 0)
       mem_words = static_cast<uint32_t>(tx_mem_blocks_) * SOC_RMT_MEM_WORDS_PER_CHANNEL;
     else
-      mem_words = (phase_aligned ? 2u : 1u) * SOC_RMT_MEM_WORDS_PER_CHANNEL;
+      mem_words = SOC_RMT_MEM_WORDS_PER_CHANNEL;
 
     rmt_tx_channel_config_t cfg = {};
     cfg.clk_src = selectRmtClkSrc();

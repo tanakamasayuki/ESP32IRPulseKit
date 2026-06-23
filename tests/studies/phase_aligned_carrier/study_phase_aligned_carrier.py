@@ -24,6 +24,10 @@ CARRIER_HZ = int(os.environ.get("PA_CARRIER_HZ", "38000"))
 DUTY = float(os.environ.get("PA_DUTY", "33"))
 FRAMES = int(os.environ.get("PA_FRAMES", "20"))
 CSV_PATH = os.environ.get("PA_CSV", "/tmp/phase_aligned_carrier.csv")
+# RMT TX mem-block counts to sweep (peer "BLOCKS <n>"; 0 = library default).
+# Set e.g. PA_BLOCKS="1,2,4" to probe how few blocks still transmit cleanly:
+# an underrun shows up as fewer valid frames / a wrong modal length.
+BLOCKS = [int(x) for x in os.environ.get("PA_BLOCKS", "0").split(",") if x != ""]
 
 
 RX_JITTER = re.compile(
@@ -33,6 +37,15 @@ TX_OK = re.compile(
     rb"TX_OK mode=(?P<mode>hw|pa) mark=(?P<mark>\d+) hz=(?P<hz>\d+) duty=(?P<duty>[0-9.]+)"
 )
 TX_READY = re.compile(rb"TX_READY impl=ESP32IRPulseKit .*resolution_us=1")
+BLOCKS_OK = re.compile(rb"BLOCKS_OK n=(?P<n>\d+)")
+
+
+def set_blocks(tx, n):
+    tx.write(f"BLOCKS {n}\n")
+    try:
+        tx.expect(BLOCKS_OK, timeout=6)
+    except (EOF, TIMEOUT):
+        pass
 
 
 def wait_boards_ready(dut, peers):
@@ -123,44 +136,51 @@ def test_phase_aligned_vs_hardware_carrier(dut, peers, record_property):
         if parent:
             os.makedirs(parent, exist_ok=True)
         csv_file = open(CSV_PATH, "w", encoding="utf-8")
-        csv_file.write("mode,mark_us,carrier_hz,duty_pct,frames,"
+        csv_file.write("blocks,mode,mark_us,carrier_hz,duty_pct,frames,"
                        "mark_mean_us,mark_sd_us,mark_max_ptp_us\n")
         csv_file.flush()
     except OSError as exc:
         print(f"PHASE_ALIGNED_CSV_ERROR {exc}")
 
-    results = {}  # (mode, mark) -> stats
-    for mark in MARKS:
-        for mode in MODES:
-            aligned = collect_point(tx, rx, mode, mark, CARRIER_HZ, DUTY, FRAMES)
-            if len(aligned) < 3:
-                print(f"PHASE_ALIGNED mode={mode} mark={mark} "
-                      f"frames={len(aligned)} INSUFFICIENT")
-                continue
-            stats = mark_jitter(aligned, mark)
-            if not stats:
-                print(f"PHASE_ALIGNED mode={mode} mark={mark} NO_MARK_EDGES")
-                continue
-            results[(mode, mark)] = stats
-            if csv_file:
-                csv_file.write(
-                    f"{mode},{mark},{CARRIER_HZ},{DUTY:g},{len(aligned)},"
-                    f"{stats['mark_mean']:.1f},{stats['mark_sd']:.2f},"
-                    f"{stats['mark_max_ptp']}\n")
-                csv_file.flush()
-            print(f"PHASE_ALIGNED mode={mode} mark={mark} frames={len(aligned)} "
-                  f"mark_mean={stats['mark_mean']:.1f} mark_sd={stats['mark_sd']:.2f} "
-                  f"mark_max_ptp={stats['mark_max_ptp']}")
+    results = {}  # (blocks, mode, mark) -> stats
+    for blocks in BLOCKS:
+        set_blocks(tx, blocks)
+        for mark in MARKS:
+            for mode in MODES:
+                aligned = collect_point(tx, rx, mode, mark, CARRIER_HZ, DUTY, FRAMES)
+                # frames < FRAMES (esp. for pa) can signal a refill underrun at
+                # this block count; report the captured count either way.
+                if len(aligned) < 3:
+                    print(f"PHASE_ALIGNED blocks={blocks} mode={mode} mark={mark} "
+                          f"frames={len(aligned)} INSUFFICIENT")
+                    continue
+                stats = mark_jitter(aligned, mark)
+                if not stats:
+                    print(f"PHASE_ALIGNED blocks={blocks} mode={mode} mark={mark} "
+                          f"NO_MARK_EDGES")
+                    continue
+                results[(blocks, mode, mark)] = stats
+                if csv_file:
+                    csv_file.write(
+                        f"{blocks},{mode},{mark},{CARRIER_HZ},{DUTY:g},{len(aligned)},"
+                        f"{stats['mark_mean']:.1f},{stats['mark_sd']:.2f},"
+                        f"{stats['mark_max_ptp']}\n")
+                    csv_file.flush()
+                print(f"PHASE_ALIGNED blocks={blocks} mode={mode} mark={mark} "
+                      f"frames={len(aligned)}/{FRAMES} "
+                      f"mark_mean={stats['mark_mean']:.1f} mark_sd={stats['mark_sd']:.2f} "
+                      f"mark_max_ptp={stats['mark_max_ptp']}")
 
-    # Side-by-side hw vs pa per mark width.
-    for mark in MARKS:
-        hw = results.get(("hw", mark))
-        pa = results.get(("pa", mark))
-        if hw and pa:
-            print(f"PHASE_ALIGNED_COMPARE mark={mark} "
-                  f"hw_sd={hw['mark_sd']:.2f} pa_sd={pa['mark_sd']:.2f} "
-                  f"hw_ptp={hw['mark_max_ptp']} pa_ptp={pa['mark_max_ptp']} "
-                  f"hw_mean={hw['mark_mean']:.1f} pa_mean={pa['mark_mean']:.1f}")
+    # Side-by-side hw vs pa per (block count, mark width).
+    for blocks in BLOCKS:
+        for mark in MARKS:
+            hw = results.get((blocks, "hw", mark))
+            pa = results.get((blocks, "pa", mark))
+            if hw and pa:
+                print(f"PHASE_ALIGNED_COMPARE blocks={blocks} mark={mark} "
+                      f"hw_sd={hw['mark_sd']:.2f} pa_sd={pa['mark_sd']:.2f} "
+                      f"hw_ptp={hw['mark_max_ptp']} pa_ptp={pa['mark_max_ptp']} "
+                      f"hw_mean={hw['mark_mean']:.1f} pa_mean={pa['mark_mean']:.1f}")
 
     if csv_file:
         csv_file.close()
@@ -168,9 +188,10 @@ def test_phase_aligned_vs_hardware_carrier(dut, peers, record_property):
 
     record_property("modes", MODES)
     record_property("marks", MARKS)
+    record_property("blocks", BLOCKS)
     record_property("points", len(results))
 
     # Observation study: require only that we collected data for both modes so the
     # comparison is meaningful. Whether pa actually beats hw is read from the log.
-    assert any(k[0] == "hw" for k in results), "no hardware-carrier points collected"
-    assert any(k[0] == "pa" for k in results), "no phase-aligned points collected"
+    assert any(k[1] == "hw" for k in results), "no hardware-carrier points collected"
+    assert any(k[1] == "pa" for k in results), "no phase-aligned points collected"

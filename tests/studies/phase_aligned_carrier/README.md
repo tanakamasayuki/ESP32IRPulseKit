@@ -43,6 +43,8 @@ refill the channel memory throughout the frame. The block count
 (`IRSender::setTxMemBlocks(n)`, 1 block = `SOC_RMT_MEM_WORDS_PER_CHANNEL` = 64 on
 ESP32/S2, 48 elsewhere) sets the refill headroom: bigger blocks mean a longer
 safe interval but consume the shared RMT TX memory pool. The peer accepts a
-`BLOCKS <n>` serial command (0 = library default = 2 blocks for phase-aligned) so
-you can probe how few blocks still transmit cleanly before committing a default.
+`BLOCKS <n>` serial command (0 = library default = 1 block) so you can probe how
+many blocks a given application load needs. Measured low-load result: 1 block
+transmits cleanly (20/20 frames) with the same jitter as 2/4 blocks, so the
+default is 1; raise it with `setTxMemBlocks(n)` for heavy-ISR-load apps.
 
