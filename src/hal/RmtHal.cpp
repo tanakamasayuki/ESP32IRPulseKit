@@ -164,6 +164,14 @@ namespace esp32irpk::hal
     return true;
   }
 
+  bool RmtTx::setTxMemBlocks(uint8_t blocks)
+  {
+    if (begun_)
+      return false; // channel memory is fixed at channel creation
+    tx_mem_blocks_ = blocks;
+    return true;
+  }
+
   bool RmtTx::begin(int gpio, bool inverted)
   {
     if (begun_)
@@ -173,10 +181,20 @@ namespace esp32irpk::hal
 
     const bool phase_aligned = (carrier_mode_ == TxCarrierMode::PhaseAligned);
 
+    // One RMT block = SOC_RMT_MEM_WORDS_PER_CHANNEL symbols (64 on ESP32/S2,
+    // 48 elsewhere). PhaseAligned streams ~1 symbol per carrier cycle, so it
+    // wants more blocks for refill headroom; the hardware path keeps one block.
+    // setTxMemBlocks() overrides the default but stays within the shared TX pool.
+    uint32_t mem_words;
+    if (tx_mem_blocks_ > 0)
+      mem_words = static_cast<uint32_t>(tx_mem_blocks_) * SOC_RMT_MEM_WORDS_PER_CHANNEL;
+    else
+      mem_words = (phase_aligned ? 2u : 1u) * SOC_RMT_MEM_WORDS_PER_CHANNEL;
+
     rmt_tx_channel_config_t cfg = {};
     cfg.clk_src = selectRmtClkSrc();
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
-    cfg.mem_block_symbols = 64;
+    cfg.mem_block_symbols = mem_words;
     cfg.resolution_hz = phase_aligned ? kRmtResolutionHzFine : kRmtResolutionHz;
     cfg.trans_queue_depth = 2;
     cfg.flags.invert_out = inverted_;
@@ -590,6 +608,14 @@ namespace esp32irpk::hal
     if (begun_)
       return false;
     carrier_mode_ = mode;
+    return true;
+  }
+
+  bool RmtTx::setTxMemBlocks(uint8_t blocks)
+  {
+    if (begun_)
+      return false;
+    tx_mem_blocks_ = blocks;
     return true;
   }
 

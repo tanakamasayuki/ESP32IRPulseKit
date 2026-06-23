@@ -104,6 +104,13 @@ namespace esp32irpk
                                          : hal::TxCarrierMode::Hardware);
   }
 
+  bool IRSender::setTxMemBlocks(uint8_t blocks)
+  {
+    if (begun_)
+      return false; // channel memory is fixed at begin()
+    return rmt_tx_.setTxMemBlocks(blocks);
+  }
+
   bool IRSender::addProtocol(const IRProtocolSpec &spec)
   {
     if (begun_)

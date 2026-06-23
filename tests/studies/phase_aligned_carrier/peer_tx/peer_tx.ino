@@ -28,6 +28,7 @@ const bool kIrTxInverted = atoi(IR_TX_INVERTED) != 0;
 esp32irpk::IRSender tx(kIrTxGpio, kIrTxInverted);
 bool g_begun = false;
 bool g_phaseAligned = false;
+uint8_t g_blocks = 0; // RMT TX mem blocks; 0 = library default
 
 // NEC-shaped RAW in 10us library ticks (mark-first): header + 32 bits + trailer.
 const uint16_t kHeaderMarkTicks = 900;  // 9000 us
@@ -90,6 +91,7 @@ namespace
       g_begun = false;
     }
     tx.setPhaseAlignedCarrier(phaseAligned);
+    tx.setTxMemBlocks(g_blocks);
     if (!tx.begin())
       return false;
     g_begun = true;
@@ -182,6 +184,25 @@ namespace
     if (line.startsWith("SEND "))
     {
       handleSend(line);
+      return;
+    }
+    if (line.startsWith("BLOCKS "))
+    {
+      int pos = String("BLOCKS").length();
+      String n;
+      if (!nextToken(line, pos, n))
+      {
+        Serial.println("TX_ERROR invalid_blocks");
+        return;
+      }
+      g_blocks = (uint8_t)n.toInt();
+      if (g_begun) // re-open on next SEND with the new block count
+      {
+        tx.end();
+        g_begun = false;
+      }
+      Serial.print("BLOCKS_OK n=");
+      Serial.println(g_blocks);
       return;
     }
     Serial.print("TX_ERROR unknown_command ");

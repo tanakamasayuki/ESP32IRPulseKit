@@ -236,6 +236,12 @@ namespace esp32irpk
     // the free-running hardware carrier (see DESIGN §12). Must be called before
     // begin(); returns false once begun.
     bool setPhaseAlignedCarrier(bool enable);
+    // Number of RMT memory blocks for the TX channel (1 block =
+    // SOC_RMT_MEM_WORDS_PER_CHANNEL symbols). Larger values give the
+    // phase-aligned path more refill headroom but consume the shared RMT TX
+    // memory pool, leaving fewer blocks for other channels. 0 = library default.
+    // Must be called before begin().
+    bool setTxMemBlocks(uint8_t blocks);
 
     bool addProtocol(const IRProtocolSpec &spec);
     bool clearProtocols();

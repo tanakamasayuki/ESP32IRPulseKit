@@ -35,3 +35,14 @@ Read the `PHASE_ALIGNED_COMPARE mark=… hw_sd=… pa_sd=…` lines: if `pa_sd` 
 and is a candidate to become the default carrier path (and to retire the JVC
 timing tweak / fix AEHA→IRremoteESP8266). Tune the sweep with `PA_MARKS`,
 `PA_CARRIER_HZ`, `PA_DUTY`, `PA_FRAMES`.
+
+## RMT memory blocks
+
+The phase-aligned path streams ~1 symbol per carrier cycle, so the driver must
+refill the channel memory throughout the frame. The block count
+(`IRSender::setTxMemBlocks(n)`, 1 block = `SOC_RMT_MEM_WORDS_PER_CHANNEL` = 64 on
+ESP32/S2, 48 elsewhere) sets the refill headroom: bigger blocks mean a longer
+safe interval but consume the shared RMT TX memory pool. The peer accepts a
+`BLOCKS <n>` serial command (0 = library default = 2 blocks for phase-aligned) so
+you can probe how few blocks still transmit cleanly before committing a default.
+

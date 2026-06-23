@@ -35,6 +35,11 @@ namespace esp32irpk::hal
     // Selects the carrier generation method. Must be called before begin(),
     // because PhaseAligned needs a finer channel resolution (1 us vs 10 us).
     bool setCarrierMode(TxCarrierMode mode);
+    // Number of RMT memory blocks for the TX channel (1 block =
+    // SOC_RMT_MEM_WORDS_PER_CHANNEL symbols). More blocks lengthen the refill
+    // interval for the PhaseAligned path but consume the shared RMT TX memory
+    // pool. 0 = library default. Must be called before begin().
+    bool setTxMemBlocks(uint8_t blocks);
     bool applyCarrierHz(uint32_t carrier_hz);
     bool setCarrierDuty(float duty); // 0 < duty < 1; applied on next send
     bool send(const esp32irpk::IRRawTickView &raw, int8_t repeat_count, uint32_t carrier_hz);
@@ -42,6 +47,7 @@ namespace esp32irpk::hal
 
   private:
     TxCarrierMode carrier_mode_ = TxCarrierMode::Hardware;
+    uint8_t tx_mem_blocks_ = 0; // 0 = library default; else RMT blocks for TX
     int gpio_ = -1;
     bool inverted_ = false;
     bool begun_ = false;

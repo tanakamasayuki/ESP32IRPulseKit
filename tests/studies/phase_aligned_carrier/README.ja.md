@@ -31,3 +31,12 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" studies/phase_alig
 `hw_*` より明確に小さければ、位相整合パスがぶれを解消しており、既定キャリアパスへの
 採用候補になります（JVCタイミング調整の撤去・AEHA→IRremoteESP8266 の改善にもつながる）。
 スイープは `PA_MARKS` / `PA_CARRIER_HZ` / `PA_DUTY` / `PA_FRAMES` で調整します。
+
+## RMTメモリブロック
+
+位相整合パスはキャリア1サイクル≒1シンボルで送るため、フレーム中ずっとドライバが
+チャネルメモリを継ぎ足します。ブロック数（`IRSender::setTxMemBlocks(n)`、1ブロック=
+`SOC_RMT_MEM_WORDS_PER_CHANNEL`＝ESP32/S2で64・他で48）が継ぎ足し余裕を決めます。
+大きいほど安全側だが共有RMT TXメモリプールを消費します。peer は `BLOCKS <n>` コマンドを
+受け付ける（0=ライブラリ既定=位相整合で2ブロック）ので、既定値を決める前に「何ブロックまで
+減らしてもきれいに送れるか」を実機で詰められます。
