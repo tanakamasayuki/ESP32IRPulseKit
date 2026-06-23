@@ -1,8 +1,15 @@
+import os
 import re
 from dataclasses import dataclass
 
 import pytest
 from pexpect import EOF, TIMEOUT
+
+
+# PulseKit TX carrier mode for this run: "hw" (default, free-running hardware
+# carrier) or "pa" (phase-aligned). Set PULSEKIT_CARRIER=pa to run the whole
+# self-matrix under the phase-aligned path (see studies/phase_aligned_carrier).
+CARRIER_MODE = os.environ.get("PULSEKIT_CARRIER", "hw")
 
 
 RX_DECODE = re.compile(
@@ -54,6 +61,13 @@ def assert_serial_control(tx, rx):
     rx.expect_exact("PONG", timeout=5)
 
 
+def set_pulsekit_carrier(tx, mode):
+    """Select the PulseKit TX carrier mode on the peer (hw|pa). A pa switch
+    re-creates the TX channel, so allow extra time for the reply."""
+    tx.write(f"CARRIER {mode}\n")
+    tx.expect(re.compile(rb"CARRIER_OK mode=(hw|pa)"), timeout=10)
+
+
 TRIALS = 5
 PASS_MIN = 3
 
@@ -97,6 +111,7 @@ def decode_best_of_n(tx, rx, case: Case):
 def test_protocol_matrix_tx_rx(dut, peers, case, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
+    set_pulsekit_carrier(tx, CARRIER_MODE)
 
     observed, n_ok = decode_best_of_n(tx, rx, case)
     record_property("decode_ratio", f"{n_ok}/{TRIALS}")
@@ -107,11 +122,12 @@ def test_protocol_matrix_tx_rx(dut, peers, case, record_property):
             pytrace=False,
         )
     record_property("protocol", case.protocol)
+    record_property("pulsekit_carrier", CARRIER_MODE)
     record_property("bits", f"0x{case.bits:x}")
     record_property("score", observed["score"])
     record_property("raw_len", observed["raw_len"])
     print(
-        f"PROTOCOL_MATRIX_OBSERVED protocol={case.protocol} "
+        f"PROTOCOL_MATRIX_OBSERVED carrier={CARRIER_MODE} protocol={case.protocol} "
         f"bits=0x{case.bits:x} score={observed['score']} raw_len={observed['raw_len']}"
     )
     # Keep this assertion loose: the matrix is for compatibility investigation,
