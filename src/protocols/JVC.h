@@ -50,7 +50,7 @@ namespace esp32irpk::specs
       .family           = IRProtocolFamily::NEC_LIKE,
       .header           = {.mark_us = 8400, .space_us = 4200},
       .one              = {.mark_us =  525, .space_us = 1575},
-      .zero             = {.mark_us =  525, .space_us =  480}, // spec 525; detuned -45us, see note above
+      .zero             = {.mark_us =  525, .space_us =  525}, // B-EXPERIMENT: spec value (was detuned 480) to validate under phase-aligned carrier
       .trailer          = {.mark_us =  525, .space_us =    0},
       .gap_threshold_us = 20000,
       .idle_threshold_us= 42000,
