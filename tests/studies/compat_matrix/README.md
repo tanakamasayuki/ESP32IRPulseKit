@@ -122,6 +122,26 @@ Against an external library that also implements Samsung36 (IRremoteESP8266) the
 cross-test observes `bit_order = same`. Arduino-IRremote does not support Samsung36,
 so it is not part of this cross-test.
 
+### Arduino-IRremote self-test: known baseline reds
+
+`arduino_irremote_self` (Arduino-IRremote TX → Arduino-IRremote RX, PulseKit not
+involved) leaves a few cases red. These reflect Arduino-IRremote's own decoder, not
+PulseKit interop:
+
+- **SONY12 / SONY15 / SONY20**: the RX receives the frame cleanly (a well-formed
+  `RX_RAW` is dumped) but Arduino-IRremote's Sony decoder rejects it. The TSOP demod
+  inflates the 600 µs SIRC space toward ~800 µs, past that decoder's space tolerance.
+  Both cross directions decode Sony (our TX → Arduino RX, Arduino TX → our RX), so
+  PulseKit's Sony is interoperable; only Arduino-IRremote decoding its own transmitter
+  fails here. The inflation scales with placement, so this case **can pass at a
+  favorable distance/alignment** — treat the red as environment-dependent, not fixed.
+- **SAMSUNG36**: Arduino-IRremote does not implement the two-block Samsung36 form, so
+  it cannot decode the frame (same reason it is out of scope for the cross-test).
+
+NEC self is green: identical frames sent within Arduino-IRremote's ~110 ms NEC repeat
+window are flagged as repeats (`OTHER_8` / `REPEAT`) and discarded by the harness, so
+the studies space trials by `INTER_TRIAL_GAP_S` to keep each send an independent frame.
+
 ## Current findings & hypotheses (NEC, as of 2026-06-18)
 
 Running the NEC case at a **very short TX↔RX distance (<10 cm)** gives 2 of 4

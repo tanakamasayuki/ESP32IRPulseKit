@@ -6,10 +6,21 @@ import pytest
 from pexpect import EOF, TIMEOUT
 
 # Self-test baseline: the SAME library transmits and receives (peer TX and the
-# primary RX are both Arduino-IRremote). If a case fails here, the placement/environment
-# is too harsh for the library to even decode its own transmitter -- which
-# isolates environment problems from cross-implementation (ESP32IRPulseKit)
-# timing/duty differences seen in the other compat_matrix variants.
+# primary RX are both Arduino-IRremote). A failure here usually means the
+# placement/environment is too harsh for the library to even decode its own
+# transmitter -- which isolates environment problems from cross-implementation
+# (ESP32IRPulseKit) timing/duty differences seen in the other compat_matrix variants.
+#
+# Known baseline reds (Arduino-IRremote's own decoder, unrelated to PulseKit; see
+# compat_matrix/README.md "Arduino-IRremote self-test: known baseline reds"):
+#   - SONY12/15/20: the frame is received cleanly (RX_RAW dumped) but Arduino-IRremote's
+#     Sony decoder rejects it -- the TSOP demod inflates the 600us SIRC space toward
+#     ~800us, past that decoder's space tolerance. Both cross directions decode Sony,
+#     so this is Arduino-IRremote decoding its own transmitter, not a PulseKit issue.
+#     The inflation scales with placement, so this case CAN pass at a favorable
+#     distance/alignment -- the red is environment-dependent, not fixed.
+#   - SAMSUNG36: Arduino-IRremote does not implement the two-block Samsung36 form, so it
+#     cannot decode the frame (same reason it is out of scope for the cross-test).
 IMPL = "Arduino-IRremote"
 
 TRIALS = 5

@@ -112,6 +112,26 @@ MSB-first格納（`bits[35..20]`=address/ブロック1、`bits[19..0]`=command/�
 `bit_order = same` を観測する。Arduino-IRremote は Samsung36 非対応のため、本クロステスト
 の対象外。
 
+### Arduino-IRremote self テスト：既知のベースライン赤
+
+`arduino_irremote_self`（Arduino-IRremote TX → Arduino-IRremote RX、PulseKit 不関与）
+はいくつかのケースが赤のまま残る。これらは Arduino-IRremote 自身のデコーダ特性であり、
+PulseKit の互換性とは無関係：
+
+- **SONY12 / SONY15 / SONY20**：RX はフレームをきれいに受信している（整形された `RX_RAW`
+  が出力される）が、Arduino-IRremote の Sony デコーダが弾く。TSOP 復調が SIRC の 600 µs
+  スペースを ~800 µs まで膨張させ、そのデコーダのスペース許容を超えるため。クロスは双方向で
+  Sony を decode する（PulseKit TX → Arduino RX、Arduino TX → PulseKit RX）ので PulseKit の
+  Sony は互換。ここで落ちるのは Arduino-IRremote が自分の送信を受けきれないケースのみ。膨張は
+  設置距離に依存するため、**近距離・良好なアライメントでは通り得る** — この赤は固定ではなく
+  環境依存。
+- **SAMSUNG36**：Arduino-IRremote は2ブロック Samsung36 を実装しておらず decode できない
+  （クロステスト対象外と同じ理由）。
+
+NEC self は緑：Arduino-IRremote の ~110 ms NEC リピート窓内に届いた同一フレームはリピート
+（`OTHER_8` / `REPEAT`）扱いとなり harness が破棄するため、各スタディは `INTER_TRIAL_GAP_S`
+で試行間隔を空け、各送信を独立フレームとして扱う。
+
 ## 現時点の所見と仮説（NEC、2026-06-18時点）
 
 **TX↔RX を極端に近づけた（<10cm）**状態でNECを流すと、4方向のうち2方向が失敗、
