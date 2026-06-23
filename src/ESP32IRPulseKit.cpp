@@ -96,6 +96,14 @@ namespace esp32irpk
     return true;
   }
 
+  bool IRSender::setPhaseAlignedCarrier(bool enable)
+  {
+    if (begun_)
+      return false; // channel resolution is fixed at begin()
+    return rmt_tx_.setCarrierMode(enable ? hal::TxCarrierMode::PhaseAligned
+                                         : hal::TxCarrierMode::Hardware);
+  }
+
   bool IRSender::addProtocol(const IRProtocolSpec &spec)
   {
     if (begun_)

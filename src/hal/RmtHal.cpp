@@ -1,6 +1,7 @@
 #include "RmtHal.h"
 #include "../ESP32IRPulseKit.h"
 
+#include <algorithm>
 #include <vector>
 #include <utility>
 
@@ -24,6 +25,9 @@ namespace esp32irpk::hal
     constexpr const char *kTag = "ESP32IRPulseKit";
     // RMT resolution: 100kHz (1 tick = 10us). Clock source is selected per SoC.
     constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us (RMT resolution)
+    // Fine resolution for the phase-aligned carrier path: 1MHz (1 tick = 1us),
+    // so a carrier half-cycle (~13us at 38kHz) is representable as RMT symbols.
+    constexpr uint32_t kRmtResolutionHzFine = 1000000; // 1 tick = 1us
     constexpr uint32_t kRmtTickUs = 10;
     constexpr uint32_t kDefaultCarrierFrequencyHz = 38000;
     constexpr size_t kMaxRxSymbols = 256;
@@ -63,7 +67,102 @@ namespace esp32irpk::hal
       }
       return syms;
     }
+
+    // Phase-aligned carrier path. Channel runs at 1us resolution. Each mark is
+    // expanded into an integer number of full carrier cycles starting at phase 0
+    // (level high then low), so the demodulated mark length is deterministic and
+    // free of the free-running-carrier ±1-cycle wobble. Spaces (and solid marks
+    // when carrier_hz == 0) are emitted as level runs. Durations are in 1us ticks.
+    std::vector<rmt_symbol_word_t> toCarrierSymbols(const esp32irpk::IRRawTickView &raw,
+                                                    uint32_t carrier_hz, float duty,
+                                                    bool mark_high)
+    {
+      constexpr uint32_t kMaxDur = 0x7FFF; // RMT duration field limit (1us units)
+      std::vector<rmt_symbol_word_t> syms;
+      const uint8_t mark_lvl = mark_high ? 1 : 0;
+      const uint8_t space_lvl = mark_high ? 0 : 1;
+
+      // Carrier cell in 1us ticks (duty = high fraction). 0 -> solid marks.
+      uint32_t period = (carrier_hz > 0) ? (1000000u + carrier_hz / 2) / carrier_hz : 0;
+      uint16_t hi = 0, lo = 0;
+      if (period > 0)
+      {
+        if (period > 2 * kMaxDur)
+          period = 2 * kMaxDur;
+        uint32_t high = static_cast<uint32_t>(period * duty + 0.5f);
+        if (high < 1)
+          high = 1;
+        if (high >= period)
+          high = period - 1;
+        hi = static_cast<uint16_t>(high);
+        lo = static_cast<uint16_t>(period - high);
+      }
+
+      // Emit a single-level run of `us` microseconds, packing two halves per
+      // symbol and never emitting a zero duration mid-stream (which the RMT HW
+      // treats as an end marker).
+      auto pushRun = [&](uint8_t level, uint32_t us)
+      {
+        while (us > 0)
+        {
+          uint32_t d0 = std::min<uint32_t>(us, kMaxDur);
+          us -= d0;
+          uint32_t d1 = std::min<uint32_t>(us, kMaxDur);
+          us -= d1;
+          if (d1 == 0 && d0 > 1)
+          {
+            d1 = d0 / 2;
+            d0 -= d1;
+          }
+          rmt_symbol_word_t s{};
+          s.level0 = level;
+          s.duration0 = static_cast<uint16_t>(d0);
+          s.level1 = level;
+          s.duration1 = static_cast<uint16_t>(d1 ? d1 : d0);
+          syms.push_back(s);
+        }
+      };
+
+      for (size_t i = 0; i < raw.len; i += 2)
+      {
+        uint32_t mark_us = static_cast<uint32_t>(raw.ticks[i]) * kRmtTickUs;
+        if (period > 0)
+        {
+          uint32_t cycles = (mark_us + period / 2) / period;
+          if (cycles < 1)
+            cycles = 1;
+          for (uint32_t c = 0; c < cycles; ++c)
+          {
+            rmt_symbol_word_t s{};
+            s.level0 = mark_lvl;
+            s.duration0 = hi;
+            s.level1 = space_lvl;
+            s.duration1 = lo;
+            syms.push_back(s);
+          }
+        }
+        else
+        {
+          pushRun(mark_lvl, mark_us);
+        }
+        if (i + 1 < raw.len)
+        {
+          uint32_t space_us = static_cast<uint32_t>(raw.ticks[i + 1]) * kRmtTickUs;
+          if (space_us > 0)
+            pushRun(space_lvl, space_us);
+        }
+      }
+      return syms;
+    }
   } // namespace
+
+  bool RmtTx::setCarrierMode(TxCarrierMode mode)
+  {
+    if (begun_)
+      return false; // resolution is fixed at channel creation
+    carrier_mode_ = mode;
+    return true;
+  }
 
   bool RmtTx::begin(int gpio, bool inverted)
   {
@@ -72,18 +171,26 @@ namespace esp32irpk::hal
     gpio_ = gpio;
     inverted_ = inverted;
 
+    const bool phase_aligned = (carrier_mode_ == TxCarrierMode::PhaseAligned);
+
     rmt_tx_channel_config_t cfg = {};
     cfg.clk_src = selectRmtClkSrc();
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
     cfg.mem_block_symbols = 64;
-    cfg.resolution_hz = kRmtResolutionHz;
+    cfg.resolution_hz = phase_aligned ? kRmtResolutionHzFine : kRmtResolutionHz;
     cfg.trans_queue_depth = 2;
     cfg.flags.invert_out = inverted_;
 
     if (rmt_new_tx_channel(&cfg, reinterpret_cast<rmt_channel_handle_t *>(&tx_channel_)) != ESP_OK)
       return false;
 
-    if (!applyCarrierHz(kDefaultCarrierFrequencyHz))
+    // PhaseAligned generates the carrier in the symbol stream, so the HW carrier
+    // (rmt_apply_carrier) stays disabled; we only track the requested frequency.
+    if (phase_aligned)
+    {
+      carrier_hz_ = kDefaultCarrierFrequencyHz;
+    }
+    else if (!applyCarrierHz(kDefaultCarrierFrequencyHz))
     {
       rmt_del_channel(reinterpret_cast<rmt_channel_handle_t>(tx_channel_));
       tx_channel_ = nullptr;
@@ -132,6 +239,13 @@ namespace esp32irpk::hal
   {
     if (!tx_channel_)
       return false;
+    // PhaseAligned encodes the carrier in the symbol stream; just track the
+    // requested frequency (0 = solid marks) and skip the HW carrier.
+    if (carrier_mode_ == TxCarrierMode::PhaseAligned)
+    {
+      carrier_hz_ = carrier_hz;
+      return true;
+    }
     // Re-apply when the frequency changes, or when the duty changed while a
     // carrier is active (same frequency but a new duty from setCarrierDuty()).
     if (carrier_hz == carrier_hz_ &&
@@ -175,7 +289,9 @@ namespace esp32irpk::hal
     if (!applyCarrierHz(carrier_hz))
       return false;
 
-    auto syms = toSymbols(raw, /*mark_high=*/true);
+    auto syms = (carrier_mode_ == TxCarrierMode::PhaseAligned)
+                    ? toCarrierSymbols(raw, carrier_hz, carrier_duty_, /*mark_high=*/true)
+                    : toSymbols(raw, /*mark_high=*/true);
     if (syms.empty())
       return false;
 
@@ -467,6 +583,14 @@ namespace esp32irpk::hal
     sending_ = false;
     carrier_hz_ = 0;
     begun_ = false;
+  }
+
+  bool RmtTx::setCarrierMode(TxCarrierMode mode)
+  {
+    if (begun_)
+      return false;
+    carrier_mode_ = mode;
+    return true;
   }
 
   bool RmtTx::applyCarrierHz(uint32_t carrier_hz)

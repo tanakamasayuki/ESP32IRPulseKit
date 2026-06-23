@@ -232,6 +232,10 @@ namespace esp32irpk
     bool clearCarrierHz();
     bool disableCarrier();         // send with no carrier modulation (solid marks)
     bool setCarrierDuty(float duty); // carrier on-time fraction (0 < duty < 1)
+    // Experimental: generate the carrier as phase-aligned RMT symbols instead of
+    // the free-running hardware carrier (see DESIGN §12). Must be called before
+    // begin(); returns false once begun.
+    bool setPhaseAlignedCarrier(bool enable);
 
     bool addProtocol(const IRProtocolSpec &spec);
     bool clearProtocols();
