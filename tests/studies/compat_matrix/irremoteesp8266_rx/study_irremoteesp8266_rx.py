@@ -1,8 +1,15 @@
+import os
 import re
 from dataclasses import dataclass
 
 import pytest
 from pexpect import EOF, TIMEOUT
+
+
+# PulseKit TX carrier mode for this run: "hw" (default, free-running hardware
+# carrier) or "pa" (experimental phase-aligned). Set PULSEKIT_CARRIER=pa to
+# re-measure interop with the phase-aligned path (see studies/phase_aligned_carrier).
+CARRIER_MODE = os.environ.get("PULSEKIT_CARRIER", "hw")
 
 
 def bit_reverse(value: int, bit_length: int) -> int:
@@ -86,6 +93,13 @@ def assert_serial_control(tx, rx):
     rx.expect_exact("PONG", timeout=5)
 
 
+def set_pulsekit_carrier(tx, mode):
+    """Select the PulseKit TX carrier mode on the peer (hw|pa). A pa switch
+    re-creates the TX channel, so allow extra time for the reply."""
+    tx.write(f"CARRIER {mode}\n")
+    tx.expect(re.compile(rb"CARRIER_OK mode=(hw|pa)"), timeout=10)
+
+
 TRIALS = 5
 PASS_MIN = 3
 
@@ -135,6 +149,7 @@ def decode_best_of_n(tx, rx, case: Case):
 def test_pulsekit_tx_to_irremoteesp8266_rx(dut, peers, case, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
+    set_pulsekit_carrier(tx, CARRIER_MODE)
 
     observed, n_ok = decode_best_of_n(tx, rx, case)
     record_property("decode_ratio", f"{n_ok}/{TRIALS}")
@@ -148,6 +163,7 @@ def test_pulsekit_tx_to_irremoteesp8266_rx(dut, peers, case, record_property):
     bit_order = classify_bit_order(case.bits, observed["bits"], observed["bit_length"])
 
     record_property("rx_impl", "IRremoteESP8266")
+    record_property("pulsekit_carrier", CARRIER_MODE)
     record_property("sent_protocol", case.protocol)
     record_property("sent_bits", f"0x{case.bits:x}")
     record_property("rx_protocol", observed["protocol"])
@@ -158,6 +174,7 @@ def test_pulsekit_tx_to_irremoteesp8266_rx(dut, peers, case, record_property):
     record_property("raw_len", observed["raw_len"])
     print(
         "COMPAT_MATRIX_OBSERVED rx=IRremoteESP8266 "
+        f"pulsekit_carrier={CARRIER_MODE} "
         f"sent={case.protocol} sent_bits=0x{case.bits:x} "
         f"rx_protocol={observed['protocol']} rx_bits=0x{observed['bits']:x} "
         f"rx_len={observed['bit_length']} "

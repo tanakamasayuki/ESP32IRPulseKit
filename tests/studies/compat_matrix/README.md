@@ -101,7 +101,10 @@ Observed results:
   almost always fails. This is the carrier-phase mark-width limitation from
   DESIGN §12 surfacing on another short-mark protocol. We do not shorten AEHA's
   spec mark for interop, so this stays a recorded incompatibility (NEC at 560 µs
-  has a wide enough window and is unaffected).
+  has a wide enough window and is unaffected). Confirmed fixable: with the
+  experimental phase-aligned carrier (`PULSEKIT_CARRIER=pa`, see
+  `studies/phase_aligned_carrier`), the rx peer's marks stay in range and
+  IRremoteESP8266 decodes the frame as `PANASONIC48` (hw = 0/5, pa = pass).
 - **self (IRremoteESP8266 -> IRremoteESP8266): baseline**, environment permitting
   (the 48-bit frame is the most placement-sensitive case in the matrix).
 

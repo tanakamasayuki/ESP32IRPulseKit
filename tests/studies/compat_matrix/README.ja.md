@@ -93,6 +93,9 @@ IRremoteESP8266 の Panasonic 値 `0x40040100BCBD`（`sendPanasonic64`）、rx �
   48bit 全マーク一致が必要なフレームはほぼ毎回失敗する。DESIGN §12 のキャリア位相による
   マーク幅問題が別の短マークprotocolで顕在化した形。相互運用のために AEHA 仕様マークは
   短くしないので、これは記録された非互換のまま（NEC は 560 µs で窓が広く無影響）。
+  ただし回避可能と確認済み: 実験的な位相整合キャリア（`PULSEKIT_CARRIER=pa`、
+  `studies/phase_aligned_carrier` 参照）では rx peer のマークが窓内に収まり、
+  IRremoteESP8266 が `PANASONIC48` として復号する（hw = 0/5、pa = pass）。
 - **self（IRremoteESP8266 → IRremoteESP8266）: ベースライン**（環境が許せば。48bit フレームは
   本マトリクスで最も配置に敏感）。
 

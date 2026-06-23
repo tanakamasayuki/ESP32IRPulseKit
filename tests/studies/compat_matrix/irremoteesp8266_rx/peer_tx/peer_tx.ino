@@ -13,6 +13,12 @@ const bool kIrTxInverted = atoi(IR_TX_INVERTED) != 0;
 
 esp32irpk::IRSender tx(kIrTxGpio, kIrTxInverted);
 
+// Carrier generation mode. Default false = hardware (free-running) carrier,
+// i.e. unchanged behavior. "CARRIER pa" flips to the experimental phase-aligned
+// path to re-measure interop (see studies/phase_aligned_carrier).
+bool g_phaseAligned = false;
+bool g_begun = false;
+
 namespace
 {
 bool readLine(String &line)
@@ -60,7 +66,28 @@ void sendReady()
   Serial.print("TX_READY impl=ESP32IRPulseKit gpio=");
   Serial.print(kIrTxGpio);
   Serial.print(" inverted=");
-  Serial.println(kIrTxInverted ? 1 : 0);
+  Serial.print(kIrTxInverted ? 1 : 0);
+  Serial.print(" carrier=");
+  Serial.println(g_phaseAligned ? "pa" : "hw");
+}
+
+// (Re)open the sender in the requested carrier mode. Channel resolution is fixed
+// at begin(), so a mode change must end() then begin() again.
+bool ensureMode(bool phaseAligned)
+{
+  if (g_begun && g_phaseAligned == phaseAligned)
+    return true;
+  if (g_begun)
+  {
+    tx.end();
+    g_begun = false;
+  }
+  tx.setPhaseAlignedCarrier(phaseAligned);
+  if (!tx.begin())
+    return false;
+  g_begun = true;
+  g_phaseAligned = phaseAligned;
+  return true;
 }
 
 bool sendBits(esp32irpk::IRProtocolID protocol, uint16_t bitLength, uint64_t bits)
@@ -171,6 +198,18 @@ void handleCommand(const String &line)
     handleSend(line);
     return;
   }
+  if (line == "CARRIER hw" || line == "CARRIER pa")
+  {
+    bool pa = line.endsWith("pa");
+    if (!ensureMode(pa))
+    {
+      Serial.println("TX_ERROR begin_failed");
+      return;
+    }
+    Serial.print("CARRIER_OK mode=");
+    Serial.println(pa ? "pa" : "hw");
+    return;
+  }
   Serial.print("TX_ERROR unknown_command ");
   Serial.println(line);
 }
@@ -180,7 +219,7 @@ void setup()
 {
   Serial.begin(115200);
   delay(5000);
-  if (!tx.begin())
+  if (!ensureMode(false)) // default: hardware carrier (unchanged behavior)
   {
     Serial.println("TX_ERROR begin_failed");
     return;
