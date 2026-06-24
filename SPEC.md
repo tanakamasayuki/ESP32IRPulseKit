@@ -465,7 +465,9 @@ public:
 `setTxMemBlocks(blocks)` sets the number of RMT memory blocks for the TX channel (1 block = `SOC_RMT_MEM_WORDS_PER_CHANNEL` symbols). It is valid only before `begin()`.
 
 - `0` uses the library default (1 block).
-- Larger values give the phase-aligned path more refill headroom under heavy interrupt load, at the cost of the shared RMT TX memory pool.
+- While sending, the RMT driver refills the channel from an interrupt. If another long-running interrupt blocks that refill, the channel underruns and the waveform is corrupted. More blocks lengthen the refill interval and raise tolerance to interrupt latency, which matters most on single-core ESP32-C parts with the radio active.
+- If underruns occur, increase the block count or fall back to the hardware carrier with `setPhaseAlignedCarrier(false)` (lower TX precision, far fewer symbols).
+- The RMT TX memory pool is shared with other users (e.g. addressable RGB LEDs) and each SoC has a limited number of blocks, so allocating all of them to one channel is not recommended.
 
 The full carrier and timing model is in [DESIGN.md](DESIGN.md) §8 and §12.
 

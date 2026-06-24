@@ -116,6 +116,8 @@ Carrier-frequency setters are rejected while a send is in progress. `setPhaseAli
 
 **Carrier duty.** The practical range is about `0.2`–`0.5`. A higher duty can reach farther but draws more power, and at close range too high a duty can saturate the receiver and *reduce* reliability; a lower duty trades range for power saving. The optimum depends on distance, so `0.33` is the common recommendation.
 
+**TX memory blocks.** While sending, the RMT driver refills the channel from an interrupt to supply the next symbols. If another long-running interrupt blocks that refill, the channel underruns and the transmitted waveform is corrupted. More memory blocks lengthen the interval between refills, raising tolerance to interrupt latency — this is most likely to matter on single-core ESP32-C parts with the radio (Wi-Fi/BLE) active. If you hit underruns, increase the block count, or fall back to the hardware carrier with `setPhaseAlignedCarrier(false)` (lower TX precision but far fewer symbols, so it stays stable more easily). The RMT TX memory pool is shared with other users such as addressable RGB LEDs, and each SoC has a limited number of blocks, so allocating all of them to one channel is not recommended.
+
 ### Who generates the carrier
 
 - **Phase-aligned, symbol-encoded (default).** The RMT encoder emits each mark as an integer number of full carrier cycles starting at phase 0. Every mark holds a deterministic cycle count, so the demodulated mark (and the space after it) is stable frame to frame, which is best for decoding in other libraries. The cost is more RMT symbols per frame (roughly one per carrier cycle); `setTxMemBlocks()` raises the streaming headroom for applications under heavy ISR load (e.g. concurrent flash writes).
