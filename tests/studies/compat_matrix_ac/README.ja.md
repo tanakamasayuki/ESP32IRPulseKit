@@ -95,8 +95,14 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   したバイトが当方encoderの生成バイトと一致（checksum ok）すること＝当方 `toRaw()` が
   独立スタックも受理する正しいバーストを出すことの証明。
 
-続いて `heatpumpir_tx/`。所見と確定したフィールドマップは
-ここと `src/ac/Panasonic.h` に反映します。
+- `heatpumpir_tx/` — 2系統目の独立参照: HeatpumpIR（`PanasonicJKEHeatpumpIR`、
+  別コードベース、LEDCキャリア）が既知状態を送信、当方RXがデコード。hard判定は
+  当方デコードが checksum 妥当かつ論理フィールドが送信状態と一致すること（バイト
+  一致ではない — 独立した2つのencoderがフィールド意味で一致することに価値がある）。
+  HeatpumpIR は fan段が1つずれるため、IRremoteESP8266 peer では届かない QUIET /
+  POWERFUL も網羅する。
+
+所見と確定したフィールドマップはここと `src/ac/Panasonic.h` に反映します。
 
 `irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
 IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを確認: 当方のRAW
@@ -118,3 +124,14 @@ IRremoteESP8266 純正TXは 25/25 到達、当方TXは自走ハードウェア�
 この差は、長尺フレームではハードウェアキャリアが位相整合キャリアよりわずかに
 検出されにくいことを示す。デューティや連送による緩和はここでは対象外。長尺向けの
 位相整合（またはライブエンコード）キャリア対応は今後の課題。
+
+### デコーダ許容（タイミングスキュー）
+
+`heatpumpir_tx` はデコーダの厳しすぎる点も炙り出した。HeatpumpIR のESP32送信は
+マーク毎にLEDCキャリアを付け直すbusy-loopビットバンガーで、空白が約+150us伸びる
+（zero空白が公称432usに対し捕捉で約620us）。元の0/1判定は各長の狭い窓を使い、
+その間のデッドゾーンでこれらのフレームを丸ごと棄却していた — HeatpumpIRが問題なく
+制御できる実機Panasonicユニットより厳しい。空白分類を0と1の長さの中点しきい値
+（とフレーム間ギャップ用の別の大きな終端しきい値）に変更し、整合性は checksum で
+担保しつつ実機並みのスキューを許容するようにした。捕捉した HeatpumpIR フレームを
+host回帰テスト（`testPanasonicAcDecodesSkewedTiming`）として固定。

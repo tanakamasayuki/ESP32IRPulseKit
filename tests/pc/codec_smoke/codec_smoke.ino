@@ -1307,6 +1307,53 @@ void testPanasonicAcCanonicalStates()
     EXPECT_TRUE(c.name, match);
   }
 }
+
+// A real capture of HeatpumpIR's PanasonicJKEHeatpumpIR over an LEDC carrier
+// (cool / 26C / fan auto / power on), recorded by our RX at 10us/tick in
+// studies/compat_matrix_ac/heatpumpir_tx. HeatpumpIR's ESP32 bit-banger skews
+// every space ~150us long (zero ~620us vs the 432us nominal), which a
+// narrow-window decoder rejects. Decoding it confirms the nearest-threshold
+// classification tolerates real-world sender skew the way a physical A/C unit
+// does, and that the field map reads an independent encoder's frame correctly.
+void testPanasonicAcDecodesSkewedTiming()
+{
+  using esp32irpk::ac::Panasonic::Fan;
+  using esp32irpk::ac::Panasonic::Frame;
+  using esp32irpk::ac::Panasonic::Mode;
+
+  static const uint16_t ticks[] = {
+      346, 208, 43, 60, 41, 150, 40, 63, 40, 62, 41, 63, 40, 62, 41, 62, 40, 62, 41, 62,
+      41, 62, 40, 62, 41, 62, 40, 62, 43, 148, 43, 60, 40, 62, 41, 62, 41, 62, 40, 62,
+      41, 62, 40, 62, 41, 150, 41, 149, 41, 150, 43, 60, 41, 62, 40, 150, 41, 62, 43, 60,
+      40, 62, 40, 62, 41, 62, 40, 63, 41, 62, 40, 62, 41, 62, 40, 62, 40, 63, 40, 62, 41,
+      62, 40, 63, 40, 62, 41, 62, 41, 62, 41, 63, 40, 62, 41, 62, 40, 63, 40, 62, 41, 62,
+      41, 62, 40, 62, 41, 62, 40, 62, 41, 62, 43, 60, 40, 63, 40, 150, 41, 150, 40, 63,
+      40, 62, 40, 62, 41, 62, 40, 63, 40, 1015, 349, 195, 41, 62, 40, 150, 43, 60, 40, 62,
+      41, 62, 40, 62, 41, 62, 40, 62, 41, 62, 40, 62, 43, 60, 40, 62, 41, 62, 40, 151, 40,
+      62, 41, 62, 40, 62, 41, 62, 41, 62, 41, 63, 40, 62, 40, 151, 40, 151, 43, 148, 40,
+      62, 40, 62, 41, 150, 41, 61, 43, 60, 40, 62, 40, 63, 40, 62, 41, 62, 40, 62, 41, 62,
+      40, 62, 41, 63, 40, 62, 41, 62, 41, 62, 40, 150, 41, 62, 41, 61, 41, 150, 41, 150,
+      40, 150, 41, 64, 38, 62, 41, 62, 40, 63, 40, 150, 41, 62, 40, 150, 41, 150, 40, 62,
+      41, 62, 40, 62, 41, 62, 41, 61, 41, 62, 40, 65, 41, 59, 40, 63, 40, 150, 41, 150, 40,
+      150, 41, 150, 40, 151, 40, 62, 41, 150, 41, 61, 41, 150, 40, 62, 41, 62, 41, 61, 41,
+      62, 40, 62, 41, 62, 40, 62, 41, 62, 40, 62, 41, 65, 41, 59, 41, 62, 40, 62, 41, 62,
+      41, 62, 40, 62, 41, 62, 40, 150, 41, 150, 41, 150, 40, 62, 41, 62, 40, 63, 41, 62,
+      41, 62, 41, 62, 40, 62, 40, 62, 41, 62, 40, 151, 40, 150, 41, 150, 41, 62, 40, 62,
+      41, 62, 43, 59, 41, 63, 40, 63, 40, 62, 40, 62, 41, 62, 41, 62, 40, 62, 41, 62, 41,
+      61, 41, 62, 40, 62, 40, 63, 43, 147, 43, 59, 41, 62, 43, 60, 40, 62, 41, 62, 40, 62,
+      41, 150, 40, 62, 41, 62, 43, 59, 41, 62, 40, 62, 41, 62, 40, 63, 40, 62, 43, 59, 41,
+      63, 40, 63, 43, 60, 43, 59, 41, 62, 40, 65, 38, 62, 40, 150, 41, 62, 40, 62, 41, 62,
+      43, 148, 40, 62, 43, 60, 42, 60, 40};
+
+  esp32irpk::IRRawTickView view{ticks, sizeof(ticks) / sizeof(ticks[0])};
+  Frame g{};
+  EXPECT_TRUE("panasonic/skewed-decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("panasonic/skewed-checksum", g.checksum_ok);
+  EXPECT_TRUE("panasonic/skewed-power", g.power());
+  EXPECT_TRUE("panasonic/skewed-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("panasonic/skewed-temp", 26, g.temperatureC());
+  EXPECT_TRUE("panasonic/skewed-fan", g.fan() == Fan::AUTO);
+}
 } // namespace
 
 void setup()
@@ -1353,6 +1400,7 @@ void setup()
   testAcCodecRoundtrip();
   testPanasonicAcRoundtrip();
   testPanasonicAcCanonicalStates();
+  testPanasonicAcDecodesSkewedTiming();
 
   Serial.print("TEST done ");
   Serial.print(g_passed);

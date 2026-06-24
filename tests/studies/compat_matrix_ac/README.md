@@ -98,9 +98,17 @@ harness are added one variant at a time. In place:
   IRremoteESP8266 decodes it. The bytes the external library recovers must equal
   the bytes our encoder produced, with a valid checksum -- proving our `toRaw()`
   emits a well-formed burst an independent stack accepts.
+- `heatpumpir_tx/` -- second, independent reference: HeatpumpIR
+  (`PanasonicJKEHeatpumpIR`, a separate codebase, over an LEDC carrier)
+  transmits a known state; our RX decodes it. The hard check is that our decode
+  is checksum-valid and its logical fields match the sent state (not byte
+  identity -- the value is two independent encoders agreeing on field
+  semantics). HeatpumpIR's fan steps are offset by one, so this variant also
+  covers the QUIET and POWERFUL fan settings the IRremoteESP8266 peer cannot
+  reach.
 
-`heatpumpir_tx/` follows. Findings and the confirmed
-field map are recorded back here and into `src/ac/Panasonic.h`.
+Findings and the confirmed field map are recorded back here and into
+`src/ac/Panasonic.h`.
 
 The `irremoteesp8266_tx/` run confirms the Panasonic field map in
 `src/ac/Panasonic.h` matches IRremoteESP8266's `IRPanasonicAc` byte-for-byte:
@@ -125,3 +133,16 @@ The gap points to the hardware carrier being marginally less reliable than a
 phase-aligned carrier for long frames. Mitigations via carrier duty or repeat
 are out of scope here; proper phase-aligned (or live-encoded) carrier support
 for long frames is future work.
+
+### Decoder tolerance (timing skew)
+
+`heatpumpir_tx` also surfaced a decoder-strictness issue. HeatpumpIR's ESP32
+sender is a busy-loop bit-banger that re-attaches the LEDC carrier per mark, so
+every space comes out ~150us long (a zero space is ~620us captured vs the 432us
+nominal). The original per-bit decode used narrow windows around each 0/1 length,
+which left a dead zone that rejected those frames outright -- stricter than a real
+Panasonic A/C unit, which HeatpumpIR drives fine. The space classifier now uses
+the midpoint threshold between the 0 and 1 lengths (and a separate, larger
+frame-end threshold for the inter-frame gap), so it tolerates real-world sender
+skew while integrity stays enforced by the checksum. A captured HeatpumpIR frame
+is locked in as a host regression test (`testPanasonicAcDecodesSkewedTiming`).

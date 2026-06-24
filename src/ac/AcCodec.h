@@ -61,6 +61,18 @@ namespace esp32irpk::ac
     for (size_t i = 0; i < out_cap; ++i)
       out[i] = 0;
 
+    // Classify each bit's space by nearest of the 0/1 lengths rather than by
+    // narrow windows around each: real IR receivers (and senders) skew mark and
+    // space lengths by ~100us, so a fixed-window scheme leaves a dead zone that
+    // rejects otherwise-valid frames. A space far longer than a one-space is the
+    // trailer's inter-frame gap, which ends the frame. Integrity is enforced by
+    // the vendor checksum, not by tight per-bit windows.
+    const uint32_t one_threshold_us = (t.zero_space_us + t.one_space_us) / 2;
+    const uint32_t frame_end_us =
+        (t.frame_gap_us > t.one_space_us)
+            ? (t.one_space_us + t.frame_gap_us) / 2
+            : t.one_space_us + t.one_space_us / 2;
+
     const size_t max_bits = out_cap * 8;
     size_t bit_count = 0;
     while (pos + 1 < raw.len)
@@ -69,25 +81,17 @@ namespace esp32irpk::ac
       const uint32_t space_us = raw.ticks[pos + 1] * kTickUs;
       if (!within(mark_us, t.bit_mark_us, t.tol_pct))
         return 0; // broken bit mark
-      if (within(space_us, t.zero_space_us, t.tol_pct))
+      if (space_us >= frame_end_us)
       {
-        // bit 0: leave the cleared bit as-is
-      }
-      else if (within(space_us, t.one_space_us, t.tol_pct))
-      {
-        if (bit_count >= max_bits)
-          return 0; // payload exceeds caller buffer
-        out[bit_count / 8] |= static_cast<uint8_t>(1u << (bit_count % 8));
-      }
-      else
-      {
-        // Not a 0/1 space: this mark is the trailer and the space is the
-        // inter-frame gap. Frame complete.
+        // This mark is the trailer and the space is the inter-frame gap.
         pos += 2;
         return bit_count;
       }
       if (bit_count >= max_bits)
-        return 0;
+        return 0; // payload exceeds caller buffer
+      if (space_us >= one_threshold_us)
+        out[bit_count / 8] |= static_cast<uint8_t>(1u << (bit_count % 8));
+      // else bit 0: leave the cleared bit as-is
       ++bit_count;
       pos += 2;
     }
