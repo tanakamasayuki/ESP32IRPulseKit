@@ -183,6 +183,11 @@ struct IRReceiveResult {
 
   const IRDecodeCandidate* candidate() const;
   const IRDecodedBits* bits() const;
+
+  bool hasFlag(IRResultFlags bit) const;
+  bool decodeSkipped() const; // hasFlag(DECODE_SKIPPED)
+  bool truncated() const;     // hasFlag(RAW_TRUNCATED)
+  bool rmtOverflow() const;   // hasFlag(RMT_OVERFLOW)
 };
 
 struct IRRxStats {
@@ -196,6 +201,7 @@ struct IRRxStats {
 
 - `candidates` are sorted by descending score. Ties are broken by earlier registration order.
 - `candidate()` returns the best candidate. `bits()` returns the best candidate's BITS. Both return `nullptr` when there is no candidate.
+- `hasFlag(bit)` tests a result flag; `decodeSkipped()`, `truncated()`, and `rmtOverflow()` are named shortcuts for the three flags.
 - `score` is a relative measure of how closely the received waveform matches the protocol spec. A waveform similar to multiple protocols may produce multiple candidates; users normally inspect the best candidate and the score gap. The absolute score value and formula are not compatibility guarantees.
 - `DECODE_SKIPPED`: decode was skipped, for example in RAW-only mode.
 - `RAW_TRUNCATED`: RAW exceeded the internal limit and was truncated.

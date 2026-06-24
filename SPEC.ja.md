@@ -181,6 +181,11 @@ struct IRReceiveResult {
 
   const IRDecodeCandidate* candidate() const;
   const IRDecodedBits* bits() const;
+
+  bool hasFlag(IRResultFlags bit) const;
+  bool decodeSkipped() const; // hasFlag(DECODE_SKIPPED)
+  bool truncated() const;     // hasFlag(RAW_TRUNCATED)
+  bool rmtOverflow() const;   // hasFlag(RMT_OVERFLOW)
 };
 
 struct IRRxStats {
@@ -194,6 +199,7 @@ struct IRRxStats {
 
 - `candidates` はscore降順で返ります。同scoreの場合は登録順が早いものを優先します。
 - `candidate()` は最上位候補、`bits()` は最上位候補のBITSを返します。候補がない場合は `nullptr` です。
+- `hasFlag(bit)` は結果フラグを判定します。`decodeSkipped()`・`truncated()`・`rmtOverflow()` は3フラグの名前付きショートカットです。
 - `score` は受信波形がprotocol specへどれだけ近いかを表す相対値です。複数protocolに似た波形は複数候補として残ることがあり、利用者は通常、最上位候補とscore差を見ます。scoreの絶対値や計算式は互換性契約ではありません。
 - `DECODE_SKIPPED`: RAW-only設定などでdecodeしなかったことを示します。
 - `RAW_TRUNCATED`: RAWが内部上限を超えて切り詰められたことを示します。

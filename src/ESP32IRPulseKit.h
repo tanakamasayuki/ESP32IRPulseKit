@@ -177,6 +177,14 @@ namespace esp32irpk
       const auto *c = candidate();
       return c ? &c->decoded : nullptr;
     }
+
+    bool hasFlag(IRResultFlags bit) const
+    {
+      return (static_cast<uint8_t>(flags) & static_cast<uint8_t>(bit)) != 0;
+    }
+    bool decodeSkipped() const { return hasFlag(IRResultFlags::DECODE_SKIPPED); }
+    bool truncated() const { return hasFlag(IRResultFlags::RAW_TRUNCATED); }
+    bool rmtOverflow() const { return hasFlag(IRResultFlags::RMT_OVERFLOW); }
   };
 
   template <size_t MaxCandidates = esp32irpk::kDefaultMaxDecodeCandidates>
