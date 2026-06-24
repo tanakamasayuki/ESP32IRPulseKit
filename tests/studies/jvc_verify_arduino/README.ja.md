@@ -16,7 +16,7 @@ cd tests
 uv run --env-file .env pytest -s -o python_files="study_*.py" studies/jvc_verify_arduino/
 ```
 
-## 観測結果（2026-06-22）
+## 観測結果
 
 N=15/点、one-space 1575、bits 0xC0DE、2台IR。
 

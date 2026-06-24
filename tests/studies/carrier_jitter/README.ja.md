@@ -76,11 +76,7 @@ CARRIER_PROBE hz=38000 duty=33 mark=560 cycles=21.280 frames=20 \
 ## 観測結果（38 / 36 / 40 kHz、TSOPは38kHz品）
 
 代表ラン（NEC形・空中・ESP32-S3 2台）。絶対値は構成依存、見るのは相対関係です。
-グラフは `data/`（`analyze.py` で再生成可）。
-
-![jitter vs mark width @38kHz](data/jitter_vs_mark_38000.png)
-![jitter vs duty @38kHz](data/jitter_vs_duty_38000.png)
-![carrier compare](data/compare_carriers.png)
+`data/*.csv` のスイープに対し `analyze.py` を実行するとプロットを生成できます。
 
 - **マーク幅でジッターが振動**（グラフ1）。谷は**整数サイクル幅**付近（38kHz: ~550=21c /
   ~581=22c）、山は半端サイクル（~570≈21.5c＝マーク末尾がサイクル中央で復調が最も曖昧）。

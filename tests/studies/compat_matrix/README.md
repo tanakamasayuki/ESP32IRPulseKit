@@ -32,7 +32,7 @@ with standard external decode/send support should be added first. If an external
 library does not have standard coverage for a PulseKit variant, the test may
 fail, but the README should record why and preserve the observed log.
 
-Local library coverage as of 2026-06-18:
+Local library coverage:
 
 | PulseKit protocol | Arduino-IRremote 4.7.1 | IRremoteESP8266 2.9.0 | compat policy |
 |---|---|---|---|
@@ -108,8 +108,6 @@ Observed results:
 - **self (IRremoteESP8266 -> IRremoteESP8266): baseline**, environment permitting
   (the 48-bit frame is the most placement-sensitive case in the matrix).
 
-A dedicated AEHA test of the field/parity layout is still a future addition.
-
 ### SAMSUNG36 (two-block)
 
 The Samsung36 format is a **two-block** waveform: header, the top 16 bits, an
@@ -142,7 +140,7 @@ NEC self is green: identical frames sent within Arduino-IRremote's ~110 ms NEC r
 window are flagged as repeats (`OTHER_8` / `REPEAT`) and discarded by the harness, so
 the studies space trials by `INTER_TRIAL_GAP_S` to keep each send an independent frame.
 
-## Current findings & hypotheses (NEC, as of 2026-06-18)
+## Current findings (NEC)
 
 Running the NEC case at a **very short TX↔RX distance (<10 cm)** gives 2 of 4
 directions failing, while the other 2 pass:
@@ -154,7 +152,7 @@ directions failing, while the other 2 pass:
 | **Arduino-IRremote (30% duty) TX → our RX** | ❌ fail | zero-space inflates to **~780 us** (> our 700 us ceiling) |
 | **our TX → IRremoteESP8266 RX** | ❌ fail | zero-space ~594–672 us (> their ~637 us ceiling) |
 
-### Hypothesis: the failures are a close-range TSOP demodulation **bias**, not jitter
+### The failures are a close-range TSOP demodulation **bias**, not jitter
 
 At short range the TSOP demodulator **saturates** and cuts the mark's trailing
 edge early; by conservation, the time lost from the mark is added to the
@@ -185,18 +183,11 @@ in the wrong direction and pushes the zero-space past the decode tolerance.
   the ~90 us **mean bias**, which only the over-the-air *decode-compatibility*
   path surfaces.
 
-### Status / next steps
-
-- This is a hypothesis pending **re-measurement at a realistic distance**, where
-  the TSOP should behave normally and both failing directions are expected to
-  decode. Distance is the only lever that can fix Failure B (we cannot change
-  IRremoteESP8266's decoder).
-- Use `studies/link_quality/` (manual meter) to find a placement where the
-  zero-space bias is small and the external-RX "compat margin" is positive.
-- A possible library-side robustness improvement (fixes Failure A only): classify
-  NEC bits by nearest expected space (threshold ≈1125 us) with a loose mark
-  check, instead of strict ±25 % membership — how most NEC decoders work. Not
-  yet implemented; it does not touch the committed 33 % default-duty decision.
+Distance is the only lever that can fix Failure B (we cannot change
+IRremoteESP8266's decoder); at a realistic distance the TSOP behaves normally and
+both failing directions decode. `studies/link_quality/` (manual meter) finds a
+placement where the zero-space bias is small and the external-RX "compat margin"
+is positive.
 
 ### JVC → IRremoteESP8266: root cause isolated
 

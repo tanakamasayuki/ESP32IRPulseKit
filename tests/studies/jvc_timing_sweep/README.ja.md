@@ -43,7 +43,7 @@ uv run --with matplotlib python studies/jvc_timing_sweep/analyze.py \
 2つのヒートマップ（行=ゼロ空白、列=マーク）：`margin_p90`（595 − p90受信ゼロ空白、
 高い＝余裕大＝最適）と `pass_ratio`。
 
-## 観測結果（2026-06-22）
+## 観測結果
 
 7マーク × 5ゼロ空白、N=12、one-space 1575、bits 0xC0DE、IRremoteESP8266経由。
 

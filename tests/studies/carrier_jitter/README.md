@@ -78,12 +78,8 @@ ready to plot as jitter-vs-mark-width with one series per duty.
 ## Observed results (38 / 36 / 40 kHz, TSOP is a 38 kHz part)
 
 Representative run (NEC-shaped, over-the-air, two ESP32-S3). Absolute numbers
-depend on the setup; the relative picture is the point. Graphs are in `data/`
-(regenerate with `analyze.py`).
-
-![jitter vs mark width @38kHz](data/jitter_vs_mark_38000.png)
-![jitter vs duty @38kHz](data/jitter_vs_duty_38000.png)
-![carrier compare](data/compare_carriers.png)
+depend on the setup; the relative picture is the point. Generate the plots
+locally with `analyze.py` on the `data/*.csv` sweeps.
 
 - **Jitter oscillates with mark width** (graph 1). Valleys sit near integer-cycle
   widths (38 kHz: ~550 = 21c / ~581 = 22c); peaks near half-integer (~570 ~= 21.5c,

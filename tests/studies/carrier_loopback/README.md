@@ -60,7 +60,7 @@ The verdict guides the root-cause fix: a finer TX resolution helps only the
 period-quantization mechanism; a per-mark carrier phase reset is needed for the
 free-running-phase mechanism.
 
-## Observed results (2026-06-18)
+## Observed results
 
 Run: 80 marks, commanded `CAP 530 530 4 33 38000` (the library rounds JVC's
 525 µs mark to 53 ticks = **530 µs**, so this is exactly what JVC emits).

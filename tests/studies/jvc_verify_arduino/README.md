@@ -15,7 +15,7 @@ cd tests
 uv run --env-file .env pytest -s -o python_files="study_*.py" studies/jvc_verify_arduino/
 ```
 
-## Observed results (2026-06-22)
+## Observed results
 
 N=15/point, one-space 1575, bits 0xC0DE, two-board IR.
 

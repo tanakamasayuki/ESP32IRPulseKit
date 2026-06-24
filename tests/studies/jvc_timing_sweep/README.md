@@ -49,7 +49,7 @@ uv run --with matplotlib python studies/jvc_timing_sweep/analyze.py \
 Two heatmaps (rows = zero-space, cols = mark): `margin_p90` (595 − p90 received
 zero-space; higher = more headroom = the optimum) and `pass_ratio`.
 
-## Observed results (2026-06-22)
+## Observed results
 
 7 marks × 5 zero-spaces, N=12, one-space 1575, bits 0xC0DE, through IRremoteESP8266.
 
