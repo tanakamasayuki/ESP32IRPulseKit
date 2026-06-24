@@ -6,11 +6,6 @@
 // ja: GPIO番号はご利用環境の配線に合わせて変更してください。
 esp32irpk::IRReceiver rx(32, true);
 
-static bool hasFlag(esp32irpk::IRResultFlags flags, esp32irpk::IRResultFlags bit)
-{
-  return (static_cast<uint8_t>(flags) & static_cast<uint8_t>(bit)) != 0;
-}
-
 void setup()
 {
   Serial.begin(115200);
@@ -34,9 +29,9 @@ void loop()
   Serial.print("raw.len(ticks)=");
   Serial.print((unsigned)r.raw.len);
   Serial.print(" truncated=");
-  Serial.print(hasFlag(r.flags, esp32irpk::IRResultFlags::RAW_TRUNCATED));
+  Serial.print(r.truncated());
   Serial.print(" rmt_overflow=");
-  Serial.println(hasFlag(r.flags, esp32irpk::IRResultFlags::RMT_OVERFLOW));
+  Serial.println(r.rmtOverflow());
 
   Serial.print("raw (us):");
   for (size_t i = 0; i < r.raw.len; ++i)
