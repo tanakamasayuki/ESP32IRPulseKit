@@ -136,7 +136,6 @@ The full test strategy is in [tests/TEST_PLAN.md](tests/TEST_PLAN.md).
 - pc: PC-only automatic tests — `fixtures` (signal data + checks), `codec_smoke` (Arduino host run), `compile` (ESP32 build-only)
 - hardware: two-board RMT TX/RX pass/fail regression
 - studies: on-demand board investigations that record observation logs (not auto-collected)
-- manual: real remotes, distance, ambient light, and other checks that need human observation
 
 ## 12. Carrier generation and timing model
 

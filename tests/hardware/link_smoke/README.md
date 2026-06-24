@@ -2,7 +2,7 @@
 
 > Japanese: [README.ja.md](README.ja.md)
 
-The standard automated target is a two-board ESP32-S3 setup. Other SoCs such as ESP32 classic are checked first with `examples/` and manual runs.
+The standard automated target is a two-board ESP32-S3 setup. Other SoCs such as ESP32 classic are checked first with `examples/`.
 
 This directory uses the pytest-embedded peer layout.
 

@@ -43,7 +43,6 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" studies/carrier_ji
   - `pc/compile/`: examplesと最小sketchのESP32向けコンパイル確認（ビルドのみ）。
 - `hardware/`: ESP32実機2台で合否が出る自動テスト。`hardware/link_smoke` はリリース判定用の安定smoke。
 - `studies/`: 実機で観測ログを取るオンデマンド調査（jitter、timing sweep、外部ライブラリ互換）。自動収集されず、判断には人手が要る。
-- `manual/`: 市販リモコン、距離/角度、外乱光など人手の確認を置きます。
 
 ## 環境設定
 

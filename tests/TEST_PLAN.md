@@ -4,7 +4,7 @@
 
 ## Strategy
 
-Tests are grouped into four levels.
+Tests are grouped into three levels.
 
 | Type | Purpose | Environment |
 | --- | --- | --- |
@@ -13,7 +13,6 @@ Tests are grouped into four levels.
 | pc/compile | ESP32 build-only checks for examples and minimal sketches | pytest + Arduino CLI on a PC |
 | hardware | RMT TX/RX pass/fail regression on two boards | ESP32 boards + pytest-embedded |
 | studies | On-demand board investigations that record observation logs | ESP32 boards + pytest (human analysis) |
-| manual | Real remotes, distance/angle, ambient light, and human-observed behavior | Manual setup |
 
 IR behavior is affected by the physical environment, so `pc/codec_smoke` asserts RAW/BITS/Frame logic in an Arduino host environment. `pc/compile` verifies examples and public headers compile for ESP32. RMT-dependent behavior is verified by hardware tests.
 
@@ -23,34 +22,33 @@ IR behavior is affected by the physical environment, so `pc/codec_smoke` asserts
 | --- | --- |
 | Local development | pc, hardware/link_smoke, hardware/protocol_matrix |
 | GitHub Actions | pc (fixtures, codec_smoke, compile) |
-| As needed | studies, manual |
+| As needed | studies |
 
 Select a top-level folder such as `pc` or `hardware/link_smoke`. Files under `studies/` are named `study_*.py`, so they are never auto-collected; run a study on demand with `-o python_files="study_*.py"`. The `hardware/` and `studies/` trees depend on physical boards and local serial ports, so they are not part of CI.
 
 ## Initial Coverage
 
-| Feature | codec_smoke | compile | hardware | manual | Status |
-| --- | --- | --- | --- | --- | --- |
-| NEC encode/decode roundtrip | ✅ | ✅ | ✅ NEC smoke | | Host/build/two-board smoke exist |
-| NEC repeat encode/decode | ✅ | | ⬜ | | Host smoke tests exist |
-| SONY decode | ✅ | | ⬜ | | Sony12 fixture host test; SONY15/20 generated roundtrips and formula checks exist |
-| Samsung decode | ✅ | | ⬜ | | Samsung32 fixture host test; SAMSUNG36 generated roundtrip and formula check exist |
-| JVC decode | ✅ | | ⬜ | | JVC fixture host test; encode/decode roundtrip and formula check exist |
-| AEHA variable-length encode/decode | ✅ | | ⬜ | | Host smoke + MSB-first variable test (covers Kaseikyo/Panasonic) |
-| RC5/RC6 decode | ✅ | | ⬜ | | RC5, RC6_M0, RC6_M6 fixture host tests |
-| Protocol carrier preferences | ✅ | ✅ | ✅ NEC smoke | | Built-in values and sender override range checked in host |
-| Candidate ordering and score threshold | ✅ | | | | Host smoke test exists |
-| Relaxed candidate matching and score degradation | ⬜ | | ⬜ studies | | RAW slightly beyond tolerance should remain a candidate and score lower than ideal timing |
-| Encode rejection / invalid inputs | ✅ | | | | Undersized buffer, unknown id, bad length |
-| RAW-only mode (0 candidates) | ✅ | | | | Host smoke test exists |
-| Tolerance boundaries | ✅ | | | | SPACE_ENC ±25% boundaries checked in host smoke |
-| Verified/generated fixture schema | ✅ | | | | YAML checks and generated candidate formula checks added |
-| Examples build | | ✅ | | | Build tests exist |
-| RMT TX RAW send | | ✅ sketch build | ✅ NEC smoke | | TX peer sketch + two-board smoke |
-| RMT RX RAW receive | | ✅ sketch build | ✅ NEC smoke | | RX dut sketch + two-board smoke |
-| TX->RX loop | | | ✅ NEC smoke | | Two-board pytest exists |
-| Protocol matrix | | ✅ sketch build | ✅ | | ESP32IRPulseKit TX -> ESP32IRPulseKit RX checks NEC/SONY12/SAMSUNG32/JVC |
-| Real remote receive | | | | ⬜ | Candidate for fixture promotion |
+| Feature | codec_smoke | compile | hardware | Status |
+| --- | --- | --- | --- | --- |
+| NEC encode/decode roundtrip | ✅ | ✅ | ✅ NEC smoke | Host/build/two-board smoke exist |
+| NEC repeat encode/decode | ✅ | | ⬜ | Host smoke tests exist |
+| SONY decode | ✅ | | ⬜ | Sony12 fixture host test; SONY15/20 generated roundtrips and formula checks exist |
+| Samsung decode | ✅ | | ⬜ | Samsung32 fixture host test; SAMSUNG36 generated roundtrip and formula check exist |
+| JVC decode | ✅ | | ⬜ | JVC fixture host test; encode/decode roundtrip and formula check exist |
+| AEHA variable-length encode/decode | ✅ | | ⬜ | Host smoke + MSB-first variable test (covers Kaseikyo/Panasonic) |
+| RC5/RC6 decode | ✅ | | ⬜ | RC5, RC6_M0, RC6_M6 fixture host tests |
+| Protocol carrier preferences | ✅ | ✅ | ✅ NEC smoke | Built-in values and sender override range checked in host |
+| Candidate ordering and score threshold | ✅ | | | Host smoke test exists |
+| Relaxed candidate matching and score degradation | ⬜ | | ⬜ studies | RAW slightly beyond tolerance should remain a candidate and score lower than ideal timing |
+| Encode rejection / invalid inputs | ✅ | | | Undersized buffer, unknown id, bad length |
+| RAW-only mode (0 candidates) | ✅ | | | Host smoke test exists |
+| Tolerance boundaries | ✅ | | | SPACE_ENC ±25% boundaries checked in host smoke |
+| Verified/generated fixture schema | ✅ | | | YAML checks and generated candidate formula checks added |
+| Examples build | | ✅ | | Build tests exist |
+| RMT TX RAW send | | ✅ sketch build | ✅ NEC smoke | TX peer sketch + two-board smoke |
+| RMT RX RAW receive | | ✅ sketch build | ✅ NEC smoke | RX dut sketch + two-board smoke |
+| TX->RX loop | | | ✅ NEC smoke | Two-board pytest exists |
+| Protocol matrix | | ✅ sketch build | ✅ | ESP32IRPulseKit TX -> ESP32IRPulseKit RX checks NEC/SONY12/SAMSUNG32/JVC |
 
 ## Hardware Setup
 
@@ -67,7 +65,7 @@ The standard hardware test setup uses two boards.
 
 `studies/compat_matrix/` is optional compatibility and investigation coverage. Each test directory keeps the primary sketch as RX and `peer_tx/` as TX. Keeping the peer name fixed as `tx` lets external-library variants reuse `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`. The matrix records score, raw_len, and decode results as observations so physical setup and external-library timer variation can be evaluated.
 
-The standard automated hardware target is a **two-board ESP32-S3 setup** for now. ESP32 classic, ESP32-C3/C6, and other SoCs are checked first with `examples/` and manual runs. If a SoC-specific difference or bug appears, it can be promoted to an optional profile or manual test.
+The standard automated hardware target is a **two-board ESP32-S3 setup** for now. ESP32 classic, ESP32-C3/C6, and other SoCs are checked first with `examples/`. If a SoC-specific difference or bug appears, it can be promoted to an optional profile.
 
 Single-board loopback is auxiliary. Direct GPIO loopback can change the inversion conditions compared with a real IR receiver module, so it is not the primary pass/fail baseline.
 

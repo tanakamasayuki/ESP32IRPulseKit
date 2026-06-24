@@ -136,7 +136,6 @@ ESP32実機ではESP-IDFの `ESP_LOGx` 系を使います。
 - pc: 実機なしでPC上で動く自動テスト — `fixtures`（信号データ+検査）、`codec_smoke`（Arduino host実行）、`compile`（ESP32コンパイルのみ）
 - hardware: ESP32実機2台でRMT TX/RXの合否回帰
 - studies: 観測ログを取るオンデマンドの実機調査（自動収集されない）
-- manual: 市販リモコン、距離、外乱光など人手が必要な確認
 
 ## 12. キャリア生成とタイミングモデル
 

@@ -2,7 +2,7 @@
 
 > English: [README.md](README.md)
 
-標準対象はESP32-S3 2台構成です。ESP32 classicなど他SoCの確認は、まず `examples/` とmanual確認で行います。
+標準対象はESP32-S3 2台構成です。ESP32 classicなど他SoCの確認は、まず `examples/` で行います。
 
 このディレクトリはpytest-embeddedのpeer構成です。
 

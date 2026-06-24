@@ -37,4 +37,3 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" studies/carrier_ji
   - `pc/compile/`: ESP32 build-only checks for examples and minimal sketches.
 - `hardware/`: ESP32 two-board automated tests that produce pass/fail. `hardware/link_smoke` is the stable release-gate smoke test.
 - `studies/`: on-demand board investigations that record observation logs (jitter, timing sweeps, external-library compatibility). Not auto-collected; conclusions need a human.
-- `manual/`: checks that require real remotes, distance/angle, ambient light, or human observation.
