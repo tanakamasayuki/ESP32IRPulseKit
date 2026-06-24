@@ -80,6 +80,16 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
 
 ## 状態
 
-scaffold段階。設計とシリアル契約はここで確定。バリアント別のsketchとハーネスは
-1つずつ追加し、まず `irremoteesp8266_tx/`（フィールドマップ較正方向）から着手。
-所見と確定したフィールドマップはここと `src/ac/Panasonic.h` に反映します。
+設計とシリアル契約はここで確定。バリアント別のsketchとハーネスは1つずつ追加。
+実装済み:
+
+- `irremoteesp8266_self/` — ベースライン: 物理治具がPanasonic ACフレームを往復
+  できること（IRremoteESP8266 がエンコード→送信→受信→同じ27バイトへデコード）を、
+  クロス方向を信頼する前に確認。
+- `irremoteesp8266_tx/` — フィールドマップ較正: IRremoteESP8266 が既知状態を送信、
+  当方RXがRAWキャプチャして `esp32irpk::ac::Panasonic` でデコード。正準フレームとの
+  バイト一致が合否判定（hard）、既知状態とのフィールド単位比較は報告のみ（assertし
+  ない）でフィールドマップ確定の材料にする。
+
+続いて `irremoteesp8266_rx/`、`heatpumpir_tx/`。所見と確定したフィールドマップは
+ここと `src/ac/Panasonic.h` に反映します。

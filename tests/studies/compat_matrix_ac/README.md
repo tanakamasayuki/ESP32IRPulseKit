@@ -82,7 +82,17 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
 
 ## Status
 
-Scaffolding. The design and serial contract are fixed here; the per-variant
-sketches and harness are added one variant at a time, starting with
-`irremoteesp8266_tx/` (the field-map calibration direction). Findings and the
-confirmed field map are recorded back here and into `src/ac/Panasonic.h`.
+The design and serial contract are fixed here; the per-variant sketches and
+harness are added one variant at a time. In place:
+
+- `irremoteesp8266_self/` -- baseline: confirms the physical rig round-trips a
+  Panasonic A/C frame (IRremoteESP8266 encodes, transmits, receives, decodes
+  back to the same 27 bytes) before the cross directions are trusted.
+- `irremoteesp8266_tx/` -- field-map calibration: IRremoteESP8266 transmits a
+  known state, our RX captures it RAW and decodes with `esp32irpk::ac::Panasonic`.
+  Byte equality against the canonical frame is the hard pass/fail; per-field
+  comparison against the known state is reported (not asserted) to drive the
+  field map.
+
+`irremoteesp8266_rx/` and `heatpumpir_tx/` follow. Findings and the confirmed
+field map are recorded back here and into `src/ac/Panasonic.h`.
