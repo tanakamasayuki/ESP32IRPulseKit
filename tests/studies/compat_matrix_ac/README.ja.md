@@ -93,3 +93,9 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
 
 続いて `irremoteesp8266_rx/`、`heatpumpir_tx/`。所見と確定したフィールドマップは
 ここと `src/ac/Panasonic.h` に反映します。
+
+`irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
+IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを確認: 当方のRAW
+キャプチャが正準27バイトを再現し、power / mode（auto/cool/heat/dry）/ temperature
+/ fan がすべて期待値にデコードされる。fan nibble は Panasonic の速度＋3
+（min/low/med/high/max = 0x3〜0x7、auto = 0xA）。

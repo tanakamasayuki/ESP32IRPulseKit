@@ -96,3 +96,9 @@ harness are added one variant at a time. In place:
 
 `irremoteesp8266_rx/` and `heatpumpir_tx/` follow. Findings and the confirmed
 field map are recorded back here and into `src/ac/Panasonic.h`.
+
+The `irremoteesp8266_tx/` run confirms the Panasonic field map in
+`src/ac/Panasonic.h` matches IRremoteESP8266's `IRPanasonicAc` byte-for-byte:
+our RAW capture reproduces the canonical 27 bytes, and power / mode (auto, cool,
+heat, dry) / temperature / fan all decode to the expected values. The fan nibble
+is the Panasonic speed plus 3 (min/low/med/high/max = 0x3..0x7, auto = 0xA).

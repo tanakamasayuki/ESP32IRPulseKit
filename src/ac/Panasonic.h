@@ -7,10 +7,10 @@
 // frames, LSB-first, frame 2 ends with a sum checksum). See SPEC §11.2.
 //
 // Frame mechanics (timing, two-frame layout, checksum) follow the documented
-// Kaseikyo/Panasonic format. The logical FIELD MAP (which byte/bit holds
-// temperature/mode/fan, and the per-vendor mode/fan codes) is PROVISIONAL and
-// is calibrated against real captures and IRremoteESP8266 in Step 3c. The
-// self-roundtrip is internally consistent regardless of the real-device map.
+// Kaseikyo/Panasonic format. The logical field map (which byte/bit holds
+// power/mode/temperature/fan, and the mode/fan codes) is verified byte-for-byte
+// against IRremoteESP8266's IRPanasonicAc encoder
+// (tests/studies/compat_matrix_ac/irremoteesp8266_tx).
 
 namespace esp32irpk::ac::Panasonic
 {
@@ -61,8 +61,7 @@ namespace esp32irpk::ac::Panasonic
     inline constexpr uint8_t kFrame1[kFrame1Bytes] = {0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06};
     inline constexpr uint8_t kFrame2Preamble[5] = {0x02, 0x20, 0xE0, 0x04, 0x00};
 
-    // Overall byte offsets (frame 2 begins at kFrame1Bytes). PROVISIONAL field
-    // positions; calibrated in Step 3c.
+    // Overall byte offsets (frame 2 begins at kFrame1Bytes).
     inline constexpr size_t kOffMode = kFrame1Bytes + 5;     // power bit + mode nibble
     inline constexpr size_t kOffTemp = kFrame1Bytes + 6;     // temperature
     inline constexpr size_t kOffFan = kFrame1Bytes + 8;      // fan nibble + swing nibble
@@ -77,8 +76,8 @@ namespace esp32irpk::ac::Panasonic
       return static_cast<uint8_t>(sum & 0xFF);
     }
 
-    // PROVISIONAL mode/fan code maps (vendor-specific values; inverse pairs so
-    // the self-roundtrip holds). Real codes are confirmed in Step 3c.
+    // Mode/fan code maps. The fan nibble is the Panasonic speed plus 3
+    // (min/low/med/high/max = 0x3..0x7, auto = 0xA).
     inline uint8_t modeToCode(Mode m)
     {
       switch (m)
@@ -136,7 +135,7 @@ namespace esp32irpk::ac::Panasonic
     uint16_t byte_length = 0;
     bool checksum_ok = false;
 
-    // Logical accessors over `bytes`. PROVISIONAL layout (see file header).
+    // Logical accessors over `bytes` (layout per the file header).
     bool power() const { return (bytes[detail::kOffMode] & 0x01u) != 0; }
     void setPower(bool on)
     {
