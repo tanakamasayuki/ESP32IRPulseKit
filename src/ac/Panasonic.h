@@ -108,8 +108,8 @@ namespace esp32irpk::ac::Panasonic
       case Fan::QUIET: return 0x3;
       case Fan::LOW_SPEED: return 0x4;
       case Fan::MED_SPEED: return 0x5;
-      case Fan::HIGH_SPEED: return 0x7;
-      case Fan::POWERFUL: return 0x6;
+      case Fan::HIGH_SPEED: return 0x6;
+      case Fan::POWERFUL: return 0x7;
       case Fan::AUTO: default: return 0xA;
       }
     }
@@ -120,8 +120,8 @@ namespace esp32irpk::ac::Panasonic
       case 0x3: return Fan::QUIET;
       case 0x4: return Fan::LOW_SPEED;
       case 0x5: return Fan::MED_SPEED;
-      case 0x7: return Fan::HIGH_SPEED;
-      case 0x6: return Fan::POWERFUL;
+      case 0x6: return Fan::HIGH_SPEED;
+      case 0x7: return Fan::POWERFUL;
       default: return Fan::AUTO;
       }
     }
