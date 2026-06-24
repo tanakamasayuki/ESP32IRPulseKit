@@ -386,6 +386,10 @@ public:
   bool setInverted(bool inverted);
   bool setCarrierHz(uint32_t hz);
   bool clearCarrierHz();
+  bool disableCarrier();
+  bool setCarrierDuty(float duty);
+  bool setPhaseAlignedCarrier(bool enable);
+  bool setTxMemBlocks(uint8_t blocks);
 
   bool addProtocol(const IRProtocolSpec& spec);
   bool clearProtocols();
@@ -442,9 +446,29 @@ public:
 
 - RAW send returns to the library default `38000`.
 - BITS send uses protocol `carrier_hz` again.
-- Carrier duty cycle is not public API. The implementation uses an internal fixed duty of about 1/3.
 
-### 6.4 encode
+`disableCarrier()` sends solid marks with no carrier modulation. Can be called before or after `begin()`; returns `false` while sending.
+
+`setCarrierDuty(duty)` sets the carrier on-time fraction. The default is about `0.33`.
+
+- Allowed range is `0 < duty < 1`. Values outside that range return `false`.
+- Can be called before or after `begin()`; returns `false` while sending.
+
+### 6.5 Carrier Generation And TX Channel
+
+`setPhaseAlignedCarrier(enable)` selects the carrier generation method. It fixes the TX channel layout, so it is valid only before `begin()` and returns `false` afterward.
+
+- `true` (default): phase-aligned, symbol-encoded carrier. Each mark is emitted as an integer number of full carrier cycles starting at phase 0, so the demodulated mark is stable frame to frame. This is preferred for cross-library interoperability.
+- `false`: free-running hardware carrier (`rmt_apply_carrier`). Far fewer RMT symbols, but the carrier phase is not reset per mark, so the demodulated mark wobbles by ±1 carrier cycle.
+
+`setTxMemBlocks(blocks)` sets the number of RMT memory blocks for the TX channel (1 block = `SOC_RMT_MEM_WORDS_PER_CHANNEL` symbols). It is valid only before `begin()`.
+
+- `0` uses the library default (1 block).
+- Larger values give the phase-aligned path more refill headroom under heavy interrupt load, at the cost of the shared RMT TX memory pool.
+
+The full carrier and timing model is in [DESIGN.md](DESIGN.md) §8 and §12.
+
+### 6.6 encode
 
 `encode(decoded, out_raw)` converts BITS to RAW without sending.
 

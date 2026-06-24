@@ -89,6 +89,38 @@ void loop() {
 
 The sender registers every built-in protocol at `begin()`, so `send()` automatically uses each protocol's preferred carrier.
 
+## Configuration
+
+### Receiver (call before `begin()`)
+
+| Method | Default | Notes |
+|---|---|---|
+| `IRReceiver<MaxCandidates>(gpio, inverted)` | `MaxCandidates = 4` | Template arg caps how many candidates can be kept |
+| `setDecodeCandidates(n)` | `MaxCandidates` | `0..MaxCandidates`; `0` = RAW-only mode (no decode) |
+| `setIdleThresholdUs(us)` | `30000` | RMT no-signal threshold; the larger of this and registered protocols' values is used |
+| `setScoreThreshold(score)` | `0` | Candidates below this score are dropped |
+| `addProtocol(spec)` / `clearProtocols()` | all built-ins | Register specs to restrict or override the decode set |
+
+### Sender
+
+| Method | Default | When | Notes |
+|---|---|---|---|
+| `setCarrierHz(hz)` | `38000` | before/after `begin()` | Explicit override, range `20000..60000`; takes precedence over protocol preference |
+| `clearCarrierHz()` | — | before/after `begin()` | Remove the override; fall back to protocol/library default |
+| `disableCarrier()` | carrier on | before/after `begin()` | Send solid marks with no carrier modulation |
+| `setCarrierDuty(duty)` | `0.33` | before/after `begin()` | Carrier on-time fraction, `0 < duty < 1` |
+| `setPhaseAlignedCarrier(enable)` | `true` | before `begin()` only | Carrier generation method — see below |
+| `setTxMemBlocks(blocks)` | `1` block | before `begin()` only | RMT TX memory blocks; `0` = library default |
+
+Carrier-frequency setters are rejected while a send is in progress. `setPhaseAlignedCarrier()` and `setTxMemBlocks()` fix the TX channel layout, so they only work before `begin()`.
+
+### Who generates the carrier
+
+- **Phase-aligned, symbol-encoded (default).** The RMT encoder emits each mark as an integer number of full carrier cycles starting at phase 0. Every mark holds a deterministic cycle count, so the demodulated mark (and the space after it) is stable frame to frame, which is best for decoding in other libraries. The cost is more RMT symbols per frame (roughly one per carrier cycle); `setTxMemBlocks()` raises the streaming headroom for applications under heavy ISR load (e.g. concurrent flash writes).
+- **Free-running hardware carrier** (`setPhaseAlignedCarrier(false)`). The RMT peripheral overlays its own carrier (`rmt_apply_carrier`): far fewer symbols, but the phase is not reset per mark, so the demodulated mark wobbles by ±1 carrier cycle (~26µs at 38kHz). That can push short-mark protocols (JVC, AEHA) outside the tightest external-decoder windows.
+
+See [DESIGN.md](DESIGN.md) §8 and §12 for the full carrier and timing model.
+
 ## Examples
 
 | Example | Description |

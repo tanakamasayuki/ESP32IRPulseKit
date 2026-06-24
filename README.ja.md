@@ -89,6 +89,38 @@ void loop() {
 
 送信側は `begin()` で全内蔵プロトコルを登録するため、`send()` は各プロトコルの推奨キャリアを自動的に使います。
 
+## 設定（初期化パラメータ）
+
+### 受信側（`begin()` より前に呼ぶ）
+
+| メソッド | 既定値 | 備考 |
+|---|---|---|
+| `IRReceiver<MaxCandidates>(gpio, inverted)` | `MaxCandidates = 4` | テンプレート引数が保持できる候補数の上限 |
+| `setDecodeCandidates(n)` | `MaxCandidates` | `0..MaxCandidates`。`0` でRAWのみモード（デコードなし） |
+| `setIdleThresholdUs(us)` | `30000` | RMTの無信号しきい値。本値と登録protocolの値の大きい方を使用 |
+| `setScoreThreshold(score)` | `0` | このスコア未満の候補は破棄 |
+| `addProtocol(spec)` / `clearProtocols()` | 全内蔵 | specを登録してデコード対象を限定・上書き |
+
+### 送信側
+
+| メソッド | 既定値 | タイミング | 備考 |
+|---|---|---|---|
+| `setCarrierHz(hz)` | `38000` | begin前後 | 明示的な上書き。範囲 `20000..60000`。protocol推奨より優先 |
+| `clearCarrierHz()` | — | begin前後 | 上書きを解除し、protocol/ライブラリ既定に戻す |
+| `disableCarrier()` | キャリアあり | begin前後 | キャリア変調なしのソリッドmarkで送信 |
+| `setCarrierDuty(duty)` | `0.33` | begin前後 | キャリアのオン時間比率。`0 < duty < 1` |
+| `setPhaseAlignedCarrier(enable)` | `true` | begin前のみ | キャリア生成方式 — 下記参照 |
+| `setTxMemBlocks(blocks)` | `1` ブロック | begin前のみ | RMT TXメモリブロック数。`0` でライブラリ既定 |
+
+キャリア周波数系のメソッドは送信中は拒否されます。`setPhaseAlignedCarrier()` と `setTxMemBlocks()` はTXチャネルの構成を固定するため、`begin()` より前でのみ有効です。
+
+### キャリアはどちらが生成するか
+
+- **位相整合・シンボルエンコード（既定）。** RMTエンコーダが各markを位相0から始まる整数個のキャリアサイクルとして出力します。各markが決定的なサイクル数を持つため、復調後のmark（とその後のspace）がフレーム間で安定し、他ライブラリでのデコードに最も適します。代償はフレームあたりのRMTシンボル数の増加（おおよそキャリア1サイクルにつき1シンボル）で、ISR負荷が高い用途（例: フラッシュ書き込みと並行）では `setTxMemBlocks()` でストリーミングの余裕を増やせます。
+- **フリーランのハードウェアキャリア**（`setPhaseAlignedCarrier(false)`）。RMTペリフェラルが自前のキャリアを重畳します（`rmt_apply_carrier`）。シンボル数は大幅に少ない一方、markごとに位相がリセットされないため、復調後のmarkが±1キャリアサイクル（38kHzで約26µs）揺れます。これによりmarkの短いprotocol（JVC・AEHA）が、外部デコーダの厳しい判定窓を外れることがあります。
+
+キャリアとタイミングモデルの全体は [DESIGN.ja.md](DESIGN.ja.md) §8・§12 を参照してください。
+
 ## サンプル
 
 | サンプル | 説明 |

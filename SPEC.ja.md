@@ -381,6 +381,10 @@ public:
   bool setInverted(bool inverted);
   bool setCarrierHz(uint32_t hz);
   bool clearCarrierHz();
+  bool disableCarrier();
+  bool setCarrierDuty(float duty);
+  bool setPhaseAlignedCarrier(bool enable);
+  bool setTxMemBlocks(uint8_t blocks);
 
   bool addProtocol(const IRProtocolSpec& spec);
   bool clearProtocols();
@@ -437,9 +441,29 @@ public:
 
 - RAW送信はライブラリ既定値 `38000` に戻ります。
 - BITS送信はprotocol specの `carrier_hz` を再び使います。
-- carrier duty比は公開APIにしません。実装内部で約1/3固定値を使います。
 
-### 6.4 encode
+`disableCarrier()` はキャリア変調なしのソリッドmarkで送信します。`begin()` 前後どちらでも呼べ、送信中は `false` を返します。
+
+`setCarrierDuty(duty)` はキャリアのオン時間比率を設定します。既定値は約 `0.33` です。
+
+- 許可範囲は `0 < duty < 1` です。範囲外は `false` を返します。
+- `begin()` 前後どちらでも呼べ、送信中は `false` を返します。
+
+### 6.5 キャリア生成とTXチャネル
+
+`setPhaseAlignedCarrier(enable)` はキャリアの生成方式を選びます。TXチャネルの構成を固定するため `begin()` より前でのみ有効で、`begin()` 後は `false` を返します。
+
+- `true`（既定）: 位相整合・シンボルエンコードのキャリア。各markを位相0から始まる整数個のキャリアサイクルとして出力するため、復調後のmarkがフレーム間で安定します。他ライブラリとの相互運用に適します。
+- `false`: フリーランのハードウェアキャリア（`rmt_apply_carrier`）。RMTシンボル数は大幅に少ない一方、markごとに位相がリセットされないため、復調後のmarkが±1キャリアサイクル揺れます。
+
+`setTxMemBlocks(blocks)` はTXチャネルのRMTメモリブロック数を設定します（1ブロック = `SOC_RMT_MEM_WORDS_PER_CHANNEL` シンボル）。`begin()` より前でのみ有効です。
+
+- `0` はライブラリ既定（1ブロック）を使います。
+- 値を大きくすると、割り込み負荷が高い状況で位相整合経路のリフィル余裕が増えますが、共有のRMT TXメモリプールを消費します。
+
+キャリアとタイミングモデルの全体は [DESIGN.ja.md](DESIGN.ja.md) §8・§12 を参照してください。
+
+### 6.6 encode
 
 `encode(decoded, out_raw)` はBITSをRAWへ変換します。送信は行いません。
 
