@@ -1,14 +1,21 @@
 // Compat-AC encoder verification -- TX side (ESP32IRPulseKit).
 //
 // Builds a known Panasonic A/C state with esp32irpk::ac::Panasonic from the
-// harness command, renders it to RAW with toRaw(), and transmits it. AC frames
-// are long, so the hardware (free-running) carrier is used -- the phase-aligned
-// carrier would explode the symbol count (see example 07 / SPEC 11). The peer
+// harness command, renders it to RAW with toRaw(), and transmits it. The peer
 // echoes the exact 27 bytes it sent (recovered via our own fromRaw, which the
 // irremoteesp8266_tx variant verified byte-for-byte) so the harness can compare
 // them against what the IRremoteESP8266 primary decodes.
 //
-// Command: SEND_AC mode=<AUTO|COOL|HEAT|DRY> fan=<AUTO|LOW|MED|HIGH> temp=<C> power=<0|1>
+// Carrier mode is selectable so the phase-aligned vs hardware carrier can be
+// compared for long AC frames (the symbol-explosion / underrun trade-off in
+// SPEC 11.3). The build-time default is PULSEKIT_CARRIER (0 = hardware,
+// 1 = phase-aligned); a runtime "CARRIER pa" / "CARRIER hw" command re-opens the
+// sender in that mode so one flash can A/B both. AC frames are long, so hardware
+// is the default.
+//
+// Commands:
+//   SEND_AC mode=<AUTO|COOL|HEAT|DRY> fan=<AUTO|LOW|MED|HIGH> temp=<C> power=<0|1>
+//   CARRIER <pa|hw>
 #include <ESP32IRPulseKit.h>
 
 #ifndef IR_TX_GPIO
@@ -19,10 +26,18 @@
 #define IR_TX_INVERTED "0"
 #endif
 
+// 0 = free-running hardware carrier (default), 1 = phase-aligned carrier.
+#ifndef PULSEKIT_CARRIER
+#define PULSEKIT_CARRIER 0
+#endif
+
 const int kIrTxGpio = atoi(IR_TX_GPIO);
 const bool kIrTxInverted = atoi(IR_TX_INVERTED) != 0;
 
 esp32irpk::IRSender tx(kIrTxGpio, kIrTxInverted);
+
+bool g_phaseAligned = (PULSEKIT_CARRIER != 0);
+bool g_begun = false;
 
 using Frame = esp32irpk::ac::Panasonic::Frame;
 using Mode = esp32irpk::ac::Panasonic::Mode;
@@ -85,7 +100,28 @@ void sendReady()
   Serial.print("TX_READY impl=ESP32IRPulseKit gpio=");
   Serial.print(kIrTxGpio);
   Serial.print(" inverted=");
-  Serial.println(kIrTxInverted ? 1 : 0);
+  Serial.print(kIrTxInverted ? 1 : 0);
+  Serial.print(" carrier=");
+  Serial.println(g_phaseAligned ? "pa" : "hw");
+}
+
+// (Re)open the sender in the requested carrier mode. The TX channel layout is
+// fixed at begin(), so a mode change must end() then begin() again.
+bool ensureMode(bool phaseAligned)
+{
+  if (g_begun && g_phaseAligned == phaseAligned)
+    return true;
+  if (g_begun)
+  {
+    tx.end();
+    g_begun = false;
+  }
+  tx.setPhaseAlignedCarrier(phaseAligned);
+  if (!tx.begin())
+    return false;
+  g_begun = true;
+  g_phaseAligned = phaseAligned;
+  return true;
 }
 
 void handleSendAc(const String &line)
@@ -155,6 +191,18 @@ void handleCommand(const String &line)
     handleSendAc(line);
     return;
   }
+  if (line == "CARRIER pa" || line == "CARRIER hw")
+  {
+    const bool pa = line.endsWith("pa");
+    if (!ensureMode(pa))
+    {
+      Serial.println("TX_ERROR begin_failed");
+      return;
+    }
+    Serial.print("CARRIER_OK mode=");
+    Serial.println(pa ? "pa" : "hw");
+    return;
+  }
   Serial.print("TX_ERROR unknown_command ");
   Serial.println(line);
 }
@@ -164,8 +212,7 @@ void setup()
 {
   Serial.begin(115200);
   delay(5000);
-  tx.setPhaseAlignedCarrier(false); // hardware carrier: long AC frames
-  if (!tx.begin())
+  if (!ensureMode(g_phaseAligned)) // build-time default: PULSEKIT_CARRIER
   {
     Serial.println("TX_ERROR begin_failed");
     return;

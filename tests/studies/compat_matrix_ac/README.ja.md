@@ -125,6 +125,18 @@ IRremoteESP8266 純正TXは 25/25 到達、当方TXは自走ハードウェア�
 検出されにくいことを示す。デューティや連送による緩和はここでは対象外。長尺向けの
 位相整合（またはライブエンコード）キャリア対応は今後の課題。
 
+キャリアを直接比較するため、`irremoteesp8266_rx` の peer（当方TX）はランタイム
+`CARRIER pa` / `CARRIER hw` コマンドを受ける（ビルド既定は `PULSEKIT_CARRIER`、
+0=ハードウェア）。`study_carrier_ab.py` が各状態を両モードで送信し、モード別の
+正準到達率を記録する。これは合否ゲートではなく計測スタディで、各モードが開けること
+と両モードで encoder が正準のままであることだけを assert するので、位相整合の到達率
+低下は失敗でなく所見として出る。実行:
+
+```sh
+uv run --env-file .env pytest -s -o python_files="study_*.py" \
+  studies/compat_matrix_ac/irremoteesp8266_rx/study_carrier_ab.py
+```
+
 ### デコーダ許容（タイミングスキュー）
 
 `heatpumpir_tx` はデコーダの厳しすぎる点も炙り出した。HeatpumpIR のESP32送信は

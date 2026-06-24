@@ -134,6 +134,18 @@ phase-aligned carrier for long frames. Mitigations via carrier duty or repeat
 are out of scope here; proper phase-aligned (or live-encoded) carrier support
 for long frames is future work.
 
+To compare the carriers directly, the `irremoteesp8266_rx` peer (our TX) takes a
+runtime `CARRIER pa` / `CARRIER hw` command (build-time default `PULSEKIT_CARRIER`,
+0 = hardware), and `study_carrier_ab.py` sends each state under both modes and
+records the canonical-delivery rate per mode. It is a measurement study, not a
+gate: it asserts only that each mode opens and that the encoder stays canonical
+in both, so a degraded phase-aligned rate is reported, not failed. Run it with:
+
+```sh
+uv run --env-file .env pytest -s -o python_files="study_*.py" \
+  studies/compat_matrix_ac/irremoteesp8266_rx/study_carrier_ab.py
+```
+
 ### Decoder tolerance (timing skew)
 
 `heatpumpir_tx` also surfaced a decoder-strictness issue. HeatpumpIR's ESP32
