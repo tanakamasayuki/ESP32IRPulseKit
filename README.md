@@ -139,6 +139,8 @@ See [DESIGN.md](DESIGN.md) §8 and §12 for the full carrier and timing model.
 | [03_send_protocols](examples/03_send_protocols) | Send one frame per built-in protocol |
 | [04_learn](examples/04_learn) | Learn a remote: receive and print copy-paste C++ to re-send it |
 | [05_raw_monitor](examples/05_raw_monitor) | RAW-only capture plus receive statistics |
+| [06_ac_learn](examples/06_ac_learn) | Learn an air conditioner: RAW capture, decoded summary, and copy-paste re-send code |
+| [07_ac_send](examples/07_ac_send) | Build and send Panasonic air-conditioner frames from scratch |
 
 ## Documentation
 

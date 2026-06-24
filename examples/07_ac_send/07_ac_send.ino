@@ -1,20 +1,5 @@
 #include <ESP32IRPulseKit.h>
 
-// ===========================================================================
-// DRAFT — usability review. The Panasonic encode backend
-//         (`esp32irpk::ac::Panasonic::Frame::toRaw`, §11.2) is implemented and
-//         self-consistent, but the field map (setters' byte/bit layout and the
-//         Panasonic::Mode / Panasonic::Fan codes) is PROVISIONAL — calibrated
-//         against real hardware / IRremoteESP8266 in Step 3c, so a real AC may
-//         not yet respond. Compiles; excluded from the build tests until then.
-// 草案 — 使い勝手レビュー。Panasonicエンコードのバックエンド
-//        （`esp32irpk::ac::Panasonic::Frame::toRaw`、§11.2）は実装済み・内部
-//        整合だが、フィールドマップ（セッタのバイト/ビット配置、Panasonic::Mode /
-//        Panasonic::Fan のコード）は仮で、Step 3c で実機/IRremoteESP8266 と
-//        突き合わせて確定する（実機はまだ反応しない可能性）。コンパイルは通るが、
-//        確定までビルドテストからは除外。
-// ===========================================================================
-
 // en: Build Panasonic AC frames from scratch and send them — no remote needed.
 //     Shows the construct -> encode -> send path with a few real operations.
 //     Adjust the GPIO number to your board wiring.

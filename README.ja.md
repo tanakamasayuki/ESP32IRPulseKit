@@ -139,6 +139,8 @@ void loop() {
 | [03_send_protocols](examples/03_send_protocols) | 内蔵プロトコルを1フレームずつ送信 |
 | [04_learn](examples/04_learn) | リモコン学習。受信し、再送用のC++コードを貼り付け可能な形で出力 |
 | [05_raw_monitor](examples/05_raw_monitor) | RAWのみのキャプチャと受信統計 |
+| [06_ac_learn](examples/06_ac_learn) | エアコン学習。RAWキャプチャ・デコード結果・再送用コードを出力 |
+| [07_ac_send](examples/07_ac_send) | PanasonicのACフレームをゼロから組み立てて送信 |
 
 ## ドキュメント
 
