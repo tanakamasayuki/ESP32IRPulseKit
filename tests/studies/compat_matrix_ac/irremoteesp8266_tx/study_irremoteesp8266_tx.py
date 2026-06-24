@@ -29,12 +29,15 @@ PASS_MIN = 3
 OUR_MODE = {"AUTO": 0, "COOL": 1, "HEAT": 2, "DRY": 3, "FAN": 4}
 OUR_FAN = {"AUTO": 0, "QUIET": 1, "LOW": 2, "MED": 3, "HIGH": 4, "POWERFUL": 5}
 
-TX_OK_AC = re.compile(rb"TX_OK_AC vendor=PANASONIC bytes=(?P<bytes>[0-9A-Fa-f]+)")
+# The state is always 27 bytes = 54 hex chars. Match exactly 54 so pexpect does
+# not lock in a partially-arrived serial buffer (a shorter run would otherwise
+# match and truncate the captured bytes).
+TX_OK_AC = re.compile(rb"TX_OK_AC vendor=PANASONIC bytes=(?P<bytes>[0-9A-Fa-f]{54})")
 
 AC_DECODE = re.compile(
     rb"AC_DECODE vendor=PANASONIC checksum=(?P<checksum>ok|bad) "
     rb"power=(?P<power>\d+) mode=(?P<mode>\d+) temp=(?P<temp>\d+) "
-    rb"fan=(?P<fan>\d+) bytes=(?P<bytes>[0-9A-Fa-f]+)"
+    rb"fan=(?P<fan>\d+) bytes=(?P<bytes>[0-9A-Fa-f]{54})"
 )
 
 

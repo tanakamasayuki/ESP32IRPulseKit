@@ -27,12 +27,15 @@ DUT_IMPL = "IRremoteESP8266"
 TRIALS = 5
 PASS_MIN = 3
 
-TX_OK_AC = re.compile(rb"TX_OK_AC vendor=PANASONIC bytes=(?P<bytes>[0-9A-Fa-f]+)")
+# The state is always 27 bytes = 54 hex chars. Match exactly 54 so pexpect does
+# not lock in a partially-arrived serial buffer (a shorter run would otherwise
+# match and truncate the captured bytes).
+TX_OK_AC = re.compile(rb"TX_OK_AC vendor=PANASONIC bytes=(?P<bytes>[0-9A-Fa-f]{54})")
 
 AC_DECODE = re.compile(
     rb"AC_DECODE vendor=PANASONIC checksum=(?P<checksum>ok|bad) "
     rb"power=(?P<power>\d+) mode=(?P<mode>\d+) temp=(?P<temp>\d+) "
-    rb"fan=(?P<fan>\d+) bytes=(?P<bytes>[0-9A-Fa-f]+)"
+    rb"fan=(?P<fan>\d+) bytes=(?P<bytes>[0-9A-Fa-f]{54})"
 )
 
 

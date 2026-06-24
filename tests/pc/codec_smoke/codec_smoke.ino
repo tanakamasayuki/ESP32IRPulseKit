@@ -1245,6 +1245,68 @@ void testPanasonicAcRoundtrip()
   esp32irpk::ac::Panasonic::Frame nf{};
   EXPECT_TRUE("panasonic/reject-nec", !esp32irpk::ac::Panasonic::Frame::fromRaw(nec, nf));
 }
+
+// Every state the compat_matrix_ac harness exercises must encode (setters ->
+// toRaw -> fromRaw) to the exact canonical 27 bytes IRremoteESP8266 produces.
+// Guards the full encoder field map + fixed feature bytes across modes/fans.
+void testPanasonicAcCanonicalStates()
+{
+  using esp32irpk::ac::Panasonic::Fan;
+  using esp32irpk::ac::Panasonic::Frame;
+  using esp32irpk::ac::Panasonic::Mode;
+
+  struct CanonCase
+  {
+    const char *name;
+    bool power;
+    Mode mode;
+    uint8_t temp;
+    Fan fan;
+    uint8_t bytes[Frame::kBytes];
+  };
+
+  static const CanonCase cases[] = {
+      {"cool/auto/26", true, Mode::COOL, 26, Fan::AUTO,
+       {0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06, 0x02, 0x20, 0xE0, 0x04, 0x00, 0x31,
+        0x34, 0x80, 0xA0, 0x00, 0x00, 0x0E, 0xE0, 0x00, 0x00, 0x81, 0x00, 0x00, 0xFA}},
+      {"heat/high/22", true, Mode::HEAT, 22, Fan::HIGH_SPEED,
+       {0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06, 0x02, 0x20, 0xE0, 0x04, 0x00, 0x41,
+        0x2C, 0x80, 0x60, 0x00, 0x00, 0x0E, 0xE0, 0x00, 0x00, 0x81, 0x00, 0x00, 0xC2}},
+      {"dry/low/24", true, Mode::DRY, 24, Fan::LOW_SPEED,
+       {0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06, 0x02, 0x20, 0xE0, 0x04, 0x00, 0x21,
+        0x30, 0x80, 0x40, 0x00, 0x00, 0x0E, 0xE0, 0x00, 0x00, 0x81, 0x00, 0x00, 0x86}},
+      {"cool/med/18", true, Mode::COOL, 18, Fan::MED_SPEED,
+       {0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06, 0x02, 0x20, 0xE0, 0x04, 0x00, 0x31,
+        0x24, 0x80, 0x50, 0x00, 0x00, 0x0E, 0xE0, 0x00, 0x00, 0x81, 0x00, 0x00, 0x9A}},
+      {"auto/auto/25/off", false, Mode::AUTO, 25, Fan::AUTO,
+       {0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06, 0x02, 0x20, 0xE0, 0x04, 0x00, 0x00,
+        0x32, 0x80, 0xA0, 0x00, 0x00, 0x0E, 0xE0, 0x00, 0x00, 0x81, 0x00, 0x00, 0xC7}},
+  };
+
+  for (const auto &c : cases)
+  {
+    Frame f{};
+    f.setPower(c.power);
+    f.setMode(c.mode);
+    f.setTemperatureC(c.temp);
+    f.setFan(c.fan);
+
+    uint16_t ticks[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+    EXPECT_TRUE("panasonic/canon-encode", f.toRaw(buf));
+
+    esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+    Frame g{};
+    EXPECT_TRUE("panasonic/canon-decode", Frame::fromRaw(view, g));
+    EXPECT_EQ("panasonic/canon-bytelen", Frame::kBytes, g.byte_length);
+
+    bool match = g.checksum_ok && g.byte_length == Frame::kBytes;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (g.bytes[i] != c.bytes[i])
+        match = false;
+    EXPECT_TRUE(c.name, match);
+  }
+}
 } // namespace
 
 void setup()
@@ -1290,6 +1352,7 @@ void setup()
   testFrameConversions();
   testAcCodecRoundtrip();
   testPanasonicAcRoundtrip();
+  testPanasonicAcCanonicalStates();
 
   Serial.print("TEST done ");
   Serial.print(g_passed);
