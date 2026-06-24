@@ -8,11 +8,16 @@ It captures RAW mark/space waveforms, decodes them into normalized bits with sco
 
 ## Features
 
-- RMT-based TX and RX: hardware-timed envelopes and hardware-timestamped capture, no per-edge interrupt jitter.
-- Three working levels: RAW ticks (`1 tick = 10us`), normalized `IRDecodedBits`, and protocol-specific `Frame` types.
-- Multi-candidate decoding: each capture is scored against registered protocols and returned best-first, so similar protocols stay distinguishable.
-- Phase-aligned, symbol-encoded carrier by default, so demodulated marks are stable frame to frame and decode cleanly in other libraries.
-- Learn-and-replay of any waveform through the RAW path, including protocols without a dedicated decoder.
+- **No busy-wait.** TX and RX run on the ESP32 RMT peripheral, not a bit-banged polling loop. Capture is hardware-timestamped and transmission is non-blocking, so the CPU stays free for the rest of your sketch and the timing does not drift under interrupt load.
+- **Scoring-based decode, not exact-match.** Real IR timings shift with the receiver module, distance, angle, carrier duty, and ambient light. Instead of rejecting anything outside a fixed window, each capture is scored by how far it deviates from each protocol's spec, so a dirty, out-of-spec waveform still decodes as long as its bits are unambiguous.
+- **Distinguishes similar protocols.** Because the deviation is folded into the score rather than discarded, look-alike protocols on the same waveform stay as ranked candidates — you get the best match plus the runners-up and their score gap, not a single yes/no guess.
+- **Three working levels:** RAW ticks (`1 tick = 10us`), normalized `IRDecodedBits`, and protocol-specific `Frame` types — drop down or stay high-level as needed.
+- **Phase-aligned, symbol-encoded carrier by default,** so demodulated marks are stable frame to frame and decode cleanly in other libraries.
+- **Learn-and-replay of any waveform** through the RAW path, including protocols without a dedicated decoder.
+
+## Scope
+
+This library targets short consumer-remote frames (NEC, Sony, AEHA, etc.) — decoding them into meaningful bits, distinguishing similar protocols, and re-sending them. It is **not** aimed at air-conditioner / heat-pump protocols (Daikin, Mitsubishi-AC, Panasonic-AC, …), where one button sends a whole multi-byte state frame that needs a different modeling layer, and it does not try to cover every exotic protocol. Broad protocol-count coverage is a non-goal; raw capture/replay already handles arbitrary waveforms when you only need learn-and-replay.
 
 ## Supported Protocols
 
