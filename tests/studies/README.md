@@ -26,5 +26,6 @@ uv run python studies/jvc_timing_sweep/analyze.py studies/jvc_timing_sweep/data/
 | `tx_jitter_loopback/` | Same, on a wired single-board loopback rig |
 | `link_quality/` | Live link-quality meter |
 | `compat_matrix/` | Protocol differences, bit order, and external-library compatibility |
+| `compat_matrix_ac/` | Air-conditioner state-field compatibility vs external AC libraries (calibrates the Panasonic field map) |
 
 Reproducible findings here should be promoted into `pc/fixtures` and `hardware/`.

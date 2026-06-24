@@ -34,7 +34,7 @@ fail, but the README should record why and preserve the observed log.
 
 Local library coverage:
 
-| PulseKit protocol | Arduino-IRremote 4.7.1 | IRremoteESP8266 2.9.0 | compat policy |
+| PulseKit protocol | Arduino-IRremote | IRremoteESP8266 | compat policy |
 |---|---|---|---|
 | NEC | TX/RX support | TX/RX support | Normal compatibility target |
 | SONY12 | TX/RX support | TX/RX support | Normal compatibility target |

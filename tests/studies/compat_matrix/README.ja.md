@@ -32,7 +32,7 @@ READMEに理由と観測ログを残します。
 
 ローカルに入っているライブラリ実装を見た整理:
 
-| PulseKit protocol | Arduino-IRremote 4.7.1 | IRremoteESP8266 2.9.0 | compat方針 |
+| PulseKit protocol | Arduino-IRremote | IRremoteESP8266 | compat方針 |
 |---|---|---|---|
 | NEC | 送受信あり | 送受信あり | 通常互換対象 |
 | SONY12 | 送受信あり | 送受信あり | 通常互換対象 |

@@ -26,5 +26,6 @@ uv run python studies/jvc_timing_sweep/analyze.py studies/jvc_timing_sweep/data/
 | `tx_jitter_loopback/` | 同上、1台有線loopback治具で |
 | `link_quality/` | リンク品質のライブメーター |
 | `compat_matrix/` | protocol差分、bit order、外部ライブラリ互換 |
+| `compat_matrix_ac/` | エアコン状態フィールドの外部ACライブラリ互換（Panasonicフィールドマップの較正） |
 
 再現性のある知見は `pc/fixtures` と `hardware/` へ昇格します。
