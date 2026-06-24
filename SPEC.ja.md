@@ -602,7 +602,8 @@ namespace Panasonic {
 // ベンダ別: Panasonicが対応する値だけ。共通メンバは命名規約に従う。
 // このenumはPanasonicが持たない値を許さない。
 enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
-enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW, MED, HIGH, POWERFUL };
+// Arduinoが LOW/HIGH をマクロ定義するため、fan段は `_SPEED` サフィックスを使う。
+enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW_SPEED, MED_SPEED, HIGH_SPEED, POWERFUL };
 
 struct Frame {
   static constexpr size_t kMaxTicks = /* ベンダフレームの上限 */;

@@ -326,3 +326,6 @@ namespace esp32irpk::detail
 } // namespace esp32irpk::detail
 
 #include "codec/Receiver.inl"
+
+// Air-conditioner support layer (separate from the generic codec; see SPEC §11).
+#include "ac/Ac.h"

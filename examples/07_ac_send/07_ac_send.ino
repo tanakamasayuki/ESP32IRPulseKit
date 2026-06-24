@@ -1,16 +1,17 @@
 #include <ESP32IRPulseKit.h>
 
 // ===========================================================================
-// DRAFT — usability review only. Targets the per-vendor AC encode API in
-//         SPEC §11.2 (`esp32irpk::ac::Panasonic::Frame::toRaw`), NOT YET
-//         IMPLEMENTED. The logical setters and the Panasonic::Mode /
-//         Panasonic::Fan enums below are PROVISIONAL and will be finalized from
-//         the Panasonic reverse engineering. Does not compile yet; excluded
-//         from build tests.
-// 草案 — 使い勝手レビュー専用。SPEC §11.2 のベンダ別ACエンコードAPI（未実装の
-//        `esp32irpk::ac::Panasonic::Frame::toRaw`）が前提。下のセッタや
-//        Panasonic::Mode / Panasonic::Fan enum は仮で、Panasonic解析後に確定する。
-//        まだコンパイルできず、ビルドテストからも除外しています。
+// DRAFT — usability review. The Panasonic encode backend
+//         (`esp32irpk::ac::Panasonic::Frame::toRaw`, §11.2) is a Step 2
+//         skeleton stub that returns false, so `ac::send` fails until Step 3.
+//         The logical setters and the Panasonic::Mode / Panasonic::Fan enums
+//         are PROVISIONAL. This compiles, but is excluded from the build tests
+//         until the backend is functional.
+// 草案 — 使い勝手レビュー。Panasonicエンコードのバックエンド
+//        （`esp32irpk::ac::Panasonic::Frame::toRaw`、§11.2）はStep 2のスケルトン
+//        スタブで false を返すため、Step 3まで `ac::send` は失敗する。セッタや
+//        Panasonic::Mode / Panasonic::Fan enum は仮。コンパイルは通るが、機能
+//        するまでビルドテストからは除外している。
 // ===========================================================================
 
 // en: Build Panasonic AC frames from scratch and send them — no remote needed.

@@ -607,7 +607,8 @@ namespace Panasonic {
 // Per-vendor: only the values Panasonic supports. Common members use the
 // shared naming convention; this enum does not allow a value Panasonic lacks.
 enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
-enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW, MED, HIGH, POWERFUL };
+// Arduino defines LOW/HIGH as macros, so fan steps use the `_SPEED` suffix.
+enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW_SPEED, MED_SPEED, HIGH_SPEED, POWERFUL };
 
 struct Frame {
   static constexpr size_t kMaxTicks = /* vendor frame upper bound */;

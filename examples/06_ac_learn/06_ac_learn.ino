@@ -1,17 +1,19 @@
 #include <ESP32IRPulseKit.h>
 
 // ===========================================================================
-// DRAFT — usability review only. Targets AC APIs defined in SPEC §11 but NOT
-//         YET IMPLEMENTED: the RAW-capture setting `setMaxRxSymbols` (§11.1)
-//         and the per-vendor decode `esp32irpk::ac::Panasonic::Frame` (§11.2).
-//         The decode accessors (power/mode/temp/fan) are PROVISIONAL and will
-//         be finalized from the Panasonic reverse engineering. Does not compile
-//         yet and is intentionally excluded from the build tests.
-// 草案 — 使い勝手レビュー専用。SPEC §11 の未実装AC API（RAWキャプチャ設定
-//        `setMaxRxSymbols`（§11.1）と、ベンダ別デコード
-//        `esp32irpk::ac::Panasonic::Frame`（§11.2））を前提とした下書き。
-//        デコードのアクセサ（power/mode/temp/fan）は仮で、Panasonic解析後に
-//        確定する。まだコンパイルできず、ビルドテストからも除外しています。
+// DRAFT — usability review. The RAW-capture path (`setMaxRxSymbols`, §11.1) is
+//         implemented, but the Panasonic decode backend
+//         (`esp32irpk::ac::Panasonic::Frame`, §11.2) is still a Step 2 skeleton
+//         stub: `fromRaw` returns false, so the decoded comment shows
+//         "no AC vendor matched" until Step 3. The decode accessors
+//         (power/mode/temp/fan) are PROVISIONAL. This compiles, but is excluded
+//         from the build tests until the backend is functional.
+// 草案 — 使い勝手レビュー。RAWキャプチャ経路（`setMaxRxSymbols`、§11.1）は実装
+//        済みだが、Panasonicデコードのバックエンド
+//        （`esp32irpk::ac::Panasonic::Frame`、§11.2）はまだStep 2のスケルトン
+//        スタブで `fromRaw` は false を返す（Step 3まではコメントは
+//        "no AC vendor matched"）。デコードのアクセサ（power/mode/temp/fan）は
+//        仮。コンパイルは通るが、機能するまでビルドテストからは除外している。
 // ===========================================================================
 
 // en: Learn an air-conditioner remote: capture it as RAW and print copy-paste
