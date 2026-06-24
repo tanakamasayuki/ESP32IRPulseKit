@@ -60,6 +60,17 @@ namespace esp32irpk
   }
 
   template <size_t MaxCandidates>
+  bool IRReceiver<MaxCandidates>::setMaxRxSymbols(size_t symbols)
+  {
+    if (begun_)
+      return false;
+    if (symbols == 0)
+      return false;
+    max_rx_symbols_ = symbols;
+    return true;
+  }
+
+  template <size_t MaxCandidates>
   bool IRReceiver<MaxCandidates>::addProtocol(const IRProtocolSpec &spec)
   {
     if (begun_)
@@ -113,7 +124,7 @@ namespace esp32irpk
       }
     }
 
-    if (!rmt_rx_.begin(gpio_, inverted_, idle_threshold))
+    if (!rmt_rx_.begin(gpio_, inverted_, idle_threshold, max_rx_symbols_))
       return false;
     begun_ = true;
     return true;

@@ -62,7 +62,7 @@ namespace esp32irpk::hal
   class RmtRx
   {
   public:
-    bool begin(int gpio, bool inverted, uint32_t idle_threshold_us);
+    bool begin(int gpio, bool inverted, uint32_t idle_threshold_us, size_t max_rx_symbols = 0);
     void end();
     bool read(/*out*/ esp32irpk::IRRawTickView &raw);
     bool consumeTruncatedFlag();
@@ -92,6 +92,7 @@ namespace esp32irpk::hal
     bool inverted_ = false;
     bool begun_ = false;
     uint32_t idle_threshold_us_ = 30000;
+    size_t max_rx_symbols_ = 0; // 0 = default capacity (kMaxRxSymbols)
     void *rx_channel_ = nullptr;
     void *rx_sem_ = nullptr;
     std::vector<uint32_t> sym_buf_;

@@ -200,6 +200,7 @@ namespace esp32irpk
     bool setDecodeCandidates(uint8_t n); // 0..MaxCandidates
     bool setIdleThresholdUs(uint32_t us);
     bool setScoreThreshold(int16_t score); // min score to accept candidates
+    bool setMaxRxSymbols(size_t symbols);  // RX capture capacity; before begin()
 
     bool addProtocol(const IRProtocolSpec &spec);
     bool clearProtocols();
@@ -222,6 +223,7 @@ namespace esp32irpk
     uint8_t order_counter_ = 0;                 // running order for protocol registration
     uint8_t decode_candidates_ = MaxCandidates; // max candidates to keep
     uint32_t idle_threshold_us_ = 30000;        // current idle threshold setting
+    size_t max_rx_symbols_ = 0;                 // RX capture capacity; 0 = HAL default
     int16_t score_threshold_ = 0;               // min score; candidates below are discarded
     IRRxStats stats_{};                         // runtime RX statistics
     std::vector<IRProtocolSpec> protocols_{};   // registered protocol list

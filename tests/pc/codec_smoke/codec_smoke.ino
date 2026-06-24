@@ -1043,12 +1043,15 @@ void testReceiverConfigurationLifecycle()
   EXPECT_TRUE("receiver-config/raw-only", rx.setDecodeCandidates(0));
   EXPECT_TRUE("receiver-config/idle-threshold", rx.setIdleThresholdUs(42000));
   EXPECT_TRUE("receiver-config/score-threshold", rx.setScoreThreshold(10));
+  EXPECT_TRUE("receiver-config/max-rx-symbols", rx.setMaxRxSymbols(1024));
+  EXPECT_TRUE("receiver-config/max-rx-symbols-zero", !rx.setMaxRxSymbols(0));
   EXPECT_TRUE("receiver-config/begin", rx.begin());
   EXPECT_TRUE("receiver-config/set-pin-after-begin", !rx.setPin(6));
   EXPECT_TRUE("receiver-config/set-inverted-after-begin", !rx.setInverted(false));
   EXPECT_TRUE("receiver-config/candidates-after-begin", !rx.setDecodeCandidates(1));
   EXPECT_TRUE("receiver-config/idle-after-begin", !rx.setIdleThresholdUs(30000));
   EXPECT_TRUE("receiver-config/score-after-begin", !rx.setScoreThreshold(0));
+  EXPECT_TRUE("receiver-config/max-rx-symbols-after-begin", !rx.setMaxRxSymbols(2048));
   EXPECT_TRUE("receiver-config/add-protocol-after-begin", !rx.addProtocol(esp32irpk::specs::NEC));
   EXPECT_TRUE("receiver-config/clear-after-begin", !rx.clearProtocols());
   EXPECT_TRUE("receiver-config/second-begin", !rx.begin());

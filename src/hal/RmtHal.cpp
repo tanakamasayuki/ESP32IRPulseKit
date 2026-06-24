@@ -337,15 +337,19 @@ namespace esp32irpk::hal
     return err == ESP_OK;
   }
 
-  bool RmtRx::begin(int gpio, bool inverted, uint32_t idle_threshold_us)
+  bool RmtRx::begin(int gpio, bool inverted, uint32_t idle_threshold_us, size_t max_rx_symbols)
   {
     if (begun_)
       return false;
     gpio_ = gpio;
     inverted_ = inverted;
-    idle_threshold_us_ = idle_threshold_us;
-    ESP_LOGV(kTag, "RMT RX begin: gpio=%d inverted=%d idle_threshold_us=%u tick_us=%u",
-             gpio_, inverted_ ? 1 : 0, idle_threshold_us_, kRmtTickUs);
+    // A single space/idle is a 15-bit duration field at the RX resolution
+    // (1 tick = kRmtTickUs). Clamp so signal_range_max_ns stays representable.
+    constexpr uint32_t kMaxIdleUs = 0x7FFFu * kRmtTickUs;
+    idle_threshold_us_ = idle_threshold_us > kMaxIdleUs ? kMaxIdleUs : idle_threshold_us;
+    max_rx_symbols_ = max_rx_symbols ? max_rx_symbols : kMaxRxSymbols;
+    ESP_LOGV(kTag, "RMT RX begin: gpio=%d inverted=%d idle_threshold_us=%u tick_us=%u max_rx_symbols=%u",
+             gpio_, inverted_ ? 1 : 0, idle_threshold_us_, kRmtTickUs, (unsigned)max_rx_symbols_);
 
     rmt_rx_channel_config_t cfg = {};
     cfg.clk_src = selectRmtClkSrc();
@@ -559,7 +563,7 @@ namespace esp32irpk::hal
     if (!rx_channel_)
       return false;
     receiving_ = false;
-    sym_buf_.resize(kMaxRxSymbols);
+    sym_buf_.resize(max_rx_symbols_ ? max_rx_symbols_ : kMaxRxSymbols);
     rmt_receive_config_t rcfg = {};
     rcfg.signal_range_min_ns = 0;
     rcfg.signal_range_max_ns = idle_threshold_us_ * 1000;
@@ -577,9 +581,10 @@ namespace esp32irpk::hal
   bool IRAM_ATTR RmtRx::handleRecvDone(const rmt_rx_done_event_data_t *edata)
   {
     sym_count_ = edata->num_symbols;
-    if (sym_count_ > kMaxRxSymbols)
+    const size_t cap = max_rx_symbols_ ? max_rx_symbols_ : kMaxRxSymbols;
+    if (sym_count_ > cap)
     {
-      sym_count_ = kMaxRxSymbols;
+      sym_count_ = cap;
       last_truncated_ = true;
     }
     has_frame_ = true;
@@ -648,11 +653,12 @@ namespace esp32irpk::hal
     return false;
   }
 
-  bool RmtRx::begin(int gpio, bool inverted, uint32_t idle_threshold_us)
+  bool RmtRx::begin(int gpio, bool inverted, uint32_t idle_threshold_us, size_t max_rx_symbols)
   {
     gpio_ = gpio;
     inverted_ = inverted;
     idle_threshold_us_ = idle_threshold_us;
+    max_rx_symbols_ = max_rx_symbols;
     queue_.clear();
     current_ = RxFrame{};
     queue_overflow_count_ = 0;
