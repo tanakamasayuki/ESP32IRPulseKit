@@ -584,36 +584,49 @@ void loop() {
 
 ### 11.2 デコード＆エンコード（ベンダ別）
 
-意味あるフィールドへのデコードとフレーム再生成はベンダごとに扱います。各ベンダは、RAW tick とバイト構造の論理状態を変換するframe型を提供します。汎用の `frames::*` の `fromBits`/`toBits` パターンを踏襲しつつ、RAWベース・バイト幅にしたものです。
+意味あるフィールドへのデコードとフレーム再生成はベンダごとに扱います。各ベンダは自分の名前空間 `esp32irpk::ac::<Vendor>` に**同じ構造**（`Mode` / `Fan` / `Frame`）を持ち、RAW tick とバイト構造の論理状態を変換します。汎用の `frames::*` の `fromBits`/`toBits` パターンを踏襲しつつ、RAWベース・バイト幅にしたものです。
+
+`Mode`・`Fan` は単一の共通enumではなく **ベンダ別enum** です。各ベンダが実際に対応する値だけを持つため、非対応の設定は名前を付けることすらできません。共通メンバは命名規約（`AUTO`/`COOL`/`HEAT`/`DRY`/`FAN`、対応する場合のfan段）を揃え、どのベンダも同じ読み口になります。名前の**構造**は全ベンダ共通（`ac::<Vendor>::Mode::COOL`）で、**メンバ集合**がベンダ固有です。
 
 ```cpp
 namespace esp32irpk::ac {
 
 enum class AcVendor : uint16_t {
   UNKNOWN = 0,
-  PANASONIC_AC = 1,
+  PANASONIC = 1,
   // ベンダは順次追加
 };
 
-struct PanasonicAcFrame {
-  AcVendor vendor = AcVendor::PANASONIC_AC;
-  uint8_t bytes[kPanasonicAcBytes] = {}; // 復号した生の状態
+namespace Panasonic {
+
+// ベンダ別: Panasonicが対応する値だけ。共通メンバは命名規約に従う。
+// このenumはPanasonicが持たない値を許さない。
+enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
+enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW, MED, HIGH, POWERFUL };
+
+struct Frame {
+  uint8_t bytes[kBytes] = {}; // 復号した生の状態（中間形式）
   uint16_t byte_length = 0;
   bool checksum_ok = false;
 
-  // power / mode / temperature / fan などの論理アクセサは
-  // `bytes` 上に実装側で定義する。
+  // `bytes` 上の論理アクセサ
+  bool power() const;          void setPower(bool on);
+  Mode mode() const;           void setMode(Mode m);
+  uint8_t temperatureC() const; void setTemperatureC(uint8_t c);
+  Fan fan() const;             void setFan(Fan f);
 
-  static bool fromRaw(const esp32irpk::IRRawTickView& raw, PanasonicAcFrame& out);
+  static bool fromRaw(const esp32irpk::IRRawTickView& raw, Frame& out);
   bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
 };
 
+} // namespace Panasonic
 }
 ```
 
-- `fromRaw(raw, out)` はRAW tickを状態バイトへ復号し、ベンダのチェックサムを検証します。そのベンダのフレームでない場合は `false` を返し、チェックサムの可否は `out.checksum_ok` で別に報告します。
-- `toRaw(out)` はチェックサムを再計算し、状態を caller提供の `IRRawTickBuffer` にRAW tickとして書き出します。結果は `IRSender::send(const IRRawTickView&)` で送信します。
-- 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサで、ベンダごとに定義します。
-- 最初の対応ベンダは Panasonic AC で、以降のベンダも同じ形に従います。
+- `Frame::fromRaw(raw, out)` はRAW tickを状態バイトへ復号し、ベンダのチェックサムを検証します。そのベンダのフレームでない場合は `false` を返し、チェックサムの可否は `out.checksum_ok` で別に報告します。
+- `Frame::toRaw(out)` はチェックサムを再計算し、状態を caller提供の `IRRawTickBuffer` にRAW tickとして書き出します。結果は `IRSender::send(const IRRawTickView&)` で送信します。
+- 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサです。
+- どのベンダもこの同じ構造を自分の `esp32irpk::ac::<Vendor>` 名前空間で提供します。enum→名前の文字列化（例 `Panasonic::toString(Mode)`）はベンダ単位で後から追加可能で、コア契約には必須ではありません。
+- 最初の対応ベンダは Panasonic です。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。

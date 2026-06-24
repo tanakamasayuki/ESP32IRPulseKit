@@ -589,36 +589,49 @@ Any AC waveform can be captured and re-sent without decoding it:
 
 ### 11.2 Decode And Encode (per vendor)
 
-Decoding into meaningful fields and regenerating a frame is handled per vendor. Each vendor exposes a frame type that converts between RAW ticks and a byte-structured logical state, mirroring the generic `frames::*` `fromBits`/`toBits` pattern but RAW-based and byte-wide.
+Decoding into meaningful fields and regenerating a frame is handled per vendor. Each vendor lives in its own namespace `esp32irpk::ac::<Vendor>` and exposes the same structure — `Mode`, `Fan`, and `Frame` — converting between RAW ticks and a byte-structured logical state, mirroring the generic `frames::*` `fromBits`/`toBits` pattern but RAW-based and byte-wide.
+
+`Mode` and `Fan` are **per-vendor enums**, not a single shared enum: each contains only the values that vendor actually supports, so an unsupported setting cannot even be named. Common members follow a shared naming convention (`AUTO`/`COOL`/`HEAT`/`DRY`/`FAN`, and fan steps where they exist) so every vendor reads the same. The naming *structure* is identical across vendors (`ac::<Vendor>::Mode::COOL`); the *member set* is vendor-specific.
 
 ```cpp
 namespace esp32irpk::ac {
 
 enum class AcVendor : uint16_t {
   UNKNOWN = 0,
-  PANASONIC_AC = 1,
+  PANASONIC = 1,
   // further vendors added incrementally
 };
 
-struct PanasonicAcFrame {
-  AcVendor vendor = AcVendor::PANASONIC_AC;
-  uint8_t bytes[kPanasonicAcBytes] = {}; // raw decoded state
+namespace Panasonic {
+
+// Per-vendor: only the values Panasonic supports. Common members use the
+// shared naming convention; this enum does not allow a value Panasonic lacks.
+enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
+enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW, MED, HIGH, POWERFUL };
+
+struct Frame {
+  uint8_t bytes[kBytes] = {}; // raw decoded state (the intermediate form)
   uint16_t byte_length = 0;
   bool checksum_ok = false;
 
-  // vendor-specific logical accessors (e.g. power, mode, temperature, fan)
-  // are defined by the implementation over `bytes`.
+  // logical accessors over `bytes`
+  bool power() const;          void setPower(bool on);
+  Mode mode() const;           void setMode(Mode m);
+  uint8_t temperatureC() const; void setTemperatureC(uint8_t c);
+  Fan fan() const;             void setFan(Fan f);
 
-  static bool fromRaw(const esp32irpk::IRRawTickView& raw, PanasonicAcFrame& out);
+  static bool fromRaw(const esp32irpk::IRRawTickView& raw, Frame& out);
   bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
 };
 
+} // namespace Panasonic
 }
 ```
 
-- `fromRaw(raw, out)` decodes RAW ticks into the state bytes and validates the vendor checksum. It returns `false` when the waveform is not that vendor's frame; `out.checksum_ok` reports checksum validity separately.
-- `toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`.
-- The byte array is the intermediate form. Vendor-specific logical fields (power, mode, temperature, fan, …) are accessors over those bytes and are defined per vendor.
-- The first supported vendor is Panasonic AC; additional vendors follow the same shape.
+- `Frame::fromRaw(raw, out)` decodes RAW ticks into the state bytes and validates the vendor checksum. It returns `false` when the waveform is not that vendor's frame; `out.checksum_ok` reports checksum validity separately.
+- `Frame::toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`.
+- The byte array is the intermediate form. Logical fields (power, mode, temperature, fan, …) are accessors over those bytes.
+- Every vendor follows this same structure under its own `esp32irpk::ac::<Vendor>` namespace. A per-vendor enum-to-name helper (e.g. `Panasonic::toString(Mode)`) may be added later; it is not required by the core contract.
+- The first supported vendor is Panasonic.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.

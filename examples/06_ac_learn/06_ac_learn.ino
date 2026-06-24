@@ -3,13 +3,13 @@
 // ===========================================================================
 // DRAFT — usability review only. Targets AC APIs defined in SPEC §11 but NOT
 //         YET IMPLEMENTED: the RAW-capture setting `setMaxRxSymbols` (§11.1)
-//         and the per-vendor decode `esp32irpk::ac::PanasonicAcFrame` (§11.2).
+//         and the per-vendor decode `esp32irpk::ac::Panasonic::Frame` (§11.2).
 //         The decode accessors (power/mode/temp/fan) are PROVISIONAL and will
 //         be finalized from the Panasonic reverse engineering. Does not compile
 //         yet and is intentionally excluded from the build tests.
 // 草案 — 使い勝手レビュー専用。SPEC §11 の未実装AC API（RAWキャプチャ設定
 //        `setMaxRxSymbols`（§11.1）と、ベンダ別デコード
-//        `esp32irpk::ac::PanasonicAcFrame`（§11.2））を前提とした下書き。
+//        `esp32irpk::ac::Panasonic::Frame`（§11.2））を前提とした下書き。
 //        デコードのアクセサ（power/mode/temp/fan）は仮で、Panasonic解析後に
 //        確定する。まだコンパイルできず、ビルドテストからも除外しています。
 // ===========================================================================
@@ -35,8 +35,8 @@ esp32irpk::IRReceiver rx(32, true); // en: most receiver modules output inverted
 //     も下のRAWスニペットでフレームは再現できる。
 static void printDecodedComment(const esp32irpk::IRRawTickView &raw)
 {
-  esp32irpk::ac::PanasonicAcFrame f;
-  if (esp32irpk::ac::PanasonicAcFrame::fromRaw(raw, f))
+  esp32irpk::ac::Panasonic::Frame f;
+  if (esp32irpk::ac::Panasonic::Frame::fromRaw(raw, f))
   {
     Serial.print("// decoded: Panasonic AC  power=");
     Serial.print(f.power() ? "on" : "off");
