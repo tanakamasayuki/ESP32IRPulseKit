@@ -172,3 +172,13 @@ That wobble can push short-mark protocols (e.g. JVC, AEHA) outside the tightest
 external-decoder windows (IRremoteESP8266), so the phase-aligned default is
 preferred for cross-library interop. Evidence:
 `tests/studies/{phase_aligned_carrier,carrier_loopback,jvc_timing_sweep}`.
+
+Long air-conditioner frames are the one case that *must* use the hardware
+carrier: at roughly one symbol per carrier cycle, a multi-frame AC burst would
+need far more symbols than the channel can stream, so the phase-aligned encoder
+is not an option for frames that long. The cost is the same ±1-cycle wobble, and
+it shows as marginally lower per-frame delivery than IRremoteESP8266's own TX on
+the same receiver (`tests/studies/compat_matrix_ac/irremoteesp8266_rx`: 23/25 vs
+25/25, drops not corruption). Closing that gap — a phase-aligned path that fits
+long frames, e.g. live-encoding the carrier during transmission instead of
+pre-expanding it into channel memory — is future work.

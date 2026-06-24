@@ -113,3 +113,15 @@ from setters and rendered by `toRaw()` is the full canonical state, including
 the fixed feature bytes a real remote always carries ([15]=0x80, [19]=0x0E,
 [20]=0xE0, [23]=0x81). A `Frame` therefore defaults to a known-good template so
 those bytes are present even when only mode/temp/fan/power are set.
+
+### Carrier reliability (long-frame TX)
+
+With the same IRremoteESP8266 receiver and the same frames, only the transmitter
+differs between two runs: IRremoteESP8266's own TX delivered 25/25 frames, while
+our TX on the free-running hardware carrier (`setPhaseAlignedCarrier(false)`,
+required for frames this long -- SPEC 11.3) delivered 23/25. Every frame that
+arrived was byte-exact (no corruption); the two misses were whole-frame drops.
+The gap points to the hardware carrier being marginally less reliable than a
+phase-aligned carrier for long frames. Mitigations via carrier duty or repeat
+are out of scope here; proper phase-aligned (or live-encoded) carrier support
+for long frames is future work.

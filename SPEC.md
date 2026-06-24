@@ -644,3 +644,9 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 - The first supported vendor is Panasonic.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
+
+### 11.3 Carrier For Long Frames
+
+AC frames are long, so they are transmitted with the free-running hardware carrier (`setPhaseAlignedCarrier(false)`). The phase-aligned carrier (§6.5) renders each mark as individual carrier-cycle symbols, which for a multi-frame AC burst exceeds the RMT symbol budget; the hardware carrier uses far fewer symbols and is the only carrier mode that fits a frame this long.
+
+The trade-off is that the hardware carrier does not reset carrier phase per mark, so a long frame's per-frame delivery is marginally less reliable than the phase-aligned carrier a short-frame remote uses: a received frame is always byte-correct (it is checksum-validated), but an occasional whole frame may not be detected by the receiver. Phase-aligned carrier support for long frames is not yet available.
