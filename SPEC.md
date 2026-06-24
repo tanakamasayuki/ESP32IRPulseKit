@@ -453,6 +453,7 @@ public:
 
 - Allowed range is `0 < duty < 1`. Values outside that range return `false`.
 - Can be called before or after `begin()`; returns `false` while sending.
+- The practical range is about `0.2`–`0.5`. A higher duty can extend range but draws more power, and at close range too high a duty can saturate the receiver and reduce reliability; a lower duty trades range for power saving. The optimum depends on distance, so `0.33` is the common recommendation.
 
 ### 6.5 Carrier Generation And TX Channel
 

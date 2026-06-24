@@ -114,6 +114,8 @@ The sender registers every built-in protocol at `begin()`, so `send()` automatic
 
 Carrier-frequency setters are rejected while a send is in progress. `setPhaseAlignedCarrier()` and `setTxMemBlocks()` fix the TX channel layout, so they only work before `begin()`.
 
+**Carrier duty.** The practical range is about `0.2`–`0.5`. A higher duty can reach farther but draws more power, and at close range too high a duty can saturate the receiver and *reduce* reliability; a lower duty trades range for power saving. The optimum depends on distance, so `0.33` is the common recommendation.
+
 ### Who generates the carrier
 
 - **Phase-aligned, symbol-encoded (default).** The RMT encoder emits each mark as an integer number of full carrier cycles starting at phase 0. Every mark holds a deterministic cycle count, so the demodulated mark (and the space after it) is stable frame to frame, which is best for decoding in other libraries. The cost is more RMT symbols per frame (roughly one per carrier cycle); `setTxMemBlocks()` raises the streaming headroom for applications under heavy ISR load (e.g. concurrent flash writes).
