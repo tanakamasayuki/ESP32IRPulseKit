@@ -264,8 +264,8 @@ esp32irpk::specs::RC6_M6_32
 - Lego Power Functions / MagiQuest（玩具・施設系）
 - Bang & Olufsen: **455kHzキャリア**。一般的な38kHz TSOPでは受信できずハード的に別物。**非対応のままが無難**
 - エアコン／ヒートポンプ系（Daikin / Mitsubishi-AC / Panasonic-AC / Gree / Coolix 等）:
-  ボタン1つで数十〜数百bitの状態を丸ごと送る別レイヤの実装。本ライブラリの汎用
-  decode/encode方針とは設計が異なるため、対象外とする
+  ボタン1つで数十〜数百bitの状態を丸ごと送るため、汎用の64bit単一フレーム
+  decode/encodeモデルには収まらない。汎用デコーダではなく別レイヤで扱う（§11参照）
 
 方針：追加するなら **Tier B まで**を上限とし、Tier C は需要が出た時点で個別に検討する。
 Tier A は「対応protocol数を増やす」目的に限り低コストで足せる。
@@ -283,6 +283,7 @@ Tier A は「対応protocol数を増やす」目的に限り低コストで足�
 - `setDecodeCandidates()`
 - `setIdleThresholdUs()`
 - `setScoreThreshold()`
+- `setMaxRxSymbols()`
 
 ### 4.1 Protocol選択
 
@@ -317,6 +318,14 @@ Tier A は「対応protocol数を増やす」目的に限り低コストで足�
 
 `setIdleThresholdUs()` の未指定値は `30000us` です。decode有効時は、登録済みprotocolの `idle_threshold_us` の最大値とreceiver設定値の大きい方を使います。
 
+### 4.5 RXキャプチャ容量
+
+`setMaxRxSymbols(symbols)` は1回のキャプチャが保持できるRMTシンボルの最大数を設定します。`begin()` より前でのみ有効です。
+
+- 既定値は通常の短いリモコンフレーム向けのサイズです。容量を超えるキャプチャはtruncateされ `RAW_TRUNCATED` が立ちます。
+- エアコンフレーム（§11）のような長い波形にはより大きい値が必要です。`setIdleThresholdUs()` と併せて引き上げ、バースト全体を1キャプチャに収めます。
+- 容量を大きくするとreceiverごとにRAMを消費するため、グローバル既定ではなくオプトインです。
+
 ## 5. IRReceiver
 
 ```cpp
@@ -334,6 +343,7 @@ public:
   bool setDecodeCandidates(uint8_t n);
   bool setIdleThresholdUs(uint32_t us);
   bool setScoreThreshold(int16_t score);
+  bool setMaxRxSymbols(size_t symbols);
 
   bool addProtocol(const IRProtocolSpec& spec);
   bool clearProtocols();
@@ -553,3 +563,51 @@ void loop() {
   }
 }
 ```
+
+## 11. エアコン対応
+
+エアコン／ヒートポンプのリモコンは、ボタン1つで多バイトの状態をまとめて送ります（しばしば100〜300+ bit、ベンダ固有レイアウト＋チェックサム、1押下で複数フレームのこともある）。これは汎用codecの64bit単一フレーム（`IRDecodedBits`）モデルに収まらないため、AC対応は `esp32irpk::ac` 配下の**別レイヤ**として RAW tick 経路上で実装します。`IRDecodedBits`・候補スコアラ・`IRProtocolID` には一切触れず、ACベンダは自動登録もされません。
+
+### 11.1 学習＆再送（ベンダ非依存）
+
+任意のAC波形は、デコードせずにキャプチャして再送できます。
+
+- RAWのみモード（`setDecodeCandidates(0)`）で受信。`setMaxRxSymbols()` をフレームに足るサイズに、`setIdleThresholdUs()` をフレーム内ギャップを跨げるサイズにして、バースト全体を1キャプチャに収める。
+- `read()` はバースト全体を1つの `IRRawTickView` として返す（RAWのみモードは分割しない）。
+- キャプチャしたRAWを `IRSender::send(const IRRawTickView&)` で再送する。長いフレームは `setPhaseAlignedCarrier(false)`（フリーランのハードウェアキャリア）にしてRMTシンボル数を抑える。
+
+### 11.2 デコード＆エンコード（ベンダ別）
+
+意味あるフィールドへのデコードとフレーム再生成はベンダごとに扱います。各ベンダは、RAW tick とバイト構造の論理状態を変換するframe型を提供します。汎用の `frames::*` の `fromBits`/`toBits` パターンを踏襲しつつ、RAWベース・バイト幅にしたものです。
+
+```cpp
+namespace esp32irpk::ac {
+
+enum class AcVendor : uint16_t {
+  UNKNOWN = 0,
+  PANASONIC_AC = 1,
+  // ベンダは順次追加
+};
+
+struct PanasonicAcFrame {
+  AcVendor vendor = AcVendor::PANASONIC_AC;
+  uint8_t bytes[kPanasonicAcBytes] = {}; // 復号した生の状態
+  uint16_t byte_length = 0;
+  bool checksum_ok = false;
+
+  // power / mode / temperature / fan などの論理アクセサは
+  // `bytes` 上に実装側で定義する。
+
+  static bool fromRaw(const esp32irpk::IRRawTickView& raw, PanasonicAcFrame& out);
+  bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
+};
+
+}
+```
+
+- `fromRaw(raw, out)` はRAW tickを状態バイトへ復号し、ベンダのチェックサムを検証します。そのベンダのフレームでない場合は `false` を返し、チェックサムの可否は `out.checksum_ok` で別に報告します。
+- `toRaw(out)` はチェックサムを再計算し、状態を caller提供の `IRRawTickBuffer` にRAW tickとして書き出します。結果は `IRSender::send(const IRRawTickView&)` で送信します。
+- 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサで、ベンダごとに定義します。
+- 最初の対応ベンダは Panasonic AC で、以降のベンダも同じ形に従います。
+
+AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。

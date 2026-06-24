@@ -268,9 +268,9 @@ bits or generate codes. They are triaged into three tiers by practical value.
 - Bang & Olufsen: **455kHz carrier** — cannot be received by a normal 38kHz TSOP,
   hardware-wise a different beast. **Best left unsupported.**
 - Air-conditioner / heat-pump protocols (Daikin / Mitsubishi-AC / Panasonic-AC /
-  Gree / Coolix, …): a single button sends a whole multi-byte state — a separate
-  layer whose design differs from this library's generic decode/encode model, so
-  it is considered out of scope.
+  Gree / Coolix, …): a single button sends a whole multi-byte state, which does
+  not fit the generic 64-bit single-frame decode/encode model. These are handled
+  by a separate layer instead of the generic decoder — see section 11.
 
 Policy: if adding, cap at **Tier B**; revisit Tier C only when demand appears.
 Tier A can be added cheaply purely to grow the supported-protocol count.
@@ -288,6 +288,7 @@ The following settings are valid only before `begin()`. They return `false` afte
 - `setDecodeCandidates()`
 - `setIdleThresholdUs()`
 - `setScoreThreshold()`
+- `setMaxRxSymbols()`
 
 ### 4.1 Protocol Selection
 
@@ -322,6 +323,14 @@ Specs added with `addProtocol()` keep their relative registration order; built-i
 
 The default `setIdleThresholdUs()` value is `30000us`. When decode is enabled, the receiver uses the larger of the receiver setting and the maximum non-zero `idle_threshold_us` among registered protocols.
 
+### 4.5 RX Capture Capacity
+
+`setMaxRxSymbols(symbols)` sets the maximum number of RMT symbols a single capture can hold. It is valid only before `begin()`.
+
+- The default is sized for normal short remote frames. Captures that exceed the capacity are truncated and `RAW_TRUNCATED` is set.
+- A long waveform such as an air-conditioner frame (section 11) needs a larger value. Raise it together with `setIdleThresholdUs()` so the whole burst lands in one capture.
+- A larger capacity costs RAM per receiver, so it is opt-in rather than a global default.
+
 ## 5. IRReceiver
 
 ```cpp
@@ -339,6 +348,7 @@ public:
   bool setDecodeCandidates(uint8_t n);
   bool setIdleThresholdUs(uint32_t us);
   bool setScoreThreshold(int16_t score);
+  bool setMaxRxSymbols(size_t symbols);
 
   bool addProtocol(const IRProtocolSpec& spec);
   bool clearProtocols();
@@ -558,3 +568,51 @@ void loop() {
   }
 }
 ```
+
+## 11. Air-Conditioner Support
+
+Air-conditioner / heat-pump remotes send a whole multi-byte state in one button press (often 100–300+ bits, vendor-specific layout with a checksum, sometimes several frames per press). This does not fit the generic codec's 64-bit single-frame `IRDecodedBits` model, so AC support is a **separate layer** under `esp32irpk::ac` that works on the RAW tick path. It does not touch `IRDecodedBits`, the candidate scorer, or `IRProtocolID`, and AC vendors are never auto-registered.
+
+### 11.1 Learn And Replay (vendor-independent)
+
+Any AC waveform can be captured and re-sent without decoding it:
+
+- Receive in RAW-only mode (`setDecodeCandidates(0)`), with `setMaxRxSymbols()` large enough for the frame and `setIdleThresholdUs()` large enough to span the frame's internal gaps so the whole burst is one capture.
+- `read()` returns the full burst as one `IRRawTickView` (RAW-only mode does not split).
+- Re-send the captured RAW with `IRSender::send(const IRRawTickView&)`. Long frames should use `setPhaseAlignedCarrier(false)` (the free-running hardware carrier) to keep the RMT symbol count manageable.
+
+### 11.2 Decode And Encode (per vendor)
+
+Decoding into meaningful fields and regenerating a frame is handled per vendor. Each vendor exposes a frame type that converts between RAW ticks and a byte-structured logical state, mirroring the generic `frames::*` `fromBits`/`toBits` pattern but RAW-based and byte-wide.
+
+```cpp
+namespace esp32irpk::ac {
+
+enum class AcVendor : uint16_t {
+  UNKNOWN = 0,
+  PANASONIC_AC = 1,
+  // further vendors added incrementally
+};
+
+struct PanasonicAcFrame {
+  AcVendor vendor = AcVendor::PANASONIC_AC;
+  uint8_t bytes[kPanasonicAcBytes] = {}; // raw decoded state
+  uint16_t byte_length = 0;
+  bool checksum_ok = false;
+
+  // vendor-specific logical accessors (e.g. power, mode, temperature, fan)
+  // are defined by the implementation over `bytes`.
+
+  static bool fromRaw(const esp32irpk::IRRawTickView& raw, PanasonicAcFrame& out);
+  bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
+};
+
+}
+```
+
+- `fromRaw(raw, out)` decodes RAW ticks into the state bytes and validates the vendor checksum. It returns `false` when the waveform is not that vendor's frame; `out.checksum_ok` reports checksum validity separately.
+- `toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`.
+- The byte array is the intermediate form. Vendor-specific logical fields (power, mode, temperature, fan, …) are accessors over those bytes and are defined per vendor.
+- The first supported vendor is Panasonic AC; additional vendors follow the same shape.
+
+AC types are not send APIs. Sending is always handled by `IRSender::send()`.
