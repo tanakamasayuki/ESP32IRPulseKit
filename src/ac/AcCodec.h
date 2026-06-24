@@ -5,12 +5,25 @@
 // Generic pulse-distance (NEC/AEHA-like) tick<->byte conversion shared by AC
 // vendors. AC frames are byte-structured and longer than the 64-bit generic
 // codec, so this layer works on raw byte arrays instead of IRDecodedBits.
-//
-// NOTE: the bodies are stubs in this skeleton (Step 2). The real decode/encode
-// is implemented in Step 3 alongside the Panasonic fixtures that verify it.
 
 namespace esp32irpk::ac
 {
+
+  namespace detail
+  {
+    constexpr uint32_t kTickUs = 10; // RAW tick unit
+
+    inline uint16_t usToTicks(uint32_t us)
+    {
+      return static_cast<uint16_t>((us + kTickUs / 2) / kTickUs);
+    }
+
+    inline bool within(uint32_t actual_us, uint32_t nominal_us, uint8_t tol_pct)
+    {
+      const uint32_t tol = nominal_us * tol_pct / 100;
+      return actual_us + tol >= nominal_us && actual_us <= nominal_us + tol;
+    }
+  } // namespace detail
 
   // Pulse-distance timing for one vendor frame: a leading header, each bit a
   // fixed mark plus a 0/1-length space, a trailing mark, and a long gap between
@@ -34,26 +47,86 @@ namespace esp32irpk::ac
   inline size_t rawFrameToBytes(const esp32irpk::IRRawTickView &raw, size_t &pos,
                                 const AcTiming &t, uint8_t *out, size_t out_cap)
   {
-    // TODO(Step 3): implement pulse-distance decode for AC frames.
-    (void)raw;
-    (void)pos;
-    (void)t;
-    (void)out;
-    (void)out_cap;
-    return 0;
+    using namespace detail;
+    if (!raw.ticks || out_cap == 0)
+      return 0;
+    // Need the header pair.
+    if (pos + 2 > raw.len)
+      return 0;
+    if (!within(raw.ticks[pos] * kTickUs, t.header_mark_us, t.tol_pct) ||
+        !within(raw.ticks[pos + 1] * kTickUs, t.header_space_us, t.tol_pct))
+      return 0;
+    pos += 2;
+
+    for (size_t i = 0; i < out_cap; ++i)
+      out[i] = 0;
+
+    const size_t max_bits = out_cap * 8;
+    size_t bit_count = 0;
+    while (pos + 1 < raw.len)
+    {
+      const uint32_t mark_us = raw.ticks[pos] * kTickUs;
+      const uint32_t space_us = raw.ticks[pos + 1] * kTickUs;
+      if (!within(mark_us, t.bit_mark_us, t.tol_pct))
+        return 0; // broken bit mark
+      if (within(space_us, t.zero_space_us, t.tol_pct))
+      {
+        // bit 0: leave the cleared bit as-is
+      }
+      else if (within(space_us, t.one_space_us, t.tol_pct))
+      {
+        if (bit_count >= max_bits)
+          return 0; // payload exceeds caller buffer
+        out[bit_count / 8] |= static_cast<uint8_t>(1u << (bit_count % 8));
+      }
+      else
+      {
+        // Not a 0/1 space: this mark is the trailer and the space is the
+        // inter-frame gap. Frame complete.
+        pos += 2;
+        return bit_count;
+      }
+      if (bit_count >= max_bits)
+        return 0;
+      ++bit_count;
+      pos += 2;
+    }
+    // Ran out of ticks: a trailing trailer mark with no recorded gap (last
+    // frame of the capture) still ends the frame.
+    if (pos < raw.len)
+      pos = raw.len;
+    return bit_count;
   }
 
   // Encode `bit_len` bits from `bytes` as one pulse-distance frame appended to
-  // `out`. Returns false on capacity overflow.
+  // `out` (LSB-first within each byte). Returns false on capacity overflow.
   inline bool bytesFrameToRaw(const uint8_t *bytes, size_t bit_len,
                               const AcTiming &t, esp32irpk::IRRawTickBuffer &out)
   {
-    // TODO(Step 3): implement pulse-distance encode for AC frames.
-    (void)bytes;
-    (void)bit_len;
-    (void)t;
-    (void)out;
-    return false;
+    using namespace detail;
+    if (!out.ticks)
+      return false;
+    auto push = [&](uint16_t tick) -> bool
+    {
+      if (out.len >= out.capacity)
+        return false;
+      out.ticks[out.len++] = tick;
+      return true;
+    };
+
+    if (!push(usToTicks(t.header_mark_us)) || !push(usToTicks(t.header_space_us)))
+      return false;
+    for (size_t i = 0; i < bit_len; ++i)
+    {
+      const bool one = (bytes[i / 8] >> (i % 8)) & 0x1u;
+      if (!push(usToTicks(t.bit_mark_us)))
+        return false;
+      if (!push(usToTicks(one ? t.one_space_us : t.zero_space_us)))
+        return false;
+    }
+    if (!push(usToTicks(t.trailer_mark_us)) || !push(usToTicks(t.frame_gap_us)))
+      return false;
+    return true;
   }
 
 } // namespace esp32irpk::ac

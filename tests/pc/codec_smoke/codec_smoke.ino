@@ -1137,6 +1137,60 @@ void testFrameConversions()
   EXPECT_EQ("frame/jvc-length", 16, jvc_bits.bit_length);
   EXPECT_EQ("frame/jvc-mask", 0xc0deULL, jvc_bits.bits);
 }
+
+// Generic AC pulse-distance codec (esp32irpk::ac::AcCodec): vendor-independent
+// tick<->byte roundtrip, including multi-frame concatenation via `pos`.
+void testAcCodecRoundtrip()
+{
+  esp32irpk::ac::AcTiming t{};
+  t.header_mark_us = 3500;
+  t.header_space_us = 1750;
+  t.bit_mark_us = 435;
+  t.zero_space_us = 435;
+  t.one_space_us = 1300;
+  t.trailer_mark_us = 435;
+  t.frame_gap_us = 10000;
+  t.tol_pct = 30;
+  t.lsb_first = true;
+
+  const uint8_t f1[] = {0x02, 0x20, 0xE0};        // 24 bits
+  const uint8_t f2[] = {0xA5, 0x3C, 0xFF, 0x00, 0x12}; // 40 bits
+
+  uint16_t ticks[256];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("ac-codec/encode-f1", esp32irpk::ac::bytesFrameToRaw(f1, 24, t, buf));
+  EXPECT_TRUE("ac-codec/encode-f2", esp32irpk::ac::bytesFrameToRaw(f2, 40, t, buf));
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  size_t pos = 0;
+  uint8_t d1[8] = {};
+  size_t bits1 = esp32irpk::ac::rawFrameToBytes(view, pos, t, d1, sizeof(d1));
+  EXPECT_EQ("ac-codec/decode-f1-bits", 24, bits1);
+  EXPECT_EQ("ac-codec/decode-f1-b0", 0x02, d1[0]);
+  EXPECT_EQ("ac-codec/decode-f1-b1", 0x20, d1[1]);
+  EXPECT_EQ("ac-codec/decode-f1-b2", 0xE0, d1[2]);
+
+  uint8_t d2[8] = {};
+  size_t bits2 = esp32irpk::ac::rawFrameToBytes(view, pos, t, d2, sizeof(d2));
+  EXPECT_EQ("ac-codec/decode-f2-bits", 40, bits2);
+  EXPECT_EQ("ac-codec/decode-f2-b0", 0xA5, d2[0]);
+  EXPECT_EQ("ac-codec/decode-f2-b1", 0x3C, d2[1]);
+  EXPECT_EQ("ac-codec/decode-f2-b2", 0xFF, d2[2]);
+  EXPECT_EQ("ac-codec/decode-f2-b3", 0x00, d2[3]);
+  EXPECT_EQ("ac-codec/decode-f2-b4", 0x12, d2[4]);
+  EXPECT_EQ("ac-codec/decode-consumed-all", view.len, pos);
+
+  // A corrupted header must be rejected.
+  uint16_t bad_ticks[64];
+  esp32irpk::IRRawTickBuffer bad{bad_ticks, sizeof(bad_ticks) / sizeof(bad_ticks[0]), 0};
+  esp32irpk::ac::bytesFrameToRaw(f1, 24, t, bad);
+  bad.ticks[0] = 10; // wipe the header mark
+  esp32irpk::IRRawTickView bad_view{bad.ticks, bad.len};
+  size_t bad_pos = 0;
+  uint8_t bd[8] = {};
+  EXPECT_EQ("ac-codec/reject-bad-header", 0,
+            esp32irpk::ac::rawFrameToBytes(bad_view, bad_pos, t, bd, sizeof(bd)));
+}
 } // namespace
 
 void setup()
@@ -1180,6 +1234,7 @@ void setup()
   testDecodeCandidateLimitZero();
   testDecodeConsumesConcatenatedFramePrefix();
   testFrameConversions();
+  testAcCodecRoundtrip();
 
   Serial.print("TEST done ");
   Serial.print(g_passed);
