@@ -30,10 +30,19 @@
 送信側で、peer名は `tx` 固定（`TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3` を使い回す）。
 
 ```text
-irremoteesp8266_tx/   # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
-irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
-heatpumpir_tx/        # TX: HeatpumpIR（既知状態） -> RX: ESP32IRPulseKit       （2系統目の参照）
+irremoteesp8266_tx/    # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
+irremoteesp8266_self/  # TX + RX: IRremoteESP8266                               （参照ベースライン）
+heatpumpir_tx/         # TX: HeatpumpIR（既知状態） -> RX: ESP32IRPulseKit       （2系統目の参照）
 ```
+
+`irremoteesp8266_self`（IRremoteESP8266 が既知状態をエンコードし、自分の送信を
+デコード）はベースライン。クロス方向を信頼する前に、参照が物理治具/配置で往復
+できることを確認します。
+
+Arduino-IRremote はここでは**使いません**。エアコン状態のデコーダを持たず
+（Panasonic を汎用48bitフレームとしてしか読まず、AC状態は復号しない）、フィールド
+比較ができないためです。
 
 - `*_tx`（外部が送信、当方RX）: peer が**既知**のAC状態（例: 冷房/26℃/風量自動）を
   送信。当方RXがRAWをキャプチャ（RAWのみ＋`setMaxRxSymbols`＋大きめidle）し

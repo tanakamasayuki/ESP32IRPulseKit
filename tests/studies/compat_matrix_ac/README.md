@@ -31,10 +31,19 @@ DUT, `peer_tx/` is the transmitter, and the peer name stays `tx` so variants
 reuse `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`.
 
 ```text
-irremoteesp8266_tx/   # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
-irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
-heatpumpir_tx/        # TX: HeatpumpIR (known state) -> RX: ESP32IRPulseKit       (second reference)
+irremoteesp8266_tx/    # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+irremoteesp8266_self/  # TX + RX: IRremoteESP8266                                 (reference baseline)
+heatpumpir_tx/         # TX: HeatpumpIR (known state) -> RX: ESP32IRPulseKit       (second reference)
 ```
+
+`irremoteesp8266_self` (IRremoteESP8266 encodes a known AC state and decodes its
+own transmission) is the baseline: it confirms the reference round-trips in the
+physical rig/placement before the cross directions are trusted.
+
+Arduino-IRremote is intentionally **not** used here: it has no air-conditioner
+state decoder (it reads Panasonic only as a generic 48-bit frame, not the AC
+state), so it cannot compare fields.
 
 - `*_tx` (external transmitter, our RX): the peer sends a **known** AC state
   (e.g. cool / 26 C / fan auto); our RX captures RAW (RAW-only +
