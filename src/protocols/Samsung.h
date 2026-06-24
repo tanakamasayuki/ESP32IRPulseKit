@@ -151,3 +151,24 @@ namespace esp32irpk::frames
   };
 
 } // namespace esp32irpk::frames
+
+namespace esp32irpk::bits
+{
+
+  inline esp32irpk::IRDecodedBits samsung32(uint16_t address, uint16_t command)
+  {
+    esp32irpk::frames::Samsung32Frame frame{};
+    frame.address = address;
+    frame.command = command;
+    return frame.toBits();
+  }
+
+  inline esp32irpk::IRDecodedBits samsung36(uint16_t address, uint32_t command)
+  {
+    esp32irpk::frames::Samsung36Frame frame{};
+    frame.address = address;
+    frame.command = command;
+    return frame.toBits();
+  }
+
+} // namespace esp32irpk::bits

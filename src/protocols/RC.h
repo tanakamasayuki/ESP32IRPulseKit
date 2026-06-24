@@ -60,6 +60,16 @@ namespace esp32irpk::frames
       out.data = static_cast<uint16_t>(in.bits & 0x3FFFu);
       return out;
     }
+
+    esp32irpk::IRDecodedBits toBits() const
+    {
+      esp32irpk::IRDecodedBits out{};
+      out.protocol_id = esp32irpk::IRProtocolID::RC5;
+      out.frame_type = esp32irpk::IRFrameType::NORMAL;
+      out.bit_length = 14;
+      out.bits = static_cast<uint64_t>(data & 0x3FFFu);
+      return out;
+    }
   };
 
   struct RC6M0Frame
@@ -69,6 +79,16 @@ namespace esp32irpk::frames
     {
       RC6M0Frame out{};
       out.data = static_cast<uint32_t>(in.bits & 0x1FFFFFu);
+      return out;
+    }
+
+    esp32irpk::IRDecodedBits toBits() const
+    {
+      esp32irpk::IRDecodedBits out{};
+      out.protocol_id = esp32irpk::IRProtocolID::RC6_M0_16;
+      out.frame_type = esp32irpk::IRFrameType::NORMAL;
+      out.bit_length = 21;
+      out.bits = static_cast<uint64_t>(data & 0x1FFFFFu);
       return out;
     }
   };
@@ -82,6 +102,42 @@ namespace esp32irpk::frames
       out.data = in.bits & 0xFFFFFFFFFULL;
       return out;
     }
+
+    esp32irpk::IRDecodedBits toBits() const
+    {
+      esp32irpk::IRDecodedBits out{};
+      out.protocol_id = esp32irpk::IRProtocolID::RC6_M6_32;
+      out.frame_type = esp32irpk::IRFrameType::NORMAL;
+      out.bit_length = 36;
+      out.bits = data & 0xFFFFFFFFFULL;
+      return out;
+    }
   };
 
 } // namespace esp32irpk::frames
+
+namespace esp32irpk::bits
+{
+
+  inline esp32irpk::IRDecodedBits rc5(uint16_t data)
+  {
+    esp32irpk::frames::RC5Frame frame{};
+    frame.data = data;
+    return frame.toBits();
+  }
+
+  inline esp32irpk::IRDecodedBits rc6m0(uint32_t data)
+  {
+    esp32irpk::frames::RC6M0Frame frame{};
+    frame.data = data;
+    return frame.toBits();
+  }
+
+  inline esp32irpk::IRDecodedBits rc6m6(uint64_t data)
+  {
+    esp32irpk::frames::RC6M6Frame frame{};
+    frame.data = data;
+    return frame.toBits();
+  }
+
+} // namespace esp32irpk::bits

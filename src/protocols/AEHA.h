@@ -70,3 +70,16 @@ namespace esp32irpk::frames
   };
 
 } // namespace esp32irpk::frames
+
+namespace esp32irpk::bits
+{
+
+  inline esp32irpk::IRDecodedBits aeha(uint64_t data, uint16_t bit_length)
+  {
+    esp32irpk::frames::AEHAFrame frame{};
+    frame.data = data;
+    frame.bit_length = bit_length;
+    return frame.toBits();
+  }
+
+} // namespace esp32irpk::bits

@@ -73,3 +73,16 @@ namespace esp32irpk::frames
   };
 
 } // namespace esp32irpk::frames
+
+namespace esp32irpk::bits
+{
+
+  inline esp32irpk::IRDecodedBits jvc(uint8_t address, uint8_t command)
+  {
+    esp32irpk::frames::JVCFrame frame{};
+    frame.address = address;
+    frame.command = command;
+    return frame.toBits();
+  }
+
+} // namespace esp32irpk::bits

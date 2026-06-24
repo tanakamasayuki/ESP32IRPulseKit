@@ -2,17 +2,108 @@
 
 > English: [README.md](README.md)
 
-ESP32 Arduino Core 3.x / ESP-IDF 5.x の新RMTドライバを使うIRリモコン送受信ライブラリです。
+ESP32 Arduino Core 3.x 向けのIRリモコン送受信ライブラリです。ESP-IDF 5.x の新RMTドライバ上で動作します。
 
-現在はリリース前の開発版です。外部仕様は [SPEC.ja.md](SPEC.ja.md)、設計メモは [DESIGN.ja.md](DESIGN.ja.md)、テスト方針は [tests/TEST_PLAN.ja.md](tests/TEST_PLAN.ja.md) を参照してください。
+RAWなmark/space波形をキャプチャし、スコア付きのプロトコル候補とともに正規化bitsへデコードします。送信は位相整合キャリアを用い、他ライブラリとの相互運用でも安定して復調できます。
 
-## 現在の開発方針
+## 特長
 
-- RAW tick capture、decode候補、protocol spec、frame変換を分離して整理する
-- codec経路はArduino host実行テストで先に固める
-- examplesや最小sketchはArduino CLIビルドテストで確認する
-- RMT/HALはESP32実機テストで検証する
-- 市販リモコンや外乱光など、ソフトウェアで完全制御できないものだけ手動テストに残す
+- RMTベースのTX/RX。エンベロープはハードウェアタイミング、受信はハードウェアタイムスタンプで、エッジごとの割り込みジッタがありません。
+- 3つの抽象レベルで扱えます。RAW tick（`1 tick = 10us`）、正規化された `IRDecodedBits`、プロトコル固有の `Frame` 型。
+- 複数候補デコード。各キャプチャを登録プロトコルに対してスコア付けし、上位順で返すため、似たプロトコルも区別できます。
+- 既定で位相整合・シンボルエンコードのキャリアを使用。復調後のmarkがフレーム間で安定し、他ライブラリでもきれいにデコードされます。
+- 専用デコーダのないプロトコルを含め、あらゆる波形をRAW経路で学習・再送できます。
+
+## 対応プロトコル
+
+| Protocol ID | ビット数 | 備考 |
+|---|---|---|
+| `NEC` | 32 | アドレス＋コマンド＋リピートフレーム |
+| `AEHA` | 可変 | 家製協（Kaseikyo/Panasonic）系。ファミリ全体で1つのID |
+| `SONY12` / `SONY15` / `SONY20` | 12 / 15 / 20 | SIRC, 40kHz |
+| `SAMSUNG32` / `SAMSUNG36` | 32 / 36 | |
+| `JVC` | 16 | |
+| `RC5` | 14 | バイフェーズ, 36kHz |
+| `RC6_M0_16` / `RC6_M6_32` | 21 / 36 | バイフェーズ, 36kHz |
+
+専用デコーダがない波形でも、RAW tick経路でキャプチャと再送が可能です。
+
+## インストール
+
+- Arduino IDE: ライブラリマネージャで `ESP32IRPulseKit` を検索。
+- 手動: 本リポジトリを Arduino の `libraries/` ディレクトリへコピー。
+- ESP32 Arduino Core 3.0 以降（ESP-IDF 5.x の新RMTドライバ）が必要です。
+
+ヘッダは1つだけインクルードします。
+
+```cpp
+#include <ESP32IRPulseKit.h>
+```
+
+## クイックスタート
+
+受信してデコード:
+
+```cpp
+#include <ESP32IRPulseKit.h>
+
+esp32irpk::IRReceiver rx(32, true); // GPIO 32。多くの受信モジュールは出力が反転
+
+void setup() {
+  Serial.begin(115200);
+  rx.begin();
+}
+
+void loop() {
+  esp32irpk::IRReceiveResult<> r;
+  if (!rx.read(r)) {
+    delay(1);
+    return;
+  }
+  if (const esp32irpk::IRDecodedBits *bits = r.bits()) {
+    Serial.print("protocol=");
+    Serial.print((unsigned)bits->protocol_id);
+    Serial.print(" bits=0x");
+    Serial.println((uint32_t)bits->bits, HEX);
+  }
+}
+```
+
+NEC送信:
+
+```cpp
+#include <ESP32IRPulseKit.h>
+
+esp32irpk::IRSender tx(4); // GPIO 4
+
+void setup() {
+  Serial.begin(115200);
+  tx.begin();
+}
+
+void loop() {
+  tx.send(esp32irpk::bits::nec(0x00ff, 0x34));
+  delay(1000);
+}
+```
+
+送信側は `begin()` で全内蔵プロトコルを登録するため、`send()` は各プロトコルの推奨キャリアを自動的に使います。
+
+## サンプル
+
+| サンプル | 説明 |
+|---|---|
+| [01_rx_dump](examples/01_rx_dump) | 受信・デコードし、候補とフレームをシリアル出力 |
+| [02_nec_tx](examples/02_nec_tx) | NECフレームの送信 |
+| [03_send_protocols](examples/03_send_protocols) | 内蔵プロトコルを1フレームずつ送信 |
+| [04_learn](examples/04_learn) | リモコン学習。受信し、再送用のC++コードを貼り付け可能な形で出力 |
+| [05_raw_monitor](examples/05_raw_monitor) | RAWのみのキャプチャと受信統計 |
+
+## ドキュメント
+
+- [SPEC.ja.md](SPEC.ja.md) — 公開APIの仕様
+- [DESIGN.ja.md](DESIGN.ja.md) — 実装メモ、スコアリングとキャリアモデル
+- [tests/TEST_PLAN.ja.md](tests/TEST_PLAN.ja.md) — テスト方針
 
 ## テスト
 
@@ -28,10 +119,6 @@ uv run --env-file .env pytest hardware/link_smoke
 
 `pytest pc` はPCテスト一式（`fixtures`、`codec_smoke`、`compile`）を実行します。`hardware/` は2台構成の合否回帰テスト、`studies/` 配下の実機調査は自動収集されません（`study_*.py`）。詳細は [tests/README.ja.md](tests/README.ja.md) を参照してください。
 
-## 開発メモ
+## ライセンス
 
-リリース前のため、APIや内部構造は破壊的変更を許容します。特に次の点は優先的に整理します。
-
-- Arduino/RMT非依存のcodec層とESP32 HAL層の境界
-- 対応済みprotocolと定義のみのprotocolの明示
-- 自動テスト可能な実機TX/RX loopの整備
+MITライセンス。[LICENSE](LICENSE) を参照してください。

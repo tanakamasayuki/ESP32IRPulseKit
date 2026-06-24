@@ -470,14 +470,25 @@ struct NECFrame {
 
 Frame型はdecode/encode本体ではありません。decode/encodeは `IRProtocolSpec` と codec が担当します。
 
+すべての内蔵protocolのFrame型は `fromBits()` と `toBits()` の両方を備えます。デコード結果の確認と再送を対称に行えます。
+
 ## 8. BITS helper
 
-よく使うFrame生成は `esp32irpk::bits` に小さなhelperを置くことがあります。helperは `IRDecodedBits` を返します。
+すべての内蔵protocolには、`IRDecodedBits` を返す小さなhelperが `esp32irpk::bits` にあります。helperは各protocolのFrameフィールドに対応し、最短の生成経路です。
 
 ```cpp
 esp32irpk::IRDecodedBits bits = esp32irpk::bits::nec(0x00ff, 0x34);
 tx.send(bits);
 ```
+
+| helper | 対象 |
+|---|---|
+| `bits::nec(address, command)` / `bits::necRepeat()` | NEC |
+| `bits::aeha(data, bit_length)` | AEHA（可変長） |
+| `bits::sony12(data)` / `bits::sony15(data)` / `bits::sony20(data)` | Sony SIRC |
+| `bits::samsung32(address, command)` / `bits::samsung36(address, command)` | Samsung |
+| `bits::jvc(address, command)` | JVC |
+| `bits::rc5(data)` / `bits::rc6m0(data)` / `bits::rc6m6(data)` | RC5 / RC6 の生ペイロード |
 
 helperは送信APIではありません。送信は常に `IRSender::send()` が担当します。
 

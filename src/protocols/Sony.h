@@ -189,3 +189,29 @@ namespace esp32irpk::frames
   };
 
 } // namespace esp32irpk::frames
+
+namespace esp32irpk::bits
+{
+
+  inline esp32irpk::IRDecodedBits sony12(uint32_t data)
+  {
+    esp32irpk::frames::Sony12Frame frame{};
+    frame.data = data;
+    return frame.toBits();
+  }
+
+  inline esp32irpk::IRDecodedBits sony15(uint32_t data)
+  {
+    esp32irpk::frames::Sony15Frame frame{};
+    frame.data = data;
+    return frame.toBits();
+  }
+
+  inline esp32irpk::IRDecodedBits sony20(uint32_t data)
+  {
+    esp32irpk::frames::Sony20Frame frame{};
+    frame.data = data;
+    return frame.toBits();
+  }
+
+} // namespace esp32irpk::bits

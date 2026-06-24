@@ -37,6 +37,21 @@ def test_nec_tx_example_builds(tmp_path):
     compile_sketch(repo / "examples" / "02_nec_tx", tmp_path)
 
 
+def test_send_protocols_example_builds(tmp_path):
+    repo = Path(__file__).resolve().parents[3]
+    compile_sketch(repo / "examples" / "03_send_protocols", tmp_path)
+
+
+def test_learn_example_builds(tmp_path):
+    repo = Path(__file__).resolve().parents[3]
+    compile_sketch(repo / "examples" / "04_learn", tmp_path)
+
+
+def test_raw_monitor_example_builds(tmp_path):
+    repo = Path(__file__).resolve().parents[3]
+    compile_sketch(repo / "examples" / "05_raw_monitor", tmp_path)
+
+
 def test_link_smoke_hardware_sketches_build(tmp_path):
     repo = Path(__file__).resolve().parents[3]
     compile_sketch(repo / "tests" / "hardware" / "link_smoke", tmp_path, "rx_esp32s3")

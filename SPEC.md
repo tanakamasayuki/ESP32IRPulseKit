@@ -475,14 +475,25 @@ struct NECFrame {
 
 Frame types are not the decode/encode implementation. Decode/encode is handled by codec and `IRProtocolSpec`.
 
+Every built-in protocol provides a Frame type with both `fromBits()` and `toBits()`, so a decoded frame can be inspected and re-sent symmetrically.
+
 ## 8. BITS Helpers
 
-Common Frame construction may also be exposed as small helpers under `esp32irpk::bits`. Helpers return `IRDecodedBits`.
+Every built-in protocol has a small helper under `esp32irpk::bits` that returns `IRDecodedBits`. Helpers mirror each protocol's Frame fields and are the shortest construction route.
 
 ```cpp
 esp32irpk::IRDecodedBits bits = esp32irpk::bits::nec(0x00ff, 0x34);
 tx.send(bits);
 ```
+
+| Helper | Fields |
+|---|---|
+| `bits::nec(address, command)` / `bits::necRepeat()` | NEC |
+| `bits::aeha(data, bit_length)` | AEHA (variable length) |
+| `bits::sony12(data)` / `bits::sony15(data)` / `bits::sony20(data)` | Sony SIRC |
+| `bits::samsung32(address, command)` / `bits::samsung36(address, command)` | Samsung |
+| `bits::jvc(address, command)` | JVC |
+| `bits::rc5(data)` / `bits::rc6m0(data)` / `bits::rc6m6(data)` | RC5 / RC6 raw payload |
 
 Helpers are not send APIs. Sending is always handled by `IRSender::send()`.
 
