@@ -605,6 +605,8 @@ enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
 enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW, MED, HIGH, POWERFUL };
 
 struct Frame {
+  static constexpr size_t kMaxTicks = /* ベンダフレームの上限 */;
+
   uint8_t bytes[kBytes] = {}; // 復号した生の状態（中間形式）
   uint16_t byte_length = 0;
   bool checksum_ok = false;
@@ -620,11 +622,17 @@ struct Frame {
 };
 
 } // namespace Panasonic
+
+// 便利関数: 任意ベンダの frame をエンコードして1呼び出しで送信する。
+template <class Frame>
+bool send(esp32irpk::IRSender& tx, const Frame& frame);
+
 }
 ```
 
 - `Frame::fromRaw(raw, out)` はRAW tickを状態バイトへ復号し、ベンダのチェックサムを検証します。そのベンダのフレームでない場合は `false` を返し、チェックサムの可否は `out.checksum_ok` で別に報告します。
 - `Frame::toRaw(out)` はチェックサムを再計算し、状態を caller提供の `IRRawTickBuffer` にRAW tickとして書き出します。結果は `IRSender::send(const IRRawTickView&)` で送信します。
+- `ac::send(tx, frame)` は1呼び出し版です。`Frame::kMaxTicks` のスタックバッファへエンコードして送信し、エンコード/送信失敗時は `false` を返します。バッファを自分で管理したい場合は `toRaw` + `IRSender::send()` を使います。送信機のキャリアモード（長尺は `setPhaseAlignedCarrier(false)`）は従来どおり別に設定します。
 - 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサです。
 - どのベンダもこの同じ構造を自分の `esp32irpk::ac::<Vendor>` 名前空間で提供します。enum→名前の文字列化（例 `Panasonic::toString(Mode)`）はベンダ単位で後から追加可能で、コア契約には必須ではありません。
 - 最初の対応ベンダは Panasonic です。

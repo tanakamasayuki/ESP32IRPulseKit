@@ -21,22 +21,6 @@
 //     GPIO番号はご利用環境の配線に合わせて変更してください。
 esp32irpk::IRSender tx(4);
 
-// en: Scratch buffer for the encoded frame. AC frames are long.
-// ja: エンコード結果用のバッファ。ACフレームは長い。
-static uint16_t out_ticks[2048];
-
-static bool sendFrame(const esp32irpk::ac::Panasonic::Frame &f)
-{
-  esp32irpk::IRRawTickBuffer out{out_ticks, sizeof(out_ticks) / sizeof(out_ticks[0]), 0};
-  if (!f.toRaw(out)) // en: fills bytes' checksum + renders ticks / ja: チェックサム込みでtick生成
-  {
-    Serial.println("encode failed (buffer too small?)");
-    return false;
-  }
-  esp32irpk::IRRawTickView view{out.ticks, out.len};
-  return tx.send(view);
-}
-
 void setup()
 {
   Serial.begin(115200);
@@ -65,7 +49,9 @@ void loop()
     Serial.print("cool ");
     Serial.print((unsigned)temp);
     Serial.println("C");
-    Serial.println(sendFrame(f) ? "  sent" : "  send failed");
+    // en: ac::send encodes the frame and transmits it in one call.
+    // ja: ac::send はフレームをエンコードして1呼び出しで送信する。
+    Serial.println(esp32irpk::ac::send(tx, f) ? "  sent" : "  send failed");
     delay(4000);
   }
 
@@ -73,6 +59,6 @@ void loop()
   // ja: 操作2 — 停止する。
   f.setPower(false);
   Serial.println("power off");
-  Serial.println(sendFrame(f) ? "  sent" : "  send failed");
+  Serial.println(esp32irpk::ac::send(tx, f) ? "  sent" : "  send failed");
   delay(8000);
 }

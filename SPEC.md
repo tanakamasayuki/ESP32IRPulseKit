@@ -610,6 +610,8 @@ enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
 enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW, MED, HIGH, POWERFUL };
 
 struct Frame {
+  static constexpr size_t kMaxTicks = /* vendor frame upper bound */;
+
   uint8_t bytes[kBytes] = {}; // raw decoded state (the intermediate form)
   uint16_t byte_length = 0;
   bool checksum_ok = false;
@@ -625,11 +627,17 @@ struct Frame {
 };
 
 } // namespace Panasonic
+
+// Convenience: encode `frame` (any vendor Frame) and transmit it in one call.
+template <class Frame>
+bool send(esp32irpk::IRSender& tx, const Frame& frame);
+
 }
 ```
 
 - `Frame::fromRaw(raw, out)` decodes RAW ticks into the state bytes and validates the vendor checksum. It returns `false` when the waveform is not that vendor's frame; `out.checksum_ok` reports checksum validity separately.
 - `Frame::toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`.
+- `ac::send(tx, frame)` is the one-call path: it encodes into a stack buffer of `Frame::kMaxTicks` and transmits, returning `false` on encode or send failure. Use the explicit `toRaw` + `IRSender::send()` pair instead when you need to control the buffer. The sender's carrier mode (`setPhaseAlignedCarrier(false)` for long frames) is configured separately, as usual.
 - The byte array is the intermediate form. Logical fields (power, mode, temperature, fan, …) are accessors over those bytes.
 - Every vendor follows this same structure under its own `esp32irpk::ac::<Vendor>` namespace. A per-vendor enum-to-name helper (e.g. `Panasonic::toString(Mode)`) may be added later; it is not required by the core contract.
 - The first supported vendor is Panasonic.
