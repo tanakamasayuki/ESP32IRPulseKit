@@ -15,3 +15,6 @@ build/
 .idea/
 *.swp
 .DS_Store
+
+# Study plots are regenerable from the CSV data via each study's analyze.py
+tests/studies/**/data/*.png
