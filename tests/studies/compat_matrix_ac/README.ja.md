@@ -90,8 +90,12 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   当方RXがRAWキャプチャして `esp32irpk::ac::Panasonic` でデコード。正準フレームとの
   バイト一致が合否判定（hard）、既知状態とのフィールド単位比較は報告のみ（assertし
   ない）でフィールドマップ確定の材料にする。
+- `irremoteesp8266_rx/` — encoder検証（`_tx`の対）: 当方TXが `esp32irpk::ac::Panasonic`
+  で既知状態をエンコードして送信、IRremoteESP8266 がデコード。外部ライブラリが復元
+  したバイトが当方encoderの生成バイトと一致（checksum ok）すること＝当方 `toRaw()` が
+  独立スタックも受理する正しいバーストを出すことの証明。
 
-続いて `irremoteesp8266_rx/`、`heatpumpir_tx/`。所見と確定したフィールドマップは
+続いて `heatpumpir_tx/`。所見と確定したフィールドマップは
 ここと `src/ac/Panasonic.h` に反映します。
 
 `irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
@@ -99,3 +103,8 @@ IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを�
 キャプチャが正準27バイトを再現し、power / mode（auto/cool/heat/dry）/ temperature
 / fan がすべて期待値にデコードされる。fan nibble は Panasonic の速度＋3
 （min/low/med/high/max = 0x3〜0x7、auto = 0xA）。
+
+`irremoteesp8266_rx/` の結果、当方encoderも確認: setterで構築し `toRaw()` で描画した
+フレームが、実機リモコンが常に持つ固定feature byte（[15]=0x80, [19]=0x0E, [20]=0xE0,
+[23]=0x81）を含む完全な正準状態になる。そのため `Frame` は既知良テンプレートを既定値
+とし、mode/temp/fan/power だけ設定してもこれらのバイトが揃う。

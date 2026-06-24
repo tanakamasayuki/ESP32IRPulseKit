@@ -93,8 +93,13 @@ harness are added one variant at a time. In place:
   Byte equality against the canonical frame is the hard pass/fail; per-field
   comparison against the known state is reported (not asserted) to drive the
   field map.
+- `irremoteesp8266_rx/` -- encoder verification (complement of `_tx`): our TX
+  encodes a known state with `esp32irpk::ac::Panasonic` and transmits it;
+  IRremoteESP8266 decodes it. The bytes the external library recovers must equal
+  the bytes our encoder produced, with a valid checksum -- proving our `toRaw()`
+  emits a well-formed burst an independent stack accepts.
 
-`irremoteesp8266_rx/` and `heatpumpir_tx/` follow. Findings and the confirmed
+`heatpumpir_tx/` follows. Findings and the confirmed
 field map are recorded back here and into `src/ac/Panasonic.h`.
 
 The `irremoteesp8266_tx/` run confirms the Panasonic field map in
@@ -102,3 +107,9 @@ The `irremoteesp8266_tx/` run confirms the Panasonic field map in
 our RAW capture reproduces the canonical 27 bytes, and power / mode (auto, cool,
 heat, dry) / temperature / fan all decode to the expected values. The fan nibble
 is the Panasonic speed plus 3 (min/low/med/high/max = 0x3..0x7, auto = 0xA).
+
+The `irremoteesp8266_rx/` run additionally confirms our encoder: a frame built
+from setters and rendered by `toRaw()` is the full canonical state, including
+the fixed feature bytes a real remote always carries ([15]=0x80, [19]=0x0E,
+[20]=0xE0, [23]=0x81). A `Frame` therefore defaults to a known-good template so
+those bytes are present even when only mode/temp/fan/power are set.

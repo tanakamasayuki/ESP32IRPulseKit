@@ -131,7 +131,16 @@ namespace esp32irpk::ac::Panasonic
     static constexpr size_t kBytes = detail::kFrame1Bytes + detail::kFrame2Bytes; // 27
     static constexpr size_t kMaxTicks = 512; // two rendered frames + headers/gaps
 
-    uint8_t bytes[kBytes] = {}; // raw state: frame1 (0..7) ++ frame2 (8..26)
+    // raw state: frame1 (0..7) ++ frame2 (8..26). Default is a known-good frame
+    // (signature, preamble, and the fixed feature bytes [15]=0x80, [19]=0x0E,
+    // [20]=0xE0, [23]=0x81 that a real Panasonic frame always carries); the
+    // logical fields (mode/power [13], temperature [14], fan [16]) and the
+    // checksum [26] are zero until set, so a frame built from setters renders a
+    // complete, decodable burst.
+    uint8_t bytes[kBytes] = {
+        0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06,
+        0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00,
+        0x00, 0x0E, 0xE0, 0x00, 0x00, 0x81, 0x00, 0x00, 0x00};
     uint16_t byte_length = 0;
     bool checksum_ok = false;
 

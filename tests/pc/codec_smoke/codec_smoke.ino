@@ -1224,6 +1224,20 @@ void testPanasonicAcRoundtrip()
   EXPECT_EQ("panasonic/decode-temp", 26, g.temperatureC());
   EXPECT_TRUE("panasonic/decode-fan", g.fan() == esp32irpk::ac::Panasonic::Fan::AUTO);
 
+  // The encoded frame must be the full canonical Panasonic state a real remote
+  // sends, including the fixed feature bytes ([15]=0x80, [19]=0x0E, [20]=0xE0,
+  // [23]=0x81). Verified byte-for-byte against IRremoteESP8266's IRPanasonicAc
+  // for power=on / cool / 26C / fan=auto (studies/compat_matrix_ac).
+  static const uint8_t kCanonicalCoolAuto26[esp32irpk::ac::Panasonic::Frame::kBytes] = {
+      0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06,
+      0x02, 0x20, 0xE0, 0x04, 0x00, 0x31, 0x34, 0x80, 0xA0, 0x00,
+      0x00, 0x0E, 0xE0, 0x00, 0x00, 0x81, 0x00, 0x00, 0xFA};
+  bool canonical_match = true;
+  for (size_t i = 0; i < esp32irpk::ac::Panasonic::Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCoolAuto26[i])
+      canonical_match = false;
+  EXPECT_TRUE("panasonic/canonical-bytes", canonical_match);
+
   // A non-Panasonic waveform (NEC) must be rejected.
   esp32irpk::IRRawTickView nec{};
   nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
