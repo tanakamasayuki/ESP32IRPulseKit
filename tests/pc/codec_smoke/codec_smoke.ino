@@ -1191,6 +1191,46 @@ void testAcCodecRoundtrip()
   EXPECT_EQ("ac-codec/reject-bad-header", 0,
             esp32irpk::ac::rawFrameToBytes(bad_view, bad_pos, t, bd, sizeof(bd)));
 }
+
+// Panasonic AC: build a frame, render it, decode it back, and confirm the
+// logical fields and checksum survive the roundtrip (provisional field map; the
+// self-roundtrip is internally consistent regardless of the real-device map).
+void testPanasonicAcRoundtrip()
+{
+  esp32irpk::ac::Panasonic::Frame f{};
+  f.setPower(true);
+  f.setMode(esp32irpk::ac::Panasonic::Mode::COOL);
+  f.setTemperatureC(26);
+  f.setFan(esp32irpk::ac::Panasonic::Fan::AUTO);
+
+  // In-memory accessor roundtrip.
+  EXPECT_TRUE("panasonic/power-get", f.power());
+  EXPECT_TRUE("panasonic/mode-get", f.mode() == esp32irpk::ac::Panasonic::Mode::COOL);
+  EXPECT_EQ("panasonic/temp-get", 26, f.temperatureC());
+  EXPECT_TRUE("panasonic/fan-get", f.fan() == esp32irpk::ac::Panasonic::Fan::AUTO);
+
+  uint16_t ticks[esp32irpk::ac::Panasonic::Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("panasonic/encode", f.toRaw(buf));
+  EXPECT_TRUE("panasonic/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  esp32irpk::ac::Panasonic::Frame g{};
+  EXPECT_TRUE("panasonic/decode", esp32irpk::ac::Panasonic::Frame::fromRaw(view, g));
+  EXPECT_TRUE("panasonic/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("panasonic/decode-bytelen", esp32irpk::ac::Panasonic::Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("panasonic/decode-power", g.power());
+  EXPECT_TRUE("panasonic/decode-mode", g.mode() == esp32irpk::ac::Panasonic::Mode::COOL);
+  EXPECT_EQ("panasonic/decode-temp", 26, g.temperatureC());
+  EXPECT_TRUE("panasonic/decode-fan", g.fan() == esp32irpk::ac::Panasonic::Fan::AUTO);
+
+  // A non-Panasonic waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  esp32irpk::ac::Panasonic::Frame nf{};
+  EXPECT_TRUE("panasonic/reject-nec", !esp32irpk::ac::Panasonic::Frame::fromRaw(nec, nf));
+}
 } // namespace
 
 void setup()
@@ -1235,6 +1275,7 @@ void setup()
   testDecodeConsumesConcatenatedFramePrefix();
   testFrameConversions();
   testAcCodecRoundtrip();
+  testPanasonicAcRoundtrip();
 
   Serial.print("TEST done ");
   Serial.print(g_passed);

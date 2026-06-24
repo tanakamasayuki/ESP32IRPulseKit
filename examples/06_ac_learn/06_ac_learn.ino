@@ -1,19 +1,17 @@
 #include <ESP32IRPulseKit.h>
 
 // ===========================================================================
-// DRAFT — usability review. The RAW-capture path (`setMaxRxSymbols`, §11.1) is
-//         implemented, but the Panasonic decode backend
-//         (`esp32irpk::ac::Panasonic::Frame`, §11.2) is still a Step 2 skeleton
-//         stub: `fromRaw` returns false, so the decoded comment shows
-//         "no AC vendor matched" until Step 3. The decode accessors
-//         (power/mode/temp/fan) are PROVISIONAL. This compiles, but is excluded
-//         from the build tests until the backend is functional.
-// 草案 — 使い勝手レビュー。RAWキャプチャ経路（`setMaxRxSymbols`、§11.1）は実装
-//        済みだが、Panasonicデコードのバックエンド
-//        （`esp32irpk::ac::Panasonic::Frame`、§11.2）はまだStep 2のスケルトン
-//        スタブで `fromRaw` は false を返す（Step 3まではコメントは
-//        "no AC vendor matched"）。デコードのアクセサ（power/mode/temp/fan）は
-//        仮。コンパイルは通るが、機能するまでビルドテストからは除外している。
+// DRAFT — usability review. The RAW-capture path (`setMaxRxSymbols`, §11.1) and
+//         the Panasonic decode backend (`esp32irpk::ac::Panasonic`, §11.2) are
+//         implemented and self-consistent, but the field map (power/mode/temp/
+//         fan offsets and codes) is PROVISIONAL — calibrated against real
+//         hardware / IRremoteESP8266 in Step 3c. Compiles; excluded from the
+//         build tests until field-map verification.
+// 草案 — 使い勝手レビュー。RAWキャプチャ経路（`setMaxRxSymbols`、§11.1）と
+//        Panasonicデコードのバックエンド（`esp32irpk::ac::Panasonic`、§11.2）は
+//        実装済み・内部整合だが、フィールドマップ（power/mode/temp/fan のバイト
+//        位置・コード）は仮で、Step 3c で実機/IRremoteESP8266 と突き合わせて確定
+//        する。コンパイルは通るが、フィールドマップ検証までビルドテストからは除外。
 // ===========================================================================
 
 // en: Learn an air-conditioner remote: capture it as RAW and print copy-paste
