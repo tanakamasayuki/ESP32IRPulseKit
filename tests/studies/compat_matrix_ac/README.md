@@ -122,11 +122,17 @@ harness are added one variant at a time. In place:
   matching `esp32irpk::ac::Gree`). The `tx` run confirms our RAW decode of the
   two-block frame (second block has no header) reproduces the canonical 8 bytes
   byte-for-byte; the `rx` run confirms our encoder emits, and an independent stack
-  accepts, those bytes with a valid Kelvinator block checksum. A Gree burst is
-  longer than Panasonic's (a 9 ms header plus two ~20 ms inter-block gaps), so its
-  RX primary needs a 50 ms end-of-message timeout (a thinner margin over the
-  20 ms gap splits off the second block) and over-the-air sends drop somewhat
-  more often, hence the larger `TRIALS` in the `rx` study.
+  accepts, those bytes with a valid Kelvinator block checksum. Two Gree specifics:
+  (1) its RX primary needs a 50 ms end-of-message timeout — `decodeGree` reads the
+  ~20 ms inter-block gap as block 2's header space, so a thinner margin splits the
+  second block off; (2) Gree must be sent with the phase-aligned carrier — the
+  free-running hardware carrier's ~1-cycle mark wobble drops about half the frames
+  (its 540 µs zero-space is shorter than the 620 µs bit mark, so the wobble pushes
+  spaces out of tolerance; measured phase-aligned 50/50 vs hardware ~55%, see
+  `study_carrier_ab.py`). Even on the phase-aligned carrier the 540 µs zero-space
+  leaves little headroom against a receiver that lengthens spaces, so the IR path
+  must be reasonably aligned for the reference decoder to accept it at its default
+  tolerance.
 
 Findings and the confirmed field maps are recorded back here and into
 `src/ac/Panasonic.h` / `src/ac/Gree.h`.
