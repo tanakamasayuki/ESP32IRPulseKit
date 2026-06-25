@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+
+## 1.0.1
 - (EN) Air-conditioner support: a separate `esp32irpk::ac` layer over the RAW path, with Panasonic decode/encode (`Frame::fromRaw`/`toRaw`, `Mode`/`Fan`, sum checksum) and a one-call `ac::send`. Verified field-for-field against IRremoteESP8266 and HeatpumpIR.
 - (JA) エアコン対応: RAW経路上の独立した `esp32irpk::ac` レイヤーを追加。Panasonic のデコード/エンコード（`Frame::fromRaw`/`toRaw`、`Mode`/`Fan`、総和チェックサム）と1呼び出しの `ac::send` を提供。IRremoteESP8266 と HeatpumpIR とフィールド単位で照合済み。
 - (EN) `IRReceiver::setMaxRxSymbols()` to enlarge the RX capture, enabling RAW-only learn & replay of long frames (e.g. air conditioners).
