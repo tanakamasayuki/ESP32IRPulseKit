@@ -31,11 +31,20 @@ DUT, `peer_tx/` is the transmitter, and the peer name stays `tx` so variants
 reuse `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`.
 
 ```text
-irremoteesp8266_tx/    # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
-irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
-irremoteesp8266_self/  # TX + RX: IRremoteESP8266                                 (reference baseline)
-heatpumpir_tx/         # TX: HeatpumpIR (known state) -> RX: ESP32IRPulseKit       (second reference)
+# Panasonic
+irremoteesp8266_tx/        # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+irremoteesp8266_rx/        # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+irremoteesp8266_self/      # TX + RX: IRremoteESP8266                                 (reference baseline)
+heatpumpir_tx/             # TX: HeatpumpIR (known state) -> RX: ESP32IRPulseKit       (second reference)
+
+# Gree (IRGreeAC with the YBOFB model, matching esp32irpk::ac::Gree)
+gree_irremoteesp8266_tx/   # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+gree_irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
+
+Each vendor uses the same `<extlib>_<role>` variants. The variant folders are
+prefixed with the vendor name (`gree_…`); the un-prefixed ones are Panasonic for
+historical reasons.
 
 `irremoteesp8266_self` (IRremoteESP8266 encodes a known AC state and decodes its
 own transmission) is the baseline: it confirms the reference round-trips in the

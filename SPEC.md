@@ -600,6 +600,7 @@ namespace esp32irpk::ac {
 enum class AcVendor : uint16_t {
   UNKNOWN = 0,
   PANASONIC = 1,
+  GREE = 2,
   // further vendors added incrementally
 };
 
@@ -642,7 +643,9 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 - `ac::send(tx, frame)` is the one-call path: it encodes into a stack buffer of `Frame::kMaxTicks` and transmits, returning `false` on encode or send failure. Use the explicit `toRaw` + `IRSender::send()` pair instead when you need to control the buffer. The sender's carrier mode (`setPhaseAlignedCarrier(false)` for long frames) is configured separately, as usual.
 - The byte array is the intermediate form. Logical fields (power, mode, temperature, fan, …) are accessors over those bytes.
 - Every vendor follows this same structure under its own `esp32irpk::ac::<Vendor>` namespace. A per-vendor enum-to-name helper (e.g. `Panasonic::toString(Mode)`) may be added later; it is not required by the core contract.
-- The first supported vendor is Panasonic.
+- Supported vendors:
+  - `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame.
+  - `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. Targets the single YBOFB-style model (the model bit stays clear). `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 

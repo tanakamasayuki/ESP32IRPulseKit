@@ -3,6 +3,7 @@
 #include "../ESP32IRPulseKit.h"
 #include "AcCodec.h"
 #include "Panasonic.h"
+#include "Gree.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -15,6 +16,7 @@ namespace esp32irpk::ac
   {
     UNKNOWN = 0,
     PANASONIC = 1,
+    GREE = 2,
     // further vendors added incrementally
   };
 

@@ -30,11 +30,19 @@
 送信側で、peer名は `tx` 固定（`TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3` を使い回す）。
 
 ```text
-irremoteesp8266_tx/    # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
-irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
-irremoteesp8266_self/  # TX + RX: IRremoteESP8266                               （参照ベースライン）
-heatpumpir_tx/         # TX: HeatpumpIR（既知状態） -> RX: ESP32IRPulseKit       （2系統目の参照）
+# Panasonic
+irremoteesp8266_tx/        # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+irremoteesp8266_rx/        # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
+irremoteesp8266_self/      # TX + RX: IRremoteESP8266                               （参照ベースライン）
+heatpumpir_tx/             # TX: HeatpumpIR（既知状態） -> RX: ESP32IRPulseKit       （2系統目の参照）
+
+# Gree（esp32irpk::ac::Gree に合わせて IRGreeAC の YBOFB モデルを使用）
+gree_irremoteesp8266_tx/   # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+gree_irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
 ```
+
+各ベンダは同じ `<extlib>_<role>` バリアントを使う。バリアントのフォルダ名は
+ベンダ名で前置する（`gree_…`）。前置のないものは歴史的経緯で Panasonic。
 
 `irremoteesp8266_self`（IRremoteESP8266 が既知状態をエンコードし、自分の送信を
 デコード）はベースライン。クロス方向を信頼する前に、参照が物理治具/配置で往復

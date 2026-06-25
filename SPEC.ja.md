@@ -595,6 +595,7 @@ namespace esp32irpk::ac {
 enum class AcVendor : uint16_t {
   UNKNOWN = 0,
   PANASONIC = 1,
+  GREE = 2,
   // ベンダは順次追加
 };
 
@@ -637,7 +638,9 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 - `ac::send(tx, frame)` は1呼び出し版です。`Frame::kMaxTicks` のスタックバッファへエンコードして送信し、エンコード/送信失敗時は `false` を返します。バッファを自分で管理したい場合は `toRaw` + `IRSender::send()` を使います。送信機のキャリアモード（長尺は `setPhaseAlignedCarrier(false)`）は従来どおり別に設定します。
 - 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサです。
 - どのベンダもこの同じ構造を自分の `esp32irpk::ac::<Vendor>` 名前空間で提供します。enum→名前の文字列化（例 `Panasonic::toString(Mode)`）はベンダ単位で後から追加可能で、コア契約には必須ではありません。
-- 最初の対応ベンダは Panasonic です。
+- 対応ベンダ:
+  - `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。
+  - `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。単一のYBOFB系モデル（モデルビットは常に0）を対象とする。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 

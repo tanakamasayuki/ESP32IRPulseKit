@@ -43,20 +43,26 @@ namespace esp32irpk::ac
 
   // Decode one pulse-distance frame from `raw` starting at tick index `pos`.
   // On success returns the decoded bit count and advances `pos` past the frame;
-  // returns 0 on mismatch.
+  // returns 0 on mismatch. `with_header` selects whether a leading header pair
+  // is expected: some vendors (e.g. Gree) concatenate a second block with no
+  // header of its own.
   inline size_t rawFrameToBytes(const esp32irpk::IRRawTickView &raw, size_t &pos,
-                                const AcTiming &t, uint8_t *out, size_t out_cap)
+                                const AcTiming &t, uint8_t *out, size_t out_cap,
+                                bool with_header = true)
   {
     using namespace detail;
     if (!raw.ticks || out_cap == 0)
       return 0;
-    // Need the header pair.
-    if (pos + 2 > raw.len)
-      return 0;
-    if (!within(raw.ticks[pos] * kTickUs, t.header_mark_us, t.tol_pct) ||
-        !within(raw.ticks[pos + 1] * kTickUs, t.header_space_us, t.tol_pct))
-      return 0;
-    pos += 2;
+    if (with_header)
+    {
+      // Need the header pair.
+      if (pos + 2 > raw.len)
+        return 0;
+      if (!within(raw.ticks[pos] * kTickUs, t.header_mark_us, t.tol_pct) ||
+          !within(raw.ticks[pos + 1] * kTickUs, t.header_space_us, t.tol_pct))
+        return 0;
+      pos += 2;
+    }
 
     for (size_t i = 0; i < out_cap; ++i)
       out[i] = 0;
@@ -104,8 +110,11 @@ namespace esp32irpk::ac
 
   // Encode `bit_len` bits from `bytes` as one pulse-distance frame appended to
   // `out` (LSB-first within each byte). Returns false on capacity overflow.
+  // `with_header` selects whether a leading header pair is emitted: some vendors
+  // (e.g. Gree) concatenate a second block with no header of its own.
   inline bool bytesFrameToRaw(const uint8_t *bytes, size_t bit_len,
-                              const AcTiming &t, esp32irpk::IRRawTickBuffer &out)
+                              const AcTiming &t, esp32irpk::IRRawTickBuffer &out,
+                              bool with_header = true)
   {
     using namespace detail;
     if (!out.ticks)
@@ -118,8 +127,9 @@ namespace esp32irpk::ac
       return true;
     };
 
-    if (!push(usToTicks(t.header_mark_us)) || !push(usToTicks(t.header_space_us)))
-      return false;
+    if (with_header)
+      if (!push(usToTicks(t.header_mark_us)) || !push(usToTicks(t.header_space_us)))
+        return false;
     for (size_t i = 0; i < bit_len; ++i)
     {
       const bool one = (bytes[i / 8] >> (i % 8)) & 0x1u;

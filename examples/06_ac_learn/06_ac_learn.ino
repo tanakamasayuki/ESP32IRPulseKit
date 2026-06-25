@@ -13,40 +13,64 @@
 esp32irpk::IRReceiver rx(32, true); // en: most receiver modules output inverted / ja: 多くの受信モジュールは出力反転
 
 // en: Decode is done here at receive time: try each AC vendor and print the
-//     decoded settings as a comment. Vendors are added incrementally; for now
-//     only Panasonic. When none match, the RAW snippet below still reproduces
-//     the frame.
+//     decoded settings as a comment. Vendors are added incrementally. When none
+//     match, the RAW snippet below still reproduces the frame.
 // ja: デコードは受信時にここで行う: 各ACベンダを試し、デコードした設定をコメント
-//     として出力する。ベンダは順次追加で、今はPanasonicのみ。どれにも当たらなくて
-//     も下のRAWスニペットでフレームは再現できる。
+//     として出力する。ベンダは順次追加。どれにも当たらなくても下のRAWスニペット
+//     でフレームは再現できる。
+
+// en: helpers live in an anonymous namespace: the Arduino .ino preprocessor does
+//     not auto-generate prototypes for namespaced functions, which is required
+//     for the printAcFrame template (a generated prototype would drop the
+//     `template` line and fail to compile).
+// ja: ヘルパは無名名前空間に置く。Arduinoの.ino前処理は名前空間内の関数に自動
+//     プロトタイプを生成しないため、テンプレート printAcFrame が壊れずに済む。
+namespace
+{
+// en: print "power/mode/temp/fan/checksum" plus the full state in hex. The hex
+//     line is handy for inspecting fields the named accessors do not expose yet
+//     (e.g. half-degree or vendor flags). Shared by all vendors.
+// ja: power/mode/temp/fan/checksum とデコード状態全体のhexを出力する。hex行は
+//     名前付きアクセサが未公開のフィールド（0.5℃やベンダ固有フラグ等）の確認に
+//     便利。全ベンダ共通。
+template <class Frame>
+void printAcFrame(const char *vendor, const Frame &f)
+{
+  Serial.print("// decoded: ");
+  Serial.print(vendor);
+  Serial.print(" AC  power=");
+  Serial.print(f.power() ? "on" : "off");
+  Serial.print(" mode=");
+  Serial.print((unsigned)f.mode());
+  Serial.print(" temp=");
+  Serial.print((unsigned)f.temperatureC());
+  Serial.print("C fan=");
+  Serial.print((unsigned)f.fan());
+  Serial.print("  checksum=");
+  Serial.println(f.checksum_ok ? "ok" : "BAD");
+  Serial.print("// bytes:");
+  for (size_t i = 0; i < f.byte_length; ++i)
+  {
+    Serial.print(' ');
+    if (f.bytes[i] < 0x10)
+      Serial.print('0');
+    Serial.print(f.bytes[i], HEX);
+  }
+  Serial.println();
+}
+
 static void printDecodedComment(const esp32irpk::IRRawTickView &raw)
 {
-  esp32irpk::ac::Panasonic::Frame f;
-  if (esp32irpk::ac::Panasonic::Frame::fromRaw(raw, f))
+  esp32irpk::ac::Panasonic::Frame pf;
+  if (esp32irpk::ac::Panasonic::Frame::fromRaw(raw, pf))
   {
-    Serial.print("// decoded: Panasonic AC  power=");
-    Serial.print(f.power() ? "on" : "off");
-    Serial.print(" mode=");
-    Serial.print((unsigned)f.mode());
-    Serial.print(" temp=");
-    Serial.print((unsigned)f.temperatureC());
-    Serial.print("C fan=");
-    Serial.print((unsigned)f.fan());
-    Serial.print("  checksum=");
-    Serial.println(f.checksum_ok ? "ok" : "BAD");
-    // en: full decoded state in hex — handy for inspecting fields the named
-    //     accessors do not expose yet (e.g. half-degree or vendor flags).
-    // ja: デコードした状態全体をhexで出力。名前付きアクセサがまだ公開していない
-    //     フィールド（0.5℃やベンダ固有フラグ等）の確認に便利。
-    Serial.print("// bytes:");
-    for (size_t i = 0; i < f.byte_length; ++i)
-    {
-      Serial.print(' ');
-      if (f.bytes[i] < 0x10)
-        Serial.print('0');
-      Serial.print(f.bytes[i], HEX);
-    }
-    Serial.println();
+    printAcFrame("Panasonic", pf);
+    return;
+  }
+  esp32irpk::ac::Gree::Frame gf;
+  if (esp32irpk::ac::Gree::Frame::fromRaw(raw, gf))
+  {
+    printAcFrame("Gree", gf);
     return;
   }
   Serial.println("// decoded: no AC vendor matched (raw replay still works)");
@@ -75,6 +99,7 @@ static void printRawSnippet(const esp32irpk::IRRawTickView &raw)
   Serial.print((unsigned)raw.len);
   Serial.println("});");
 }
+} // namespace
 
 void setup()
 {

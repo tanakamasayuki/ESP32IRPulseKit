@@ -1354,6 +1354,110 @@ void testPanasonicAcDecodesSkewedTiming()
   EXPECT_EQ("panasonic/skewed-temp", 26, g.temperatureC());
   EXPECT_TRUE("panasonic/skewed-fan", g.fan() == Fan::AUTO);
 }
+
+// Gree AC: build a frame, render the two-block burst (the second block carries
+// no header), decode it back, and confirm the logical fields and Kelvinator
+// block checksum survive the roundtrip. The canonical bytes are derived from
+// the documented field layout + checksum algorithm; the hardware study in
+// studies/compat_matrix_ac verifies them against IRremoteESP8266's IRGreeAC.
+void testGreeAcRoundtrip()
+{
+  using esp32irpk::ac::Gree::Fan;
+  using esp32irpk::ac::Gree::Frame;
+  using esp32irpk::ac::Gree::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(25);
+  f.setFan(Fan::AUTO);
+
+  // In-memory accessor roundtrip.
+  EXPECT_TRUE("gree/power-get", f.power());
+  EXPECT_TRUE("gree/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("gree/temp-get", 25, f.temperatureC());
+  EXPECT_TRUE("gree/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("gree/encode", f.toRaw(buf));
+  EXPECT_TRUE("gree/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("gree/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("gree/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("gree/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("gree/decode-power", g.power());
+  EXPECT_TRUE("gree/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("gree/decode-temp", 25, g.temperatureC());
+  EXPECT_TRUE("gree/decode-fan", g.fan() == Fan::AUTO);
+
+  // Power on / cool / 25C / fan auto, derived from the documented layout and the
+  // Kelvinator block checksum (byte7 high nibble).
+  static const uint8_t kCanonicalCool25[Frame::kBytes] = {
+      0x09, 0x09, 0x20, 0x50, 0x00, 0x20, 0x00, 0xE0};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool25[i])
+      canonical_match = false;
+  EXPECT_TRUE("gree/canonical-bytes", canonical_match);
+
+  // Temperature clamps to the supported range.
+  Frame t{};
+  t.setTemperatureC(40);
+  EXPECT_EQ("gree/temp-clamp-high", 30, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("gree/temp-clamp-low", 16, t.temperatureC());
+
+  // A non-Gree waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("gree/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature combination must encode (setters -> toRaw ->
+// fromRaw) back to itself with a valid checksum, exercising the full field map
+// and the two-block (no-header second block) codec path.
+void testGreeAcStateMatrix()
+{
+  using esp32irpk::ac::Gree::Fan;
+  using esp32irpk::ac::Gree::Frame;
+  using esp32irpk::ac::Gree::Mode;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::COOL, Mode::HEAT, Mode::DRY, Mode::FAN};
+  static const Fan fans[] = {Fan::AUTO, Fan::MIN_SPEED, Fan::MED_SPEED, Fan::MAX_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 16; temp <= 30; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          Frame f{};
+          f.setPower(power != 0);
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan ||
+              g.temperatureC() != temp)
+            all_ok = false;
+        }
+  EXPECT_TRUE("gree/state-matrix", all_ok);
+}
 } // namespace
 
 void setup()
@@ -1401,6 +1505,8 @@ void setup()
   testPanasonicAcRoundtrip();
   testPanasonicAcCanonicalStates();
   testPanasonicAcDecodesSkewedTiming();
+  testGreeAcRoundtrip();
+  testGreeAcStateMatrix();
 
   Serial.print("TEST done ");
   Serial.print(g_passed);

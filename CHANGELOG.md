@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+- (EN) Gree air-conditioner support (`esp32irpk::ac::Gree`): decode/encode of the 8-byte two-block state (second block has no header), Kelvinator block checksum, and `Mode`/`Fan` accessors. `06_ac_learn` now recognizes Gree as well as Panasonic.
+- (JA) Gree エアコン対応（`esp32irpk::ac::Gree`）: 8バイト2ブロック状態（2ブロック目はヘッダ無し）のデコード/エンコード、Kelvinatorブロックチェックサム、`Mode`/`Fan` アクセサを追加。`06_ac_learn` が Panasonic に加えて Gree も認識します。
 
 ## 1.0.1
 - (EN) Air-conditioner support: a separate `esp32irpk::ac` layer over the RAW path, with Panasonic decode/encode (`Frame::fromRaw`/`toRaw`, `Mode`/`Fan`, sum checksum) and a one-call `ac::send`. Verified field-for-field against IRremoteESP8266 and HeatpumpIR.
