@@ -179,17 +179,27 @@ external-decoder windows (IRremoteESP8266), so the phase-aligned default is
 preferred for cross-library interop. Evidence:
 `tests/studies/{phase_aligned_carrier,carrier_loopback,jvc_timing_sweep}`.
 
-The AC examples select the hardware carrier (`setPhaseAlignedCarrier(false)`)
-rather than the phase-aligned default — for cost, not necessity. At roughly one
-symbol per carrier cycle a multi-frame AC burst expands to several thousand
-symbols (~17 KB), allocated transiently and streamed through the channel buffer.
-The phase-aligned encoder still sends them correctly — durations beyond the
-15-bit field are split across symbols, so even the inter-section gap (well under
-the ~33 ms single-symbol limit at 1 µs anyway) is never the constraint — and
-measured delivery matched the hardware carrier
-(`tests/studies/compat_matrix_ac/irremoteesp8266_rx/study_carrier_ab.py`:
-phase-aligned and hardware both 150/150). Phase-aligned would give higher mark
-precision (no ±1-cycle wobble), but the large per-send allocation and the higher
-refill-underrun risk under heavy interrupt load are why the examples recommend
-the hardware carrier for long frames. The real bottleneck is mark expansion
-(symbol count), not gap representation.
+For AC the right carrier depends on the vendor's timing margins. The
+phase-aligned carrier is the safe default; the hardware carrier is a memory
+optimization that only some vendors tolerate. At roughly one symbol per carrier
+cycle a multi-frame AC burst expands to several thousand symbols (~17 KB),
+allocated transiently and streamed through the channel buffer, with a higher
+refill-underrun risk under heavy interrupt load — that is the cost of
+phase-aligned. The hardware carrier avoids it but each mark edge wobbles by ±1
+carrier cycle (~26 µs).
+
+Measured (`tests/studies/compat_matrix_ac/.../study_carrier_ab.py`):
+
+- Panasonic: phase-aligned and hardware both 150/150 — its loose timing
+  tolerates the wobble, so the hardware carrier is fine and cheaper.
+- Gree: phase-aligned 50/50 vs hardware ~55%. Its zero-space (540 µs) is shorter
+  than its bit mark (620 µs), so the wobble pushes spaces out of the receiver's
+  tolerance and ~half the frames are rejected — the hardware carrier is not
+  usable here.
+
+So phase-aligned is the cross-vendor-safe choice; the hardware carrier is opt-in
+per vendor (e.g. Panasonic). Neither affects byte integrity — frames are
+checksum-validated; the carrier affects delivery rate. The phase-aligned encoder
+is never size-limited: durations beyond the 15-bit field are split across
+symbols, so even the inter-block gap (well under the ~33 ms single-symbol limit
+at 1 µs) is never the constraint; the cost is mark expansion (symbol count).

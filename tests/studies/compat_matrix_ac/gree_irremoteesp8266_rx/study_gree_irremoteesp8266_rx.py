@@ -21,15 +21,10 @@ from pexpect import EOF, TIMEOUT
 # transmission check sees IRremoteESP8266 decode our over-the-air frame to them
 # with a valid checksum.
 #
-# TRIALS is larger here than Panasonic's: a Gree burst is longer (a 9ms header
-# plus two 20ms inter-block gaps), so over-the-air sends drop somewhat more often
-# on a bench rig. PASS_MIN only needs a few clean deliveries to prove an
-# independent stack accepts our frame; the drop rate itself is a documented
-# long-frame characteristic (SPEC 11.3), not an encoder defect.
 PEER_IMPL = "ESP32IRPulseKit"
 DUT_IMPL = "IRremoteESP8266"
 
-TRIALS = 10
+TRIALS = 5
 PASS_MIN = 3
 
 # The state is always 8 bytes = 16 hex chars. Match exactly 16 so pexpect does
@@ -78,6 +73,11 @@ def assert_serial_control(tx, rx):
     tx.expect_exact("PONG", timeout=5)
     rx.write("PING\n")
     rx.expect_exact("PONG", timeout=5)
+
+
+def set_carrier(tx, mode: str):
+    tx.write(f"CARRIER {mode}\n")
+    tx.expect_exact(f"CARRIER_OK mode={mode}", timeout=10)
 
 
 def send_once(tx, case: Case):
@@ -134,6 +134,12 @@ def run_trials(tx, rx, case: Case):
 def test_gree_irremoteesp8266_rx(dut, peers, case, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
+
+    # Gree requires the phase-aligned carrier: the free-running hardware carrier's
+    # ~1-cycle mark wobble drops ~half of these long frames (zero-space 540us is
+    # shorter than the 620us bit mark, so matchGeneric rejects the frame).
+    # Measured PA=50/50 vs HW~55% in study_carrier_ab.py.
+    set_carrier(tx, "pa")
 
     our_sent, observed, n_ok = run_trials(tx, rx, case)
     record_property("peer_impl", PEER_IMPL)

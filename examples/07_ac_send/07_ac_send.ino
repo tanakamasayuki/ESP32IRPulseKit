@@ -11,9 +11,13 @@ esp32irpk::IRSender tx(4);
 void setup()
 {
   Serial.begin(115200);
-  // en: Long frames: hardware carrier keeps the RMT symbol count manageable.
-  // ja: 長いフレームはハードウェアキャリアでRMTシンボル数を抑える。
-  tx.setPhaseAlignedCarrier(false);
+  // en: AC uses the phase-aligned carrier (the default — do not call
+  //     setPhaseAlignedCarrier). It is the safe choice across vendors; the
+  //     hardware carrier (setPhaseAlignedCarrier(false)) saves memory but some
+  //     vendors (e.g. Gree) drop frames on it. Panasonic tolerates either.
+  // ja: ACは位相整合キャリア（既定。setPhaseAlignedCarrier を呼ばない）を使う。
+  //     ベンダ横断で安全。ハードウェアキャリア（setPhaseAlignedCarrier(false)）は
+  //     省メモリだが一部ベンダ（例: Gree）はフレームが落ちる。Panasonicは両対応。
   tx.begin();
 }
 

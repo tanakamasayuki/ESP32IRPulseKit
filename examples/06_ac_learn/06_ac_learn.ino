@@ -83,8 +83,10 @@ static void printDecodedComment(const esp32irpk::IRRawTickView &raw)
 static void printRawSnippet(const esp32irpk::IRRawTickView &raw)
 {
   Serial.println("// send code (raw replay):");
-  Serial.println("// en: send with a sender configured as setPhaseAlignedCarrier(false)");
-  Serial.println("// ja: setPhaseAlignedCarrier(false) にした送信機で送ること");
+  Serial.println("// en: send with setPhaseAlignedCarrier(true) -- the safe AC default;");
+  Serial.println("//     some vendors (e.g. Gree) drop frames on the hardware carrier.");
+  Serial.println("// ja: setPhaseAlignedCarrier(true) で送ること（ACの安全な既定。");
+  Serial.println("//     一部ベンダ（例: Gree）はハードウェアキャリアだとフレームが落ちる）。");
   Serial.print("const uint16_t ticks[] = {");
   for (size_t i = 0; i < raw.len; ++i)
   {

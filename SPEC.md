@@ -586,7 +586,7 @@ Any AC waveform can be captured and re-sent without decoding it:
 
 - Receive in RAW-only mode (`setDecodeCandidates(0)`), with `setMaxRxSymbols()` large enough for the frame and `setIdleThresholdUs()` large enough to span the frame's internal gaps so the whole burst is one capture.
 - `read()` returns the full burst as one `IRRawTickView` (RAW-only mode does not split).
-- Re-send the captured RAW with `IRSender::send(const IRRawTickView&)`. Long frames should use `setPhaseAlignedCarrier(false)` (the free-running hardware carrier) to keep the RMT symbol count manageable.
+- Re-send the captured RAW with `IRSender::send(const IRRawTickView&)`. For AC frames use the phase-aligned carrier (the default; §11.3) — it is the safe choice across vendors, since some (e.g. Gree) drop frames on the hardware carrier.
 
 ### 11.2 Decode And Encode (per vendor)
 
@@ -640,7 +640,7 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 
 - `Frame::fromRaw(raw, out)` decodes RAW ticks into the state bytes and validates the vendor checksum. It returns `false` when the waveform is not that vendor's frame; `out.checksum_ok` reports checksum validity separately.
 - `Frame::toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`.
-- `ac::send(tx, frame)` is the one-call path: it encodes into a stack buffer of `Frame::kMaxTicks` and transmits, returning `false` on encode or send failure. Use the explicit `toRaw` + `IRSender::send()` pair instead when you need to control the buffer. The sender's carrier mode (`setPhaseAlignedCarrier(false)` for long frames) is configured separately, as usual.
+- `ac::send(tx, frame)` is the one-call path: it encodes into a stack buffer of `Frame::kMaxTicks` and transmits, returning `false` on encode or send failure. Use the explicit `toRaw` + `IRSender::send()` pair instead when you need to control the buffer. The sender's carrier mode is configured separately, as usual (use the phase-aligned default for AC; see §11.3).
 - The byte array is the intermediate form. Logical fields (power, mode, temperature, fan, …) are accessors over those bytes.
 - Every vendor follows this same structure under its own `esp32irpk::ac::<Vendor>` namespace. A per-vendor enum-to-name helper (e.g. `Panasonic::toString(Mode)`) may be added later; it is not required by the core contract.
 - Supported vendors:
@@ -651,8 +651,13 @@ AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
 ### 11.3 Carrier For Long Frames
 
-AC frames are long. The library carrier when you do not call `setPhaseAlignedCarrier` is the phase-aligned one (§6.5), but the AC examples explicitly select the hardware carrier with `setPhaseAlignedCarrier(false)`, which is the recommendation for long frames.
+AC frames are long, and the carrier that delivers them reliably depends on the vendor's timing margins. The library carrier when you do not call `setPhaseAlignedCarrier` is the phase-aligned one (§6.5).
 
-The phase-aligned carrier emits each mark as individual carrier-cycle symbols, so a multi-frame AC burst expands to several thousand RMT symbols (~17 KB allocated transiently per send and streamed through the channel). It can give higher TX precision — each mark is an exact whole number of carrier cycles, without the ±1-cycle wobble of the free-running carrier — but the larger symbol stream raises the refill-underrun risk under heavy interrupt load. The hardware carrier uses far fewer symbols and avoids that, so the examples set it for AC.
+The two carriers trade precision for size. The **phase-aligned** carrier emits each mark as whole carrier-cycle symbols: every mark is an exact integer number of cycles, with no ±1-cycle wobble, but a multi-frame burst expands to several thousand RMT symbols (~17 KB allocated transiently per send) and the larger stream raises the refill-underrun risk under heavy interrupt load. The **hardware** (free-running) carrier uses far fewer symbols, but each mark edge can land up to one carrier period late (~26 µs at 38 kHz).
 
-This is a trade-off, not a hard limit: the phase-aligned carrier also sends long frames correctly (it is not size-limited — durations beyond the 15-bit field are split across symbols), and on the test rig both carriers delivered AC frames equally well. Either is fine for AC; a received frame is always byte-correct because it is checksum-validated.
+That wobble matters for tightly-timed vendors:
+
+- **Panasonic** tolerates either carrier — both delivered every frame on the test rig — so the hardware carrier is fine and cheaper.
+- **Gree** requires the phase-aligned carrier. Its zero-space (540 µs) is shorter than its bit mark (620 µs), so the hardware carrier's mark wobble pushes spaces out of tolerance and the receiver rejects about half the frames (measured: phase-aligned 50/50 vs hardware ~55%).
+
+Recommendation: the phase-aligned carrier is the safe default for AC, and is what you get if you never call `setPhaseAlignedCarrier`. Use the hardware carrier (`setPhaseAlignedCarrier(false)`) only as a memory optimization for loosely-timed vendors such as Panasonic. The carrier affects delivery rate, not byte integrity — a received frame is always byte-correct because it is checksum-validated, and the phase-aligned carrier is not size-limited (durations beyond the 15-bit field are split across symbols).

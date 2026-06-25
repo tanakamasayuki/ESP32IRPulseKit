@@ -7,11 +7,12 @@
 // compare them against what the IRremoteESP8266 primary decodes.
 //
 // Carrier mode is selectable so the phase-aligned vs hardware carrier can be
-// compared for long AC frames (the symbol-explosion / underrun trade-off in
-// SPEC 11.3). The build-time default is PULSEKIT_CARRIER (0 = hardware,
-// 1 = phase-aligned); a runtime "CARRIER pa" / "CARRIER hw" command re-opens the
-// sender in that mode so one flash can A/B both. AC frames are long, so hardware
-// is recommended.
+// compared (study_carrier_ab.py). A runtime "CARRIER pa" / "CARRIER hw" command
+// re-opens the sender in that mode so one flash can A/B both. Unlike Panasonic,
+// Gree REQUIRES the phase-aligned carrier: measured PA=50/50 vs hardware ~55%
+// (the hardware carrier's ~1-cycle mark wobble drops ~half of these frames,
+// whose 540us zero-space is shorter than the 620us bit mark). So the build-time
+// default here is phase-aligned (PULSEKIT_CARRIER 1).
 //
 // Commands:
 //   SEND_AC mode=<AUTO|COOL|HEAT|DRY|FAN> fan=<AUTO|MIN|MED|MAX> temp=<C> power=<0|1>
@@ -26,9 +27,9 @@
 #define IR_TX_INVERTED "0"
 #endif
 
-// 0 = free-running hardware carrier (default), 1 = phase-aligned carrier.
+// 0 = free-running hardware carrier, 1 = phase-aligned carrier (Gree default).
 #ifndef PULSEKIT_CARRIER
-#define PULSEKIT_CARRIER 0
+#define PULSEKIT_CARRIER 1
 #endif
 
 const int kIrTxGpio = atoi(IR_TX_GPIO);

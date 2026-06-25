@@ -15,6 +15,11 @@
 // with power. The logical field map (byte/bit positions and the mode/fan codes)
 // is verified field-for-field against IRremoteESP8266's IRGreeAC (YBOFB model)
 // via the compat_matrix_ac studies (gree_irremoteesp8266_*).
+//
+// Transmit Gree with the PHASE-ALIGNED carrier (setPhaseAlignedCarrier(true)).
+// Gree's zero-space (540us) is shorter than its bit mark (620us), so the
+// free-running hardware carrier's ~1-cycle (~26us) mark wobble drops about half
+// the frames over the air (measured PA 50/50 vs hardware ~55%, see SPEC 11.3).
 
 namespace esp32irpk::ac::Gree
 {
