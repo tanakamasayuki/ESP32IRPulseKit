@@ -1238,6 +1238,21 @@ void testPanasonicAcRoundtrip()
       canonical_match = false;
   EXPECT_TRUE("panasonic/canonical-bytes", canonical_match);
 
+  // JKE is the implemented model (the default), so it must encode; DKE and the
+  // other unimplemented models must fail rather than silently emit a JKE frame
+  // (DKE actually differs on the wire: byte23=0x01/byte25=0x06 + horiz swing).
+  uint16_t m_ticks[esp32irpk::ac::Panasonic::Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer m_buf{m_ticks, sizeof(m_ticks) / sizeof(m_ticks[0]), 0};
+  esp32irpk::ac::Panasonic::Frame jke{};
+  jke.model = esp32irpk::ac::Panasonic::Model::JKE;
+  EXPECT_TRUE("panasonic/encode-allows-jke", jke.toRaw(m_buf));
+  esp32irpk::ac::Panasonic::Frame dke{};
+  dke.model = esp32irpk::ac::Panasonic::Model::DKE;
+  EXPECT_TRUE("panasonic/encode-rejects-dke", !dke.toRaw(m_buf));
+  esp32irpk::ac::Panasonic::Frame nke{};
+  nke.model = esp32irpk::ac::Panasonic::Model::NKE;
+  EXPECT_TRUE("panasonic/encode-rejects-unimpl-model", !nke.toRaw(m_buf));
+
   // A non-Panasonic waveform (NEC) must be rejected.
   esp32irpk::IRRawTickView nec{};
   nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
@@ -1409,6 +1424,14 @@ void testGreeAcRoundtrip()
   EXPECT_EQ("gree/temp-clamp-high", 30, t.temperatureC());
   t.setTemperatureC(5);
   EXPECT_EQ("gree/temp-clamp-low", 16, t.temperatureC());
+
+  // An unimplemented model must fail to encode, not silently emit a YBOFB frame.
+  Frame um{};
+  um.setMode(Mode::COOL);
+  um.model = esp32irpk::ac::Gree::Model::YAW1F;
+  uint16_t um_ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer um_buf{um_ticks, sizeof(um_ticks) / sizeof(um_ticks[0]), 0};
+  EXPECT_TRUE("gree/encode-rejects-unimpl-model", !um.toRaw(um_buf));
 
   // A non-Gree waveform (NEC) must be rejected.
   esp32irpk::IRRawTickView nec{};

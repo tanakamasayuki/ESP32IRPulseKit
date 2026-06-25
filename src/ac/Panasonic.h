@@ -7,10 +7,16 @@
 // frames, LSB-first, frame 2 ends with a sum checksum). See SPEC §11.2.
 //
 // Frame mechanics (timing, two-frame layout, checksum) follow the documented
-// Kaseikyo/Panasonic format. The logical field map (which byte/bit holds
-// power/mode/temperature/fan, and the mode/fan codes) is verified byte-for-byte
-// against IRremoteESP8266's IRPanasonicAc encoder
-// (tests/studies/compat_matrix_ac/irremoteesp8266_tx).
+// Kaseikyo/Panasonic format. This wire format has model variants (SPEC §11.2,
+// "two axes of variation"); they are carried as a `Model` parameter on the
+// Frame, not separate types. The implemented model is JKE (its template is
+// byte-identical to IRPanasonicAc's default known-good state); DKE/NKE/LKE/CKP/
+// RKR differ in fixed marker bytes and are reserved for later (no handling). The
+// logical field map (which byte/bit holds power/mode/temperature/fan, and the
+// mode/fan codes) is verified byte-for-byte against IRremoteESP8266's
+// IRPanasonicAc encoder (tests/studies/compat_matrix_ac/irremoteesp8266_tx).
+// The separate Panasonic-AC32 protocol is a different wire format (a future
+// distinct Frame type), not a model of this one.
 
 namespace esp32irpk::ac::Panasonic
 {
@@ -37,6 +43,23 @@ namespace esp32irpk::ac::Panasonic
     MED_SPEED,
     HIGH_SPEED,
     POWERFUL,
+  };
+
+  // Model variants of the one Kaseikyo Panasonic-AC wire format (SPEC §11.2).
+  // They share this format and differ only by a few marker bytes, so they are a
+  // parameter on Frame rather than separate types. Only JKE is implemented — its
+  // template is byte-identical to IRPanasonicAc's default known-good state. The
+  // others are reserved (decode is future) and differ in fixed marker bytes,
+  // e.g. DKE sets byte23=0x01 / byte25=0x06 and adds horizontal swing; JKE keeps
+  // byte23=0x81 / byte25=0x00; NKE/LKE set byte17=0x06; RKR sets byte23=0x89.
+  enum class Model : uint8_t
+  {
+    JKE = 0,
+    DKE,
+    NKE,
+    LKE,
+    CKP,
+    RKR,
   };
 
   namespace detail
@@ -143,6 +166,7 @@ namespace esp32irpk::ac::Panasonic
         0x00, 0x0E, 0xE0, 0x00, 0x00, 0x81, 0x00, 0x00, 0x00};
     uint16_t byte_length = 0;
     bool checksum_ok = false;
+    Model model = Model::JKE; // set by fromRaw; honored by toRaw/accessors
 
     // Logical accessors over `bytes` (layout per the file header).
     bool power() const { return (bytes[detail::kOffMode] & 0x01u) != 0; }
@@ -186,6 +210,10 @@ namespace esp32irpk::ac::Panasonic
       for (size_t i = 0; i < detail::kFrame2Bytes; ++i)
         out.bytes[detail::kFrame1Bytes + i] = f2[i];
       out.byte_length = kBytes;
+      // Only JKE is implemented, so the model is JKE (already the default from
+      // `out = Frame{}`). When DKE/NKE/LKE/CKP/RKR are added, classify them here
+      // from the marker bytes (cf. IRPanasonicAc::getModel) and decode deltas.
+      out.model = Model::JKE;
       out.checksum_ok = (f2[detail::kFrame2Bytes - 1] == detail::checksum(f2));
       return true;
     }
@@ -194,6 +222,11 @@ namespace esp32irpk::ac::Panasonic
     // checksum, so a frame built from setters renders a valid burst.
     bool toRaw(esp32irpk::IRRawTickBuffer &out) const
     {
+      // Only JKE is implemented; refuse to encode a model whose field map is not
+      // implemented rather than silently emitting a JKE frame.
+      if (model != Model::JKE)
+        return false;
+
       uint8_t buf[kBytes];
       for (size_t i = 0; i < kBytes; ++i)
         buf[i] = bytes[i];

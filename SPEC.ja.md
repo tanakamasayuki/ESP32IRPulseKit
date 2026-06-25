@@ -637,7 +637,7 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 ```
 
 - `Frame::fromRaw(raw, out)` はRAW tickを状態バイトへ復号し、ベンダのチェックサムを検証します。そのベンダのフレームでない場合は `false` を返し、チェックサムの可否は `out.checksum_ok` で別に報告します。
-- `Frame::toRaw(out)` はチェックサムを再計算し、状態を caller提供の `IRRawTickBuffer` にRAW tickとして書き出します。結果は `IRSender::send(const IRRawTickView&)` で送信します。
+- `Frame::toRaw(out)` はチェックサムを再計算し、状態を caller提供の `IRRawTickBuffer` にRAW tickとして書き出します。結果は `IRSender::send(const IRRawTickView&)` で送信します。`model` がフィールドマップ未実装のモデルを指す場合は `false` を返します（未対応モデルは、実装済みモデルのレイアウトを黙って出力せず、エンコード失敗にする）。`ac::send` もこれを伝播して `false` を返します。
 - `ac::send(tx, frame)` は1呼び出し版です。`Frame::kMaxTicks` のスタックバッファへエンコードして送信し、エンコード/送信失敗時は `false` を返します。バッファを自分で管理したい場合は `toRaw` + `IRSender::send()` を使います。送信機のキャリアモードは従来どおり別に設定します（ACでは位相整合の既定を使う。§11.3参照）。
 - 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサです。
 - どのベンダもこの同じ構造を自分の `esp32irpk::ac::<Vendor>` 名前空間で提供します。enum→名前の文字列化（例 `Panasonic::toString(Mode)`）はベンダ単位で後から追加可能で、コア契約には必須ではありません。
@@ -662,8 +662,8 @@ struct Frame {
 
 | ベンダ | フォーマット（プロトコル） | フレーム | モデル | 状態 |
 |---|---|---|---|---|
-| Panasonic | Kaseikyo AC | 27バイト・2フレーム | DKE / JKE系 | **対応** |
-| | | | NKE / LKE / CKP / RKR | 未対応 |
+| Panasonic | Kaseikyo AC | 27バイト・2フレーム | JKE | **対応** |
+| | | | DKE / NKE / LKE / CKP / RKR | 未対応 |
 | | Panasonic-AC32 | 短縮32bit | — | 未対応 |
 | Gree | Gree | 8バイト・2ブロック | YBOFB | **対応** |
 | | | | YAW1F / YX1FSF | 未対応 |
@@ -676,7 +676,7 @@ struct Frame {
 
 対応フォーマットのベンダ別構造:
 
-- `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。実装モデルは DKE/JKE系テンプレート。
+- `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。実装モデルは `Model::JKE`（テンプレートは IRremoteESP8266 の既定known-good stateとバイト完全一致）。DKE/NKE/LKE/CKP/RKR は固定マーカーバイトが異なり予約。
 - `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。実装モデルは YBOFB（`Model::YBOFB`、モデルビットは0）。`Model::YAW1F`/`YX1FSF` は将来用に予約。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。
 - `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。このフォーマットは単一モデル（`Model` パラメータ無し）。他のMitsubishi波形フォーマット（136 / 112 / Heavy）は別の `Frame` 型になる。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。
 

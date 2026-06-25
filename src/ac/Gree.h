@@ -10,11 +10,14 @@
 // high nibble of byte 7. See SPEC §11.2.
 //
 // Frame mechanics (timing, two-block layout, checksum) follow the documented
-// Gree format. The state targets the YBOFB-style single model: the model bit
+// Gree format. This one 8-byte wire format has model variants (SPEC §11.2,
+// "two axes of variation"); they are carried as a `Model` parameter on the
+// Frame, not as separate types. The implemented model is YBOFB: the model bit
 // (byte 2, bit 6) stays clear, so byte 2 is a stable 0x20 and does not change
 // with power. The logical field map (byte/bit positions and the mode/fan codes)
 // is verified field-for-field against IRremoteESP8266's IRGreeAC (YBOFB model)
-// via the compat_matrix_ac studies (gree_irremoteesp8266_*).
+// via the compat_matrix_ac studies (gree_irremoteesp8266_*). Model::YAW1F and
+// Model::YX1FSF are reserved for later (no field handling yet).
 //
 // Transmit Gree with the PHASE-ALIGNED carrier (setPhaseAlignedCarrier(true)).
 // Gree's zero-space (540us) is shorter than its bit mark (620us), so the
@@ -44,6 +47,17 @@ namespace esp32irpk::ac::Gree
     MIN_SPEED,
     MED_SPEED,
     MAX_SPEED,
+  };
+
+  // Model variants of the one Gree 8-byte wire format (SPEC §11.2). They share
+  // this format and differ only by a model marker / a few fields, so they are a
+  // parameter on Frame rather than separate types. Only YBOFB is implemented;
+  // YAW1F/YX1FSF are reserved (fromRaw will classify them, decode is future).
+  enum class Model : uint8_t
+  {
+    YBOFB = 0,
+    YAW1F,
+    YX1FSF,
   };
 
   namespace detail
@@ -145,6 +159,7 @@ namespace esp32irpk::ac::Gree
     uint8_t bytes[kBytes] = {0x00, 0x09, 0x20, 0x50, 0x00, 0x20, 0x00, 0x50};
     uint16_t byte_length = 0;
     bool checksum_ok = false;
+    Model model = Model::YBOFB; // set by fromRaw; honored by toRaw/accessors
 
     // Logical accessors over `bytes` (layout per the file header).
     bool power() const { return (bytes[0] & 0x08u) != 0; }
@@ -200,6 +215,10 @@ namespace esp32irpk::ac::Gree
       for (size_t i = 0; i < detail::kBlockBytes; ++i)
         out.bytes[detail::kBlockBytes + i] = b2[i];
       out.byte_length = kBytes;
+      // Only YBOFB is implemented, so the model is YBOFB (already the default
+      // from `out = Frame{}`). When YAW1F/YX1FSF are added, classify them here
+      // from the model marker and decode their field deltas accordingly.
+      out.model = Model::YBOFB;
       out.checksum_ok = (((out.bytes[7] >> 4) & 0x0Fu) == detail::checksum(out.bytes));
       return true;
     }
@@ -208,6 +227,11 @@ namespace esp32irpk::ac::Gree
     // renders a valid two-block burst.
     bool toRaw(esp32irpk::IRRawTickBuffer &out) const
     {
+      // Only YBOFB is implemented; refuse to encode a model whose field map is
+      // not implemented rather than silently emitting a YBOFB-shaped frame.
+      if (model != Model::YBOFB)
+        return false;
+
       uint8_t buf[kBytes];
       for (size_t i = 0; i < kBytes; ++i)
         buf[i] = bytes[i];

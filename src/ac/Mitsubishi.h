@@ -13,6 +13,11 @@
 // field-for-field against IRremoteESP8266's IRMitsubishiAC via the
 // compat_matrix_ac studies (mitsubishi_irremoteesp8266_*).
 //
+// This wire format has a single model, so there is no `Model` parameter (SPEC
+// §11.2, "two axes of variation"). The other Mitsubishi wire formats (136 / 112
+// and Mitsubishi-Heavy) are different waveforms and would be separate Frame
+// types, not models of this one.
+//
 // Transmit with the PHASE-ALIGNED carrier (setPhaseAlignedCarrier(true)): like
 // Gree, the zero-space (420us) is shorter than the bit mark (450us), so the
 // free-running hardware carrier's mark wobble can push spaces out of an external

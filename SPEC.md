@@ -642,7 +642,7 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 ```
 
 - `Frame::fromRaw(raw, out)` decodes RAW ticks into the state bytes and validates the vendor checksum. It returns `false` when the waveform is not that vendor's frame; `out.checksum_ok` reports checksum validity separately.
-- `Frame::toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`.
+- `Frame::toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`. It returns `false` if `model` names a variant whose field map is not implemented — encoding an unsupported model fails rather than silently emitting the implemented model's layout. `ac::send` propagates this and also returns `false`.
 - `ac::send(tx, frame)` is the one-call path: it encodes into a stack buffer of `Frame::kMaxTicks` and transmits, returning `false` on encode or send failure. Use the explicit `toRaw` + `IRSender::send()` pair instead when you need to control the buffer. The sender's carrier mode is configured separately, as usual (use the phase-aligned default for AC; see §11.3).
 - The byte array is the intermediate form. Logical fields (power, mode, temperature, fan, …) are accessors over those bytes.
 - Every vendor follows this same structure under its own `esp32irpk::ac::<Vendor>` namespace. A per-vendor enum-to-name helper (e.g. `Panasonic::toString(Mode)`) may be added later; it is not required by the core contract.
@@ -667,8 +667,8 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 | Vendor | Format (protocol) | Frame | Model(s) | Status |
 |---|---|---|---|---|
-| Panasonic | Kaseikyo AC | 27-byte, two frames | DKE / JKE-style | **Supported** |
-| | | | NKE / LKE / CKP / RKR | Not yet |
+| Panasonic | Kaseikyo AC | 27-byte, two frames | JKE | **Supported** |
+| | | | DKE / NKE / LKE / CKP / RKR | Not yet |
 | | Panasonic-AC32 | short 32-bit | — | Not yet |
 | Gree | Gree | 8-byte, two blocks | YBOFB | **Supported** |
 | | | | YAW1F / YX1FSF | Not yet |
@@ -681,7 +681,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 Per-vendor framing of the supported formats:
 
-- `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame. The implemented model uses the DKE/JKE-style template.
+- `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame. The implemented model is `Model::JKE` (its template is byte-identical to IRremoteESP8266's default known-good state); DKE/NKE/LKE/CKP/RKR differ in fixed marker bytes and are reserved.
 - `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. The implemented model is YBOFB (`Model::YBOFB`, model bit clear); `Model::YAW1F`/`YX1FSF` are reserved for later. `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`.
 - `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. This format has a single model (no `Model` parameter); the other Mitsubishi wire formats (136 / 112 / Heavy) would be separate `Frame` types. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`.
 
