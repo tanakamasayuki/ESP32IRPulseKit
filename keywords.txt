@@ -1,0 +1,67 @@
+#######################################
+# Syntax coloring map for ESP32IRPulseKit
+#######################################
+
+# Datatypes (KEYWORD1)
+IRReceiver	KEYWORD1
+IRSender	KEYWORD1
+IRReceiveResult	KEYWORD1
+IRDecodedBits	KEYWORD1
+IRDecodeCandidate	KEYWORD1
+IRRawTickView	KEYWORD1
+IRRawTickBuffer	KEYWORD1
+IRPulseUs	KEYWORD1
+IRProtocolSpec	KEYWORD1
+IRProtocolID	KEYWORD1
+IRProtocolScheme	KEYWORD1
+IRProtocolFamily	KEYWORD1
+IRFrameType	KEYWORD1
+IRResultFlags	KEYWORD1
+IRRxStats	KEYWORD1
+AcVendor	KEYWORD1
+AcTiming	KEYWORD1
+
+# Methods and functions (KEYWORD2)
+begin	KEYWORD2
+end	KEYWORD2
+read	KEYWORD2
+decode	KEYWORD2
+send	KEYWORD2
+setDecodeCandidates	KEYWORD2
+setIdleThresholdUs	KEYWORD2
+setMaxRxSymbols	KEYWORD2
+setCarrierHz	KEYWORD2
+clearCarrierHz	KEYWORD2
+disableCarrier	KEYWORD2
+setCarrierDuty	KEYWORD2
+setPhaseAlignedCarrier	KEYWORD2
+setTxMemBlocks	KEYWORD2
+hasFlag	KEYWORD2
+decodeSkipped	KEYWORD2
+truncated	KEYWORD2
+rmtOverflow	KEYWORD2
+isRepeat	KEYWORD2
+fromBits	KEYWORD2
+toBits	KEYWORD2
+fromRaw	KEYWORD2
+toRaw	KEYWORD2
+power	KEYWORD2
+setPower	KEYWORD2
+temperatureC	KEYWORD2
+setTemperatureC	KEYWORD2
+setMode	KEYWORD2
+setFan	KEYWORD2
+
+# Constants (LITERAL1)
+NEC	LITERAL1
+AEHA	LITERAL1
+SONY12	LITERAL1
+SONY15	LITERAL1
+SONY20	LITERAL1
+SAMSUNG32	LITERAL1
+SAMSUNG36	LITERAL1
+JVC	LITERAL1
+RC5	LITERAL1
+RC6_M0_16	LITERAL1
+RC6_M6_32	LITERAL1
+PANASONIC	LITERAL1
