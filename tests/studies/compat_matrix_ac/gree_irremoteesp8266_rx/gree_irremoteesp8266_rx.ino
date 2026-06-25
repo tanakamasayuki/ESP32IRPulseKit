@@ -36,54 +36,54 @@ decode_results results;
 
 namespace
 {
-void printStateHex(const uint8_t *state, uint16_t nbytes)
-{
-  for (uint16_t i = 0; i < nbytes; ++i)
+  void printStateHex(const uint8_t *state, uint16_t nbytes)
   {
-    if (state[i] < 0x10)
-      Serial.print('0');
-    Serial.print(state[i], HEX);
+    for (uint16_t i = 0; i < nbytes; ++i)
+    {
+      if (state[i] < 0x10)
+        Serial.print('0');
+      Serial.print(state[i], HEX);
+    }
   }
-}
 
-void sendReady()
-{
-  Serial.print("RX_READY impl=IRremoteESP8266 gpio=");
-  Serial.print(kIrRxGpio);
-  Serial.print(" inverted=");
-  Serial.println(kIrRxInverted ? 1 : 0);
-}
+  void sendReady()
+  {
+    Serial.print("RX_READY impl=IRremoteESP8266 gpio=");
+    Serial.print(kIrRxGpio);
+    Serial.print(" inverted=");
+    Serial.println(kIrRxInverted ? 1 : 0);
+  }
 
-bool readLine(String &line)
-{
-  if (!Serial.available())
-    return false;
-  line = Serial.readStringUntil('\n');
-  line.trim();
-  return line.length() > 0;
-}
+  bool readLine(String &line)
+  {
+    if (!Serial.available())
+      return false;
+    line = Serial.readStringUntil('\n');
+    line.trim();
+    return line.length() > 0;
+  }
 
-void printAcDecode(const decode_results &r)
-{
-  IRGreeAC ac(0);
-  ac.setRaw(r.state);
-  const bool checksum_ok =
-      IRGreeAC::validChecksum(r.state, kGreeStateLength);
+  void printAcDecode(const decode_results &r)
+  {
+    IRGreeAC ac(0);
+    ac.setRaw(r.state);
+    const bool checksum_ok =
+        IRGreeAC::validChecksum(r.state, kGreeStateLength);
 
-  Serial.print("AC_DECODE vendor=GREE checksum=");
-  Serial.print(checksum_ok ? "ok" : "bad");
-  Serial.print(" power=");
-  Serial.print(ac.getPower() ? 1 : 0);
-  Serial.print(" mode=");
-  Serial.print(ac.getMode());
-  Serial.print(" temp=");
-  Serial.print(ac.getTemp());
-  Serial.print(" fan=");
-  Serial.print(ac.getFan());
-  Serial.print(" bytes=");
-  printStateHex(r.state, kGreeStateLength);
-  Serial.println();
-}
+    Serial.print("AC_DECODE vendor=GREE checksum=");
+    Serial.print(checksum_ok ? "ok" : "bad");
+    Serial.print(" power=");
+    Serial.print(ac.getPower() ? 1 : 0);
+    Serial.print(" mode=");
+    Serial.print(ac.getMode());
+    Serial.print(" temp=");
+    Serial.print(ac.getTemp());
+    Serial.print(" fan=");
+    Serial.print(ac.getFan());
+    Serial.print(" bytes=");
+    printStateHex(r.state, kGreeStateLength);
+    Serial.println();
+  }
 } // namespace
 
 void setup()
@@ -115,6 +115,16 @@ void loop()
       Serial.print((int)results.decode_type);
       Serial.print(" raw_len=");
       Serial.println(results.rawlen);
+      // Dump the captured durations (microseconds) so a GREE decode failure can
+      // be diagnosed against the expected timing (hdr 9000/4500, bit mark 620,
+      // one 1600, zero 540, inter-block gap 19980).
+      Serial.print("AC_TICKS_US");
+      for (uint16_t i = 1; i < results.rawlen; ++i)
+      {
+        Serial.print(' ');
+        Serial.print((uint32_t)results.rawbuf[i] * kRawTick);
+      }
+      Serial.println();
     }
     irrecv.resume();
   }
