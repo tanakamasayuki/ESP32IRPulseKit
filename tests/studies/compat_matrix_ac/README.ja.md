@@ -132,6 +132,14 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   bitマーク（450us）より短いので位相整合キャリアで送る（`rx` study が設定。
   `study_carrier_ab.py` で位相整合 vs ハードウェアを計測）。
 
+- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` — それぞれの2系統目の独立参照
+  （`heatpumpir_tx` と同型）。HeatpumpIR（`GreeGenericHeatpumpIR` /
+  `MitsubishiFEHeatpumpIR`、別コードベース、LEDCキャリア）が既知状態を送信し当方RXが
+  デコード。hard判定は意味一致（checksum妥当＋論理フィールドが送信状態と一致）で、
+  バイト一致ではない（HeatpumpIRはIRremoteESP8266と異なる補助バイトを埋めるため）。
+  HeatpumpIR の Mitsubishi fan は QUIET/HIGH に届き、fan-auto を専用FanAutoビット
+  無しで符号化するので、それらのデコード経路も検証できる。
+
 所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` /
 `src/ac/Mitsubishi.h` に反映します。
 

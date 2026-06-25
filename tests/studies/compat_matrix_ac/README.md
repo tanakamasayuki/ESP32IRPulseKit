@@ -143,6 +143,15 @@ harness are added one variant at a time. In place:
   its bit mark (450 µs), so it is sent on the phase-aligned carrier (the `rx`
   study sets it; `study_carrier_ab.py` quantifies phase-aligned vs hardware).
 
+- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` -- a second independent
+  reference for each, mirroring `heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`
+  / `MitsubishiFEHeatpumpIR`, a separate codebase over an LEDC carrier) transmits
+  a known state and our RX decodes it. The hard check is semantic (checksum valid
+  + logical fields match the sent state), not byte identity, since HeatpumpIR
+  fills different auxiliary bytes than IRremoteESP8266. HeatpumpIR's Mitsubishi
+  fan steps reach QUIET and HIGH, and it encodes fan-auto without the dedicated
+  FanAuto bit, so this variant also exercises those decode paths.
+
 Findings and the confirmed field maps are recorded back here and into
 `src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h`.
 
