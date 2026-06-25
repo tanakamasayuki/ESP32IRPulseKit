@@ -34,6 +34,19 @@ static void printDecodedComment(const esp32irpk::IRRawTickView &raw)
     Serial.print((unsigned)f.fan());
     Serial.print("  checksum=");
     Serial.println(f.checksum_ok ? "ok" : "BAD");
+    // en: full decoded state in hex — handy for inspecting fields the named
+    //     accessors do not expose yet (e.g. half-degree or vendor flags).
+    // ja: デコードした状態全体をhexで出力。名前付きアクセサがまだ公開していない
+    //     フィールド（0.5℃やベンダ固有フラグ等）の確認に便利。
+    Serial.print("// bytes:");
+    for (size_t i = 0; i < f.byte_length; ++i)
+    {
+      Serial.print(' ');
+      if (f.bytes[i] < 0x10)
+        Serial.print('0');
+      Serial.print(f.bytes[i], HEX);
+    }
+    Serial.println();
     return;
   }
   Serial.println("// decoded: no AC vendor matched (raw replay still works)");
