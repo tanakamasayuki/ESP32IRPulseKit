@@ -475,7 +475,7 @@ public:
 
 `setPhaseAlignedCarrier(enable)` selects the carrier generation method. It fixes the TX channel layout, so it is valid only before `begin()` and returns `false` afterward.
 
-- `true` (default): phase-aligned, symbol-encoded carrier. Each mark is emitted as an integer number of full carrier cycles starting at phase 0, so the demodulated mark is stable frame to frame. This is preferred for cross-library interoperability.
+- `true` (default): phase-aligned, symbol-encoded carrier. Each mark is emitted as an integer number of full carrier cycles starting at phase 0, so the demodulated mark is stable frame to frame. This is preferred for cross-library interoperability. The carrier period is quantized to whole microseconds (the channel runs at 1 µs resolution), so the emitted frequency is rounded to the nearest `1/N µs`: 38 kHz → 26 µs ≈ 38.46 kHz (+1.2 %), 36 kHz → 28 µs ≈ 35.71 kHz (−0.8 %), 40 kHz → 25 µs (exact). The error is well within IR receiver passbands; there is no per-cycle dithering.
 - `false`: free-running hardware carrier (`rmt_apply_carrier`). Far fewer RMT symbols, but the carrier phase is not reset per mark, so the demodulated mark wobbles by ±1 carrier cycle.
 
 `setTxMemBlocks(blocks)` sets the number of RMT memory blocks for the TX channel (1 block = `SOC_RMT_MEM_WORDS_PER_CHANNEL` symbols). It is valid only before `begin()`.

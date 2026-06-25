@@ -156,6 +156,12 @@ Trade-offs:
 
 - Mark width is quantized to whole carrier cycles (~26 µs at 38 kHz), well inside
   standard IR tolerance (±25–30 %).
+- The carrier period itself is quantized to whole microseconds (`period =
+  round(1e6 / carrier_hz)` at the 1 µs channel resolution), so the emitted
+  frequency is rounded: 38 kHz → 26 µs ≈ 38.46 kHz (+1.2 %), 36 kHz → 28 µs ≈
+  35.71 kHz (−0.8 %), 40 kHz → 25 µs (exact). There is no per-cycle dithering to
+  recover the fractional part; the residual error is well within IR receiver
+  passbands, so it is left as-is.
 - A frame expands to roughly one symbol per carrier cycle (hundreds to ~1000+ per
   frame). The RMT driver streams it from the channel memory; refill headroom is
   set by `IRSender::setTxMemBlocks(n)` (1 block = `SOC_RMT_MEM_WORDS_PER_CHANNEL`
