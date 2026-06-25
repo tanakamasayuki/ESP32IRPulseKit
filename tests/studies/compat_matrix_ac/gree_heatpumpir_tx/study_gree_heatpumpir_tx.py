@@ -42,7 +42,11 @@ class Case:
 
 
 # Covers all Gree fan steps and modes; AUTO uses 25C and DRY uses MIN to match
-# HeatpumpIR's mode quirks.
+# HeatpumpIR's mode quirks. All cases are power=ON: HeatpumpIR's Gree drops the
+# requested mode on power-off (it leaves the default HEAT and only clears the
+# power bit), so mode/fan/temp are vendor-encoder-dependent don't-cares when off.
+# The power bit itself is verified in the IRremoteESP8266 studies and the host
+# state matrix.
 CASES = [
     Case("COOL", "AUTO", 26, 1),
     Case("COOL", "MIN", 22, 1),
@@ -50,7 +54,7 @@ CASES = [
     Case("HEAT", "MAX", 28, 1),
     Case("DRY", "MIN", 24, 1),
     Case("AUTO", "AUTO", 25, 1),
-    Case("COOL", "MAX", 20, 0),
+    Case("COOL", "MAX", 20, 1),
 ]
 
 

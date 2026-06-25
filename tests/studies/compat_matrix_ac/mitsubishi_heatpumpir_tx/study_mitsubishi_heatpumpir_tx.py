@@ -44,7 +44,11 @@ class Case:
     power: int
 
 
-# Covers all fan steps including QUIET and HIGH.
+# Covers all fan steps including QUIET and HIGH. All cases are power=ON:
+# HeatpumpIR's Mitsubishi drops the requested mode on power-off (it leaves the
+# default and only clears the power bit), so mode/fan/temp are
+# vendor-encoder-dependent don't-cares when off. The power bit itself is verified
+# in the IRremoteESP8266 studies and the host state matrix.
 CASES = [
     Case("COOL", "AUTO", 22, 1),
     Case("COOL", "LOW", 24, 1),
@@ -52,7 +56,7 @@ CASES = [
     Case("HEAT", "HIGH", 28, 1),
     Case("COOL", "MAX", 20, 1),
     Case("COOL", "QUIET", 23, 1),
-    Case("AUTO", "AUTO", 25, 0),
+    Case("AUTO", "AUTO", 25, 1),
 ]
 
 
