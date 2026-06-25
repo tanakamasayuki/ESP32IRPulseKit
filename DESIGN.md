@@ -173,15 +173,17 @@ external-decoder windows (IRremoteESP8266), so the phase-aligned default is
 preferred for cross-library interop. Evidence:
 `tests/studies/{phase_aligned_carrier,carrier_loopback,jvc_timing_sweep}`.
 
-Long air-conditioner frames default to the hardware carrier for cost, not
-necessity. At roughly one symbol per carrier cycle a multi-frame AC burst expands
-to several thousand symbols (~17 KB), allocated transiently and streamed through
-the channel buffer. The phase-aligned encoder still sends them correctly —
-durations beyond the 15-bit field are split across symbols, so even the inter-
-section gap (well under the ~33 ms single-symbol limit at 1 µs anyway) is never
-the constraint — and measured delivery matched the hardware carrier
+The AC examples select the hardware carrier (`setPhaseAlignedCarrier(false)`)
+rather than the phase-aligned default — for cost, not necessity. At roughly one
+symbol per carrier cycle a multi-frame AC burst expands to several thousand
+symbols (~17 KB), allocated transiently and streamed through the channel buffer.
+The phase-aligned encoder still sends them correctly — durations beyond the
+15-bit field are split across symbols, so even the inter-section gap (well under
+the ~33 ms single-symbol limit at 1 µs anyway) is never the constraint — and
+measured delivery matched the hardware carrier
 (`tests/studies/compat_matrix_ac/irremoteesp8266_rx/study_carrier_ab.py`:
-phase-aligned and hardware both 150/150). The reason for the default is the large
-per-send allocation and the higher refill-underrun risk under heavy interrupt
-load, which the hardware carrier avoids; the real bottleneck is mark expansion
+phase-aligned and hardware both 150/150). Phase-aligned would give higher mark
+precision (no ±1-cycle wobble), but the large per-send allocation and the higher
+refill-underrun risk under heavy interrupt load are why the examples recommend
+the hardware carrier for long frames. The real bottleneck is mark expansion
 (symbol count), not gap representation.

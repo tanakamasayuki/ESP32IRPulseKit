@@ -124,22 +124,23 @@ those bytes are present even when only mode/temp/fan/power are set.
 
 ### Carrier reliability (long-frame TX)
 
-With the same IRremoteESP8266 receiver and the same frames, only the transmitter
-differs between two runs: IRremoteESP8266's own TX delivered 25/25 frames, while
-our TX on the free-running hardware carrier (`setPhaseAlignedCarrier(false)`,
-required for frames this long -- SPEC 11.3) delivered 23/25. Every frame that
-arrived was byte-exact (no corruption); the two misses were whole-frame drops.
-The gap points to the hardware carrier being marginally less reliable than a
-phase-aligned carrier for long frames. Mitigations via carrier duty or repeat
-are out of scope here; proper phase-aligned (or live-encoded) carrier support
-for long frames is future work.
+The AC examples select the hardware carrier with `setPhaseAlignedCarrier(false)`
+(the library carrier is otherwise phase-aligned). The phase-aligned carrier can
+give higher mark precision but expands a long AC burst to ~17 KB of symbols per
+send and raises the refill-underrun risk under heavy interrupt load (SPEC 11.3),
+which is why the examples recommend the hardware carrier for long frames.
 
-To compare the carriers directly, the `irremoteesp8266_rx` peer (our TX) takes a
-runtime `CARRIER pa` / `CARRIER hw` command (build-time default `PULSEKIT_CARRIER`,
-0 = hardware), and `study_carrier_ab.py` sends each state under both modes and
-records the canonical-delivery rate per mode. It is a measurement study, not a
-gate: it asserts only that each mode opens and that the encoder stays canonical
-in both, so a degraded phase-aligned rate is reported, not failed. Run it with:
+`study_carrier_ab.py` measures whether that choice costs delivery. The
+`irremoteesp8266_rx` peer (our TX) takes a runtime `CARRIER pa` / `CARRIER hw`
+command (build-time default `PULSEKIT_CARRIER`, 0 = hardware), and the study sends
+each state under both modes and records the canonical-delivery rate per mode. On
+the test rig both carriers delivered every frame (phase-aligned and hardware each
+150/150, no corruption), so there is no measurable delivery difference here --
+the phase-aligned symbol expansion did not hurt at default settings under test
+load. (An earlier one-off 23/25 on the hardware carrier was transient RF
+variance.) It is a measurement study, not a gate: it asserts only that each mode
+opens and that the encoder stays canonical in both, so a degraded phase-aligned
+rate would be reported, not failed. Run it with:
 
 ```sh
 uv run --env-file .env pytest -s -o python_files="study_*.py" \
