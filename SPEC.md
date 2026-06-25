@@ -276,7 +276,8 @@ bits or generate codes. They are triaged into three tiers by practical value.
 - Air-conditioner / heat-pump protocols (Daikin / Mitsubishi-AC / Panasonic-AC /
   Gree / Coolix, …): a single button sends a whole multi-byte state, which does
   not fit the generic 64-bit single-frame decode/encode model. These are handled
-  by a separate layer instead of the generic decoder — see section 11.
+  by a separate layer (`esp32irpk::ac`) instead of the generic decoder, so they
+  are not generic candidates — see section 11 (Panasonic is implemented there).
 
 Policy: if adding, cap at **Tier B**; revisit Tier C only when demand appears.
 Tier A can be added cheaply purely to grow the supported-protocol count.

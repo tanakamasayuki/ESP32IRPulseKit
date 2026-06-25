@@ -271,7 +271,8 @@ esp32irpk::specs::RC6_M6_32
 - Bang & Olufsen: **455kHzキャリア**。一般的な38kHz TSOPでは受信できずハード的に別物。**非対応のままが無難**
 - エアコン／ヒートポンプ系（Daikin / Mitsubishi-AC / Panasonic-AC / Gree / Coolix 等）:
   ボタン1つで数十〜数百bitの状態を丸ごと送るため、汎用の64bit単一フレーム
-  decode/encodeモデルには収まらない。汎用デコーダではなく別レイヤで扱う（§11参照）
+  decode/encodeモデルには収まらない。汎用デコーダではなく別レイヤ（`esp32irpk::ac`）で
+  扱うので汎用候補ではない（§11参照。Panasonic は実装済み）
 
 方針：追加するなら **Tier B まで**を上限とし、Tier C は需要が出た時点で個別に検討する。
 Tier A は「対応protocol数を増やす」目的に限り低コストで足せる。
