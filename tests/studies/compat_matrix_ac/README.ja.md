@@ -110,7 +110,18 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   HeatpumpIR は fan段が1つずれるため、IRremoteESP8266 peer では届かない QUIET /
   POWERFUL も網羅する。
 
-所見と確定したフィールドマップはここと `src/ac/Panasonic.h` に反映します。
+- `gree_irremoteesp8266_tx/` + `gree_irremoteesp8266_rx/` — Gree版の較正＋encoder
+  検証の対。IRremoteESP8266 の `IRGreeAC` を **YBOFBモデル**で使う（モデルビットが
+  常に0でbyte2が0x20固定となり `esp32irpk::ac::Gree` と一致）。`tx` で2ブロック
+  （2ブロック目はヘッダ無し）の当方RAW復号が正準8バイトをバイト単位で再現すること、
+  `rx` で当方encoderの出力を独立スタックが Kelvinatorブロックチェックサム妥当で
+  受理することを確認。Greeバーストは Panasonic より長い（9msヘッダ＋約20msの
+  ブロック間ギャップ×2）ため、RX primary は終端タイムアウトを50msにする必要があり
+  （20msギャップとの余裕が薄いと2ブロック目が切り離される）、無線送信のドロップも
+  やや多いので `rx` study の `TRIALS` を大きめにしている。
+
+所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` に
+反映します。
 
 `irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
 IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを確認: 当方のRAW

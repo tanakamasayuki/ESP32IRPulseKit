@@ -116,8 +116,20 @@ harness are added one variant at a time. In place:
   covers the QUIET and POWERFUL fan settings the IRremoteESP8266 peer cannot
   reach.
 
-Findings and the confirmed field map are recorded back here and into
-`src/ac/Panasonic.h`.
+- `gree_irremoteesp8266_tx/` + `gree_irremoteesp8266_rx/` -- the same calibration
+  and encoder-verification pair for Gree, using IRremoteESP8266's `IRGreeAC` with
+  the YBOFB model (so the model bit stays clear and byte 2 is a stable 0x20,
+  matching `esp32irpk::ac::Gree`). The `tx` run confirms our RAW decode of the
+  two-block frame (second block has no header) reproduces the canonical 8 bytes
+  byte-for-byte; the `rx` run confirms our encoder emits, and an independent stack
+  accepts, those bytes with a valid Kelvinator block checksum. A Gree burst is
+  longer than Panasonic's (a 9 ms header plus two ~20 ms inter-block gaps), so its
+  RX primary needs a 50 ms end-of-message timeout (a thinner margin over the
+  20 ms gap splits off the second block) and over-the-air sends drop somewhat
+  more often, hence the larger `TRIALS` in the `rx` study.
+
+Findings and the confirmed field maps are recorded back here and into
+`src/ac/Panasonic.h` / `src/ac/Gree.h`.
 
 The `irremoteesp8266_tx/` run confirms the Panasonic field map in
 `src/ac/Panasonic.h` matches IRremoteESP8266's `IRPanasonicAc` byte-for-byte:

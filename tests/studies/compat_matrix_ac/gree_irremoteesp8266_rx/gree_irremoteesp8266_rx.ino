@@ -8,8 +8,11 @@
 // same 8 bytes with a valid checksum -- i.e. our toRaw() produces a well-formed
 // Gree A/C burst.
 //
-// The 20ms inter-block gap must stay below the end-of-message timeout so both
-// blocks land in one capture, hence 30ms.
+// decodeGree reads the 19980us (~20ms) inter-block gap as block 2's header
+// space, so the end-of-message timeout must comfortably exceed it or the second
+// block gets split off and the frame is rejected (rawlen too short -> AC_RAW).
+// 50ms gives ~2.5x margin and matches IRremoteESP8266's standard A/C timeout; a
+// thin 30ms margin intermittently splits the capture (~half the sends drop).
 #include <IRrecv.h>
 #include <IRutils.h>
 #include <ir_Gree.h>
@@ -26,7 +29,7 @@ const int kIrRxGpio = atoi(IR_RX_GPIO);
 const bool kIrRxInverted = atoi(IR_RX_INVERTED) != 0;
 
 const uint16_t kRxCaptureBufferSize = 1024;
-const uint8_t kRxTimeoutMs = 30;
+const uint8_t kRxTimeoutMs = 50;
 
 IRrecv irrecv(kIrRxGpio, kRxCaptureBufferSize, kRxTimeoutMs, true);
 decode_results results;

@@ -16,15 +16,20 @@ from pexpect import EOF, TIMEOUT
 #     burst to those canonical bytes with a valid checksum, proving an
 #     independent stack accepts what we send over the air.
 #
-# NOTE: the canonical bytes below are DERIVED from the documented Gree field
-# layout + Kelvinator block checksum, not yet confirmed against the hardware.
-# Run gree_irremoteesp8266_tx first (it prints the bytes IRremoteESP8266's
-# IRGreeAC actually emits per state) and replace any that differ before trusting
-# this study's ENCODER assertion.
+# The canonical bytes below are confirmed: gree_irremoteesp8266_tx (IRremoteESP8266
+# IRGreeAC with the YBOFB model) decodes byte-for-byte to them, and this study's
+# transmission check sees IRremoteESP8266 decode our over-the-air frame to them
+# with a valid checksum.
+#
+# TRIALS is larger here than Panasonic's: a Gree burst is longer (a 9ms header
+# plus two 20ms inter-block gaps), so over-the-air sends drop somewhat more often
+# on a bench rig. PASS_MIN only needs a few clean deliveries to prove an
+# independent stack accepts our frame; the drop rate itself is a documented
+# long-frame characteristic (SPEC 11.3), not an encoder defect.
 PEER_IMPL = "ESP32IRPulseKit"
 DUT_IMPL = "IRremoteESP8266"
 
-TRIALS = 5
+TRIALS = 10
 PASS_MIN = 3
 
 # The state is always 8 bytes = 16 hex chars. Match exactly 16 so pexpect does
@@ -44,8 +49,8 @@ class Case:
     fan: str
     temp: int
     power: int
-    # Canonical 8-byte state (provisional, derived from spec; confirm via
-    # gree_irremoteesp8266_tx).
+    # Canonical 8-byte state (confirmed against IRremoteESP8266 IRGreeAC[YBOFB]
+    # by gree_irremoteesp8266_tx).
     canonical: str
 
 

@@ -13,8 +13,8 @@
 // Gree format. The state targets the YBOFB-style single model: the model bit
 // (byte 2, bit 6) stays clear, so byte 2 is a stable 0x20 and does not change
 // with power. The logical field map (byte/bit positions and the mode/fan codes)
-// is calibrated against IRremoteESP8266's IRGreeAC encoder via the
-// compat_matrix_ac studies (gree_irremoteesp8266_*).
+// is verified field-for-field against IRremoteESP8266's IRGreeAC (YBOFB model)
+// via the compat_matrix_ac studies (gree_irremoteesp8266_*).
 
 namespace esp32irpk::ac::Gree
 {
