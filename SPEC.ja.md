@@ -613,6 +613,9 @@ struct Frame {
   uint8_t bytes[kBytes] = {}; // 復号した生の状態（中間形式）
   uint16_t byte_length = 0;
   bool checksum_ok = false;
+  // この波形フォーマットにモデル分岐がある場合（例 Gree の YBOFB/YAW1F）、Frame は
+  // `Model model` フィールドも持つ。fromRaw が設定し、toRaw/アクセサが従う。
+  // 単一モデルのフォーマットでは持たない。後述「分岐の2軸」を参照。
 
   // `bytes` 上の論理アクセサ
   bool power() const;          void setPower(bool on);
@@ -638,10 +641,44 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 - `ac::send(tx, frame)` は1呼び出し版です。`Frame::kMaxTicks` のスタックバッファへエンコードして送信し、エンコード/送信失敗時は `false` を返します。バッファを自分で管理したい場合は `toRaw` + `IRSender::send()` を使います。送信機のキャリアモードは従来どおり別に設定します（ACでは位相整合の既定を使う。§11.3参照）。
 - 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサです。
 - どのベンダもこの同じ構造を自分の `esp32irpk::ac::<Vendor>` 名前空間で提供します。enum→名前の文字列化（例 `Panasonic::toString(Mode)`）はベンダ単位で後から追加可能で、コア契約には必須ではありません。
-- 対応ベンダ:
-  - `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。
-  - `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。単一のYBOFB系モデル（モデルビットは常に0）を対象とする。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。
-  - `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。
+**分岐の2軸。** あるベンダのリモコンは独立した2つの軸で異なり、本レイヤーはそれぞれ別の表現で扱います。
+
+- **フォーマット（波形プロトコル）** — フレーム長・タイミング・ヘッダ・チェックサムが違うものは本質的に別波形で別パーサが要るため、**別の `Frame` 型**にします。複数の波形フォーマットを持つベンダは、自分の名前空間にフォーマットごとに1つの `Frame` 型を持ちます（例: 18バイトの「Mitsubishi AC」protocol は1つの型、より短い Mitsubishi 136 / 112 protocol は別の型になる）。
+- **モデル** — 同一の波形フォーマットを共有し、モデル識別ビットや一部フィールド符号化だけが違う場合は、**単一の `Frame` 型の `Model` パラメータ**として扱います（別型にはしません）。`fromRaw` が捕捉バイト（フレーム長/チェックサム/モデルビット）からモデルを判定して `Frame::model` に記録し、`toRaw` とアクセサがそれに従います。モデル追加は加算的で、enum値とそのフィールド処理を足すだけ・API変更なし。
+
+```cpp
+namespace Gree {
+enum class Model : uint8_t { YBOFB = 0, YAW1F, YX1FSF }; // 1つの波形フォーマットの分岐
+struct Frame {
+  // ...bytes / checksum_ok は上記と同じ...
+  Model model = Model::YBOFB; // fromRaw が判定し、toRaw＋アクセサが従う
+};
+}
+```
+
+モデルを「モデルごとの別型」でなくパラメータにするのは、受信フレームが `fromRaw` で**自分のモデルを自分で解決**する必要があるからです（受信側がクラスを先に選べない）。一方、新しい波形**フォーマット**はパーサを共有できないため常に独自の `Frame` 型になります。
+
+**ベンダ／フォーマット／モデル対応可否一覧。** 「対応」は実装済みかつ実機検証済み（IRremoteESP8266 と双方向＋HeatpumpIR の2系統目参照）を意味します。「予定」「未対応」のフォーマット／モデルは存在を把握しているが未実装で、対象モデルは実装前に決定し、ここで先に固定はしません。
+
+| ベンダ | フォーマット（プロトコル） | フレーム | モデル | 状態 |
+|---|---|---|---|---|
+| Panasonic | Kaseikyo AC | 27バイト・2フレーム | DKE / JKE系 | **対応** |
+| | | | NKE / LKE / CKP / RKR | 未対応 |
+| | Panasonic-AC32 | 短縮32bit | — | 未対応 |
+| Gree | Gree | 8バイト・2ブロック | YBOFB | **対応** |
+| | | | YAW1F / YX1FSF | 未対応 |
+| Mitsubishi | Mitsubishi AC | 18バイト | 単一 | **対応** |
+| | Mitsubishi 136 | 17バイト | — | 未対応 |
+| | Mitsubishi 112 | 14バイト | — | 未対応 |
+| | Mitsubishi Heavy | 88 / 152bit | — | 未対応 |
+| Fujitsu | Fujitsu AC | 長16バイト / 短7バイト | ARRAH2E … ARREW4E | 予定（モデル未定） |
+| Daikin | Daikin（＋サイズ別） | 35バイト＋他 | — | 予定（モデル未定） |
+
+対応フォーマットのベンダ別構造:
+
+- `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。実装モデルは DKE/JKE系テンプレート。
+- `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。実装モデルは YBOFB（`Model::YBOFB`、モデルビットは0）。`Model::YAW1F`/`YX1FSF` は将来用に予約。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。
+- `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。このフォーマットは単一モデル（`Model` パラメータ無し）。他のMitsubishi波形フォーマット（136 / 112 / Heavy）は別の `Frame` 型になる。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 

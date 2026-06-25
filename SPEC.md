@@ -618,6 +618,9 @@ struct Frame {
   uint8_t bytes[kBytes] = {}; // raw decoded state (the intermediate form)
   uint16_t byte_length = 0;
   bool checksum_ok = false;
+  // When this wire format has model variants (e.g. Gree YBOFB/YAW1F), the Frame
+  // also carries a `Model model` field: fromRaw sets it, toRaw/accessors honor
+  // it. Formats with a single model omit it. See "Two axes of variation" below.
 
   // logical accessors over `bytes`
   bool power() const;          void setPower(bool on);
@@ -643,10 +646,44 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 - `ac::send(tx, frame)` is the one-call path: it encodes into a stack buffer of `Frame::kMaxTicks` and transmits, returning `false` on encode or send failure. Use the explicit `toRaw` + `IRSender::send()` pair instead when you need to control the buffer. The sender's carrier mode is configured separately, as usual (use the phase-aligned default for AC; see §11.3).
 - The byte array is the intermediate form. Logical fields (power, mode, temperature, fan, …) are accessors over those bytes.
 - Every vendor follows this same structure under its own `esp32irpk::ac::<Vendor>` namespace. A per-vendor enum-to-name helper (e.g. `Panasonic::toString(Mode)`) may be added later; it is not required by the core contract.
-- Supported vendors:
-  - `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame.
-  - `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. Targets the single YBOFB-style model (the model bit stays clear). `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`.
-  - `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`.
+**Two axes of variation.** A vendor's remotes differ in two independent ways, and the layer represents them differently:
+
+- **Format (wire protocol)** — a different frame length, timing, header, or checksum is a genuinely different waveform that needs its own parser, so it is a **separate `Frame` type**. A vendor with several wire formats exposes one `Frame` type per format under its namespace (e.g. the 18-byte "Mitsubishi AC" protocol is one type; the shorter Mitsubishi 136 / 112 protocols would be distinct types).
+- **Model** — when remotes share one wire format and differ only by a model-identifier bit or a few field encodings, that is a **`Model` parameter** on the single `Frame` type, not a separate type. `fromRaw` detects the model from the captured bytes (frame length / checksum / model bit) and records it in `Frame::model`; `toRaw` and the accessors honor it. Adding a model is additive — a new enum value plus its field handling — with no API change.
+
+```cpp
+namespace Gree {
+enum class Model : uint8_t { YBOFB = 0, YAW1F, YX1FSF }; // variants of one wire format
+struct Frame {
+  // ...bytes / checksum_ok as above...
+  Model model = Model::YBOFB; // fromRaw detects it; toRaw + accessors honor it
+};
+}
+```
+
+This is why a model is a parameter rather than a type-per-model: a received frame must resolve its own model on `fromRaw`, so the decoder cannot require the caller to pick the class first. A new wire *format* always gets its own `Frame` type because it cannot share a parser.
+
+**Vendor / format / model support matrix.** "Supported" means implemented and hardware-verified (bidirectionally against IRremoteESP8266, plus a HeatpumpIR second reference). "Planned" / "Not yet" formats and models are recognized but not implemented; their target models are decided before implementation, not pre-locked here.
+
+| Vendor | Format (protocol) | Frame | Model(s) | Status |
+|---|---|---|---|---|
+| Panasonic | Kaseikyo AC | 27-byte, two frames | DKE / JKE-style | **Supported** |
+| | | | NKE / LKE / CKP / RKR | Not yet |
+| | Panasonic-AC32 | short 32-bit | — | Not yet |
+| Gree | Gree | 8-byte, two blocks | YBOFB | **Supported** |
+| | | | YAW1F / YX1FSF | Not yet |
+| Mitsubishi | Mitsubishi AC | 18-byte | single | **Supported** |
+| | Mitsubishi 136 | 17-byte | — | Not yet |
+| | Mitsubishi 112 | 14-byte | — | Not yet |
+| | Mitsubishi Heavy | 88 / 152-bit | — | Not yet |
+| Fujitsu | Fujitsu AC | 16-byte long / 7-byte short | ARRAH2E … ARREW4E | Planned (model TBD) |
+| Daikin | Daikin (+ size variants) | 35-byte + others | — | Planned (model TBD) |
+
+Per-vendor framing of the supported formats:
+
+- `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame. The implemented model uses the DKE/JKE-style template.
+- `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. The implemented model is YBOFB (`Model::YBOFB`, model bit clear); `Model::YAW1F`/`YX1FSF` are reserved for later. `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`.
+- `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. This format has a single model (no `Model` parameter); the other Mitsubishi wire formats (136 / 112 / Heavy) would be separate `Frame` types. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
