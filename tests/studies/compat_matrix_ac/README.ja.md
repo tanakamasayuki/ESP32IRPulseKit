@@ -124,8 +124,16 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   zeroスペースはスペースを伸ばす受光に対し余裕が小さいので、参照デコーダが既定許容で
   受理するにはIR経路がそれなりに整列している必要がある。
 
-所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` に
-反映します。
+- `mitsubishi_irremoteesp8266_tx/` + `mitsubishi_irremoteesp8266_rx/` — 18バイトの
+  「Mitsubishi AC」protocol 用の較正＋encoder検証の対。IRremoteESP8266 の
+  `IRMitsubishiAC` を使う。フレームは単一のpulse-distance（5バイト署名、最終バイトに
+  総和チェックサム）を約15.5msギャップで2回送る構成で、`rx` primary は両コピーを1
+  キャプチャに収めるため50msタイムアウトを使う。Gree同様、zeroスペース（420us）が
+  bitマーク（450us）より短いので位相整合キャリアで送る（`rx` study が設定。
+  `study_carrier_ab.py` で位相整合 vs ハードウェアを計測）。
+
+所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` /
+`src/ac/Mitsubishi.h` に反映します。
 
 `irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
 IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを確認: 当方のRAW

@@ -646,6 +646,7 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 - Supported vendors:
   - `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame.
   - `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. Targets the single YBOFB-style model (the model bit stays clear). `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`.
+  - `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
@@ -659,5 +660,6 @@ That wobble matters for tightly-timed vendors:
 
 - **Panasonic** tolerates either carrier — both delivered every frame on the test rig — so the hardware carrier is fine and cheaper.
 - **Gree** requires the phase-aligned carrier. Its zero-space (540 µs) is shorter than its bit mark (620 µs), so the hardware carrier's mark wobble pushes spaces out of tolerance and the receiver rejects about half the frames (measured: phase-aligned 50/50 vs hardware ~55%).
+- **Mitsubishi** is the same tight-timing case (zero-space 420 µs < bit mark 450 µs) and likewise uses the phase-aligned carrier.
 
 Recommendation: the phase-aligned carrier is the safe default for AC, and is what you get if you never call `setPhaseAlignedCarrier`. Use the hardware carrier (`setPhaseAlignedCarrier(false)`) only as a memory optimization for loosely-timed vendors such as Panasonic. The carrier affects delivery rate, not byte integrity — a received frame is always byte-correct because it is checksum-validated, and the phase-aligned carrier is not size-limited (durations beyond the 15-bit field are split across symbols).

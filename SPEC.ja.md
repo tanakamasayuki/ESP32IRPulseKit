@@ -641,6 +641,7 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 - 対応ベンダ:
   - `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。
   - `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。単一のYBOFB系モデル（モデルビットは常に0）を対象とする。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。
+  - `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 
@@ -654,5 +655,6 @@ ACフレームは長く、確実に届くキャリアはベンダのタイミン
 
 - **Panasonic** はどちらのキャリアでも問題ありません（実機治具で両方とも全フレーム到達）。ハードウェアキャリアで十分かつ省メモリです。
 - **Gree** は位相整合キャリアが必須です。zeroスペース（540us）がbitマーク（620us）より短いため、ハードウェアキャリアのマーク揺れでスペースが許容範囲を外れ、受信側がフレームの約半数を棄却します（実測: 位相整合 50/50 vs ハードウェア 約55%）。
+- **Mitsubishi** も同じタイミング余裕の狭い例（zeroスペース420us < bitマーク450us）で、同様に位相整合キャリアを使います。
 
 推奨: ACでは位相整合キャリアが安全な既定で、`setPhaseAlignedCarrier` を呼ばなければこれになります。ハードウェアキャリア（`setPhaseAlignedCarrier(false)`）は、Panasonic のようなタイミング余裕の広いベンダでの省メモリ最適化としてのみ使ってください。キャリアはバイト整合性ではなく到達率に影響します——受信できたフレームは常にバイト正確（チェックサム検証済み）で、位相整合キャリアにサイズ上限はありません（15bitフィールドを超える時間は複数シンボルに分割）。

@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+- (EN) Mitsubishi air-conditioner support (`esp32irpk::ac::Mitsubishi`): decode/encode of the 18-byte "Mitsubishi AC" state (5-byte signature, sum checksum, frame sent twice), and `Mode`/`Fan` accessors. `06_ac_learn` recognizes it too.
+- (JA) Mitsubishi エアコン対応（`esp32irpk::ac::Mitsubishi`）: 18バイトの「Mitsubishi AC」状態（5バイト署名、総和チェックサム、フレームを2回送信）のデコード/エンコードと `Mode`/`Fan` アクセサを追加。`06_ac_learn` も認識します。
 
 ## 1.0.2
 - (EN) Gree air-conditioner support (`esp32irpk::ac::Gree`): decode/encode of the 8-byte two-block state (second block has no header), Kelvinator block checksum, and `Mode`/`Fan` accessors. `06_ac_learn` now recognizes Gree as well as Panasonic.

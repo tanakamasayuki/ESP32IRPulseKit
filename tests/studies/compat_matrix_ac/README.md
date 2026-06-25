@@ -134,8 +134,17 @@ harness are added one variant at a time. In place:
   must be reasonably aligned for the reference decoder to accept it at its default
   tolerance.
 
+- `mitsubishi_irremoteesp8266_tx/` + `mitsubishi_irremoteesp8266_rx/` -- the same
+  calibration and encoder-verification pair for the 18-byte "Mitsubishi AC"
+  protocol, using IRremoteESP8266's `IRMitsubishiAC`. The frame is a single
+  pulse-distance frame (5-byte signature, sum checksum in the last byte) sent
+  twice with a ~15.5 ms gap; the `rx` primary uses a 50 ms timeout so both copies
+  land in one capture. Like Gree, Mitsubishi's zero-space (420 µs) is shorter than
+  its bit mark (450 µs), so it is sent on the phase-aligned carrier (the `rx`
+  study sets it; `study_carrier_ab.py` quantifies phase-aligned vs hardware).
+
 Findings and the confirmed field maps are recorded back here and into
-`src/ac/Panasonic.h` / `src/ac/Gree.h`.
+`src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h`.
 
 The `irremoteesp8266_tx/` run confirms the Panasonic field map in
 `src/ac/Panasonic.h` matches IRremoteESP8266's `IRPanasonicAc` byte-for-byte:

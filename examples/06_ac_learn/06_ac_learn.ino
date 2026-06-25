@@ -73,6 +73,12 @@ static void printDecodedComment(const esp32irpk::IRRawTickView &raw)
     printAcFrame("Gree", gf);
     return;
   }
+  esp32irpk::ac::Mitsubishi::Frame mf;
+  if (esp32irpk::ac::Mitsubishi::Frame::fromRaw(raw, mf))
+  {
+    printAcFrame("Mitsubishi", mf);
+    return;
+  }
   Serial.println("// decoded: no AC vendor matched (raw replay still works)");
 }
 

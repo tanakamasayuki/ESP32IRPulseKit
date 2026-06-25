@@ -1458,6 +1458,109 @@ void testGreeAcStateMatrix()
         }
   EXPECT_TRUE("gree/state-matrix", all_ok);
 }
+
+// Mitsubishi AC: build a frame, render the burst (an 18-byte frame sent twice),
+// decode the first copy back, and confirm the logical fields and sum checksum
+// survive the roundtrip. The canonical bytes are derived from the documented
+// field layout; the hardware study verifies them against IRMitsubishiAC.
+void testMitsubishiAcRoundtrip()
+{
+  using esp32irpk::ac::Mitsubishi::Fan;
+  using esp32irpk::ac::Mitsubishi::Frame;
+  using esp32irpk::ac::Mitsubishi::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(22);
+  f.setFan(Fan::AUTO);
+
+  EXPECT_TRUE("mitsubishi/power-get", f.power());
+  EXPECT_TRUE("mitsubishi/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("mitsubishi/temp-get", 22, f.temperatureC());
+  EXPECT_TRUE("mitsubishi/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("mitsubishi/encode", f.toRaw(buf));
+  EXPECT_TRUE("mitsubishi/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("mitsubishi/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("mitsubishi/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("mitsubishi/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("mitsubishi/decode-power", g.power());
+  EXPECT_TRUE("mitsubishi/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("mitsubishi/decode-temp", 22, g.temperatureC());
+  EXPECT_TRUE("mitsubishi/decode-fan", g.fan() == Fan::AUTO);
+
+  // Power on / cool / 22C / fan auto, derived from the documented layout and the
+  // sum checksum (byte 17).
+  static const uint8_t kCanonicalCool22[Frame::kBytes] = {
+      0x23, 0xCB, 0x26, 0x01, 0x00, 0x20, 0x18, 0x06, 0x36,
+      0xC0, 0x67, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB0};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool22[i])
+      canonical_match = false;
+  EXPECT_TRUE("mitsubishi/canonical-bytes", canonical_match);
+
+  // Temperature clamps to the supported range.
+  Frame t{};
+  t.setTemperatureC(40);
+  EXPECT_EQ("mitsubishi/temp-clamp-high", 31, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("mitsubishi/temp-clamp-low", 16, t.temperatureC());
+
+  // A non-Mitsubishi waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("mitsubishi/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power combination must encode (setters -> toRaw ->
+// fromRaw) back to itself with a valid checksum, exercising the full field map.
+void testMitsubishiAcStateMatrix()
+{
+  using esp32irpk::ac::Mitsubishi::Fan;
+  using esp32irpk::ac::Mitsubishi::Frame;
+  using esp32irpk::ac::Mitsubishi::Mode;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::COOL, Mode::HEAT, Mode::DRY, Mode::FAN};
+  static const Fan fans[] = {Fan::AUTO, Fan::QUIET, Fan::LOW_SPEED,
+                             Fan::MED_SPEED, Fan::HIGH_SPEED, Fan::MAX_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 16; temp <= 31; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          Frame f{};
+          f.setPower(power != 0);
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan ||
+              g.temperatureC() != temp)
+            all_ok = false;
+        }
+  EXPECT_TRUE("mitsubishi/state-matrix", all_ok);
+}
 } // namespace
 
 void setup()
@@ -1507,6 +1610,8 @@ void setup()
   testPanasonicAcDecodesSkewedTiming();
   testGreeAcRoundtrip();
   testGreeAcStateMatrix();
+  testMitsubishiAcRoundtrip();
+  testMitsubishiAcStateMatrix();
 
   Serial.print("TEST done ");
   Serial.print(g_passed);
