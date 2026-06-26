@@ -203,3 +203,30 @@ checksum-validated; the carrier affects delivery rate. The phase-aligned encoder
 is never size-limited: durations beyond the 15-bit field are split across
 symbols, so even the inter-block gap (well under the ~33 ms single-symbol limit
 at 1 µs) is never the constraint; the cost is mark expansion (symbol count).
+
+## 13. AC vendor field-map and accessor policy
+
+Which fields get accessors (setters) is decided by the remote-control library's
+role. The field map (byte/bit layout and confidence) lives in SPEC §11.2; the
+measured evidence is in `tests/studies/dump/panasonic_captures.md`.
+
+- **Everyday control fields get accessors**: power/mode/temperature (integer)/fan
+  are implemented; half-degree, louver, and quiet/powerful are planned.
+- **Timers (on/off) get no setter.** Scheduling is the sender's (controller's)
+  job — emitting a power ON/OFF frame at the right time is the natural model. The
+  timer is likely absolute-time, so using it correctly would also need a
+  clock-set frame (poor cost/benefit). To replay a real timer frame verbatim, use
+  RAW replay. This is "don't touch", not "ignore": the field map is documented so
+  (1) decode never misreads it and (2) a frame built from setters keeps byte 13
+  timer bits = 0 and bytes 18–20 at the sentinel, never dirtying the timer bits.
+  Read-only accessors are optional.
+- **Special-function buttons (e.g. internal clean) are a separate short command
+  frame** (a different `Frame` type, not yet supported). No setter; re-send via
+  RAW replay if needed.
+- **Reconciling the `Fan` enum's `QUIET`/`POWERFUL` with the remote's
+  quiet/powerful**: the current `Fan` enum (IRremoteESP8266-derived) models
+  QUIET/POWERFUL as fan-nibble values (byte 16 high nibble 3/7), but on the real
+  remote (ACXA75C15870, JKE family) quiet/powerful keep the fan at auto and are a
+  separate bit set in byte 21. When implementing, treat "fan speed" and
+  "quiet/powerful" as distinct fields (keep the fan-nibble QUIET/POWERFUL for now
+  for other-model compatibility).

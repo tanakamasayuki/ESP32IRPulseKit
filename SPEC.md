@@ -685,6 +685,22 @@ Per-vendor framing of the supported formats:
 - `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. The implemented model is YBOFB (`Model::YBOFB`, model bit clear); `Model::YAW1F`/`YX1FSF` are reserved for later. `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`.
 - `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. This format has a single model (no `Model` parameter); the other Mitsubishi wire formats (136 / 112 / Heavy) would be separate `Frame` types. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`.
 
+**Panasonic field map (decoded logical fields).** Where each control field lives in the 27-byte state. Status legend: ✅ implemented (decode + encode) · 🔜 planned · 🟡 documented, no setter (re-send via RAW replay) · ⛔ out of scope (separate frame type).
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| power | byte 13 bit 0 | on=1 / off=0 | ✅ |
+| mode | byte 13 high nibble | cool=3 / dry=2 / heat=4 (auto=0 / fan=6) | ✅ |
+| temperature (integer) | byte 14 | `floor(°C) << 1`, 16–30 °C | ✅ |
+| half-degree (0.5 °C) | byte 22 bit 7 | set = +0.5 °C | 🔜 |
+| fan (airflow) | byte 16 high nibble | auto=A / 3..7 (low→max) | ✅ |
+| louver (swing) | byte 16 low nibble | 1–5 = fixed / F = auto | 🔜 |
+| quiet / powerful | byte 21 bit 5 / bit 0 | quiet=0x20 / powerful=0x01 | 🔜 |
+| on/off timer | byte 13 bit 1,2 + bytes 18–20 | 11-bit minutes | 🟡 |
+| checksum | byte 26 | sum of frame-2 bytes 8–25 mod 256 | ✅ |
+
+The newly mapped fields (half-degree, louver, quiet/powerful, timer) were reverse-engineered from one real remote (part ACXA75C15870, a JKE-family unit) and are not yet cross-validated across models/libraries, unlike power/mode/temperature/fan/checksum (verified against IRremoteESP8266). Quiet/powerful are dedicated buttons that keep the fan nibble at auto — they are not fan speeds, so they differ from the `Fan` enum's `QUIET`/`POWERFUL` (rationale and the no-setter policy for timers are in [DESIGN.md](DESIGN.md)). Special-function buttons (e.g. internal clean) are sent as a separate, shorter command frame (⛔ a different `Frame` type, not yet supported); RAW replay still reproduces them.
+
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
 ### 11.3 Carrier For Long Frames

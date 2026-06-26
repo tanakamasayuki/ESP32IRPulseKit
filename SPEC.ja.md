@@ -680,6 +680,22 @@ struct Frame {
 - `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。実装モデルは YBOFB（`Model::YBOFB`、モデルビットは0）。`Model::YAW1F`/`YX1FSF` は将来用に予約。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。
 - `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。このフォーマットは単一モデル（`Model` パラメータ無し）。他のMitsubishi波形フォーマット（136 / 112 / Heavy）は別の `Frame` 型になる。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。
 
+**Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
+
+| フィールド | 位置 (byte/bit) | コード/値域 | ステータス |
+|---|---|---|---|
+| power | byte13 bit0 | on=1 / off=0 | ✅ |
+| mode | byte13 上位ニブル | cool=3 / dry=2 / heat=4（auto=0 / fan=6） | ✅ |
+| 温度(整数) | byte14 | `floor(℃) << 1`、16–30℃ | ✅ |
+| 0.5℃ | byte22 bit7 | セットで +0.5℃ | 🔜 |
+| fan(風量) | byte16 上位ニブル | auto=A / 3..7（弱→最強） | ✅ |
+| 風向(louver) | byte16 下位ニブル | 1–5=固定 / F=auto | 🔜 |
+| しずか/パワフル | byte21 bit5 / bit0 | しずか=0x20 / パワフル=0x01 | 🔜 |
+| タイマー入/切 | byte13 bit1,2 + byte18–20 | 11bit・分単位 | 🟡 |
+| checksum | byte26 | frame2（byte8..25）の総和 mod256 | ✅ |
+
+新規マップ分（0.5℃・風向・しずか/パワフル・タイマー）は実機1台（型番 ACXA75C15870、JKE系）からのリバースエンジニアリングで、power/mode/temperature/fan/checksum（IRremoteESP8266 でクロス検証済み）とは異なりモデル/ライブラリ横断の検証はまだ。しずか/パワフルは fan ニブルを auto に保つ専用ボタンで、fan 速度ではない——`Fan` enum の `QUIET`/`POWERFUL` とは別系統（理由とタイマーの setter 非作成方針は [DESIGN.ja.md](DESIGN.ja.md)）。内部クリーン等の特殊ボタンは状態フレームと別系統の短縮コマンドフレームで送られる（⛔別Frame型・未対応）。RAW replay で再送は可能。
+
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 
 ### 11.3 長尺フレームのキャリア
