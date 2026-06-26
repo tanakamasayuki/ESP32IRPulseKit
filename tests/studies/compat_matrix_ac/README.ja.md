@@ -123,7 +123,7 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   余裕が薄いと2ブロック目が切り離される）。(2) Gree は位相整合キャリアで送る必要が
   ある——自走ハードウェアキャリアの約1サイクルのマーク揺れでフレームの約半数が落ちる
   （zeroスペース540us がbitマーク620usより短く、揺れでスペースが許容を外れる。実測:
-  位相整合 50/50 vs ハードウェア 約55%。`study_carrier_ab.py`）。位相整合でも540usの
+  位相整合 50/50 vs ハードウェア 約55%。`study_gree_carrier_ab.py`）。位相整合でも540usの
   zeroスペースはスペースを伸ばす受光に対し余裕が小さいので、参照デコーダが既定許容で
   受理するにはIR経路がそれなりに整列している必要がある。
 
@@ -133,7 +133,7 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   総和チェックサム）を約15.5msギャップで2回送る構成で、`rx` primary は両コピーを1
   キャプチャに収めるため50msタイムアウトを使う。Gree同様、zeroスペース（420us）が
   bitマーク（450us）より短いので位相整合キャリアで送る（`rx` study が設定。
-  `study_carrier_ab.py` で位相整合 vs ハードウェアを計測）。
+  `study_mitsubishi_carrier_ab.py` で位相整合 vs ハードウェアを計測）。
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` — それぞれの2系統目の独立参照
   （`heatpumpir_tx` と同型）。HeatpumpIR（`GreeGenericHeatpumpIR` /
@@ -165,7 +165,7 @@ ACのサンプルは `setPhaseAlignedCarrier(false)` で自走ハードウェア
 リフィルのアンダーランリスクが増す（SPEC §11.3）。そのためサンプルは長尺フレームで
 ハードウェアキャリアを推奨する。
 
-`study_carrier_ab.py` はその選択が到達率を損なうかを計測する。`irremoteesp8266_rx`
+`study_irremoteesp8266_carrier_ab.py` はその選択が到達率を損なうかを計測する。`irremoteesp8266_rx`
 の peer（当方TX）はランタイム `CARRIER pa` / `CARRIER hw` コマンドを受け
 （ビルド既定は `PULSEKIT_CARRIER`、0=ハードウェア）、各状態を両モードで送信して
 モード別の正準到達率を記録する。実機治具では両キャリアとも全フレーム到達
@@ -177,7 +177,7 @@ ACのサンプルは `setPhaseAlignedCarrier(false)` で自走ハードウェア
 
 ```sh
 uv run --env-file .env pytest -s -o python_files="study_*.py" \
-  studies/compat_matrix_ac/irremoteesp8266_rx/study_carrier_ab.py
+  studies/compat_matrix_ac/irremoteesp8266_rx/study_irremoteesp8266_carrier_ab.py
 ```
 
 ### デコーダ許容（タイミングスキュー）

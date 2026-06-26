@@ -31,7 +31,7 @@ AC_DECODE = re.compile(
 
 
 @dataclass(frozen=True)
-class Case:
+class PanasonicCase:
     mode: str
     fan: str
     temp: int
@@ -42,9 +42,9 @@ class Case:
 # A few representative states; canonical bytes are the ground truth captured by
 # irremoteesp8266_tx.
 CASES = [
-    Case("COOL", "AUTO", 26, 1, "0220e004000000060220e00400313480a000000ee00000810000fa"),
-    Case("HEAT", "HIGH", 22, 1, "0220e004000000060220e00400412c806000000ee00000810000c2"),
-    Case("COOL", "MED", 18, 1, "0220e004000000060220e004003124805000000ee000008100009a"),
+    PanasonicCase("COOL", "AUTO", 26, 1, "0220e004000000060220e00400313480a000000ee00000810000fa"),
+    PanasonicCase("HEAT", "HIGH", 22, 1, "0220e004000000060220e00400412c806000000ee00000810000c2"),
+    PanasonicCase("COOL", "MED", 18, 1, "0220e004000000060220e004003124805000000ee000008100009a"),
 ]
 
 
@@ -63,7 +63,7 @@ def set_carrier(tx, mode: str):
     tx.expect_exact(f"CARRIER_OK mode={mode}", timeout=10)
 
 
-def send_once(tx, case: Case):
+def send_once(tx, case: PanasonicCase):
     tx.write(
         f"SEND_AC mode={case.mode} fan={case.fan} "
         f"temp={case.temp} power={case.power}\n"
@@ -90,7 +90,7 @@ def decode_once(rx):
 @pytest.mark.parametrize(
     "case", CASES, ids=lambda c: f"{c.mode}_{c.fan}_{c.temp}_p{c.power}"
 )
-def test_carrier_ab(dut, peers, case, carrier, record_property):
+def test_irremoteesp8266_carrier_ab(dut, peers, case, carrier, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     set_carrier(tx, carrier)
 

@@ -18,7 +18,7 @@ from pexpect import EOF, TIMEOUT
 #
 # Like Gree, Mitsubishi is sent on the phase-aligned carrier (its 420us zero-space
 # is shorter than the 450us bit mark, so the hardware carrier's mark wobble is
-# unreliable); see study_carrier_ab.py.
+# unreliable); see study_mitsubishi_carrier_ab.py.
 PEER_IMPL = "ESP32IRPulseKit"
 DUT_IMPL = "IRremoteESP8266"
 
@@ -135,7 +135,7 @@ def test_mitsubishi_irremoteesp8266_rx(dut, peers, case, record_property):
 
     # Mitsubishi is sent on the phase-aligned carrier (zero-space 420us < 450us
     # bit mark; the hardware carrier's mark wobble is unreliable). See
-    # study_carrier_ab.py.
+    # study_mitsubishi_carrier_ab.py.
     set_carrier(tx, "pa")
 
     our_sent, observed, n_ok = run_trials(tx, rx, case)

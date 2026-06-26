@@ -132,7 +132,7 @@ harness are added one variant at a time. In place:
   free-running hardware carrier's ~1-cycle mark wobble drops about half the frames
   (its 540 µs zero-space is shorter than the 620 µs bit mark, so the wobble pushes
   spaces out of tolerance; measured phase-aligned 50/50 vs hardware ~55%, see
-  `study_carrier_ab.py`). Even on the phase-aligned carrier the 540 µs zero-space
+  `study_gree_carrier_ab.py`). Even on the phase-aligned carrier the 540 µs zero-space
   leaves little headroom against a receiver that lengthens spaces, so the IR path
   must be reasonably aligned for the reference decoder to accept it at its default
   tolerance.
@@ -144,7 +144,7 @@ harness are added one variant at a time. In place:
   twice with a ~15.5 ms gap; the `rx` primary uses a 50 ms timeout so both copies
   land in one capture. Like Gree, Mitsubishi's zero-space (420 µs) is shorter than
   its bit mark (450 µs), so it is sent on the phase-aligned carrier (the `rx`
-  study sets it; `study_carrier_ab.py` quantifies phase-aligned vs hardware).
+  study sets it; `study_mitsubishi_carrier_ab.py` quantifies phase-aligned vs hardware).
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`
@@ -178,7 +178,7 @@ give higher mark precision but expands a long AC burst to ~17 KB of symbols per
 send and raises the refill-underrun risk under heavy interrupt load (SPEC 11.3),
 which is why the examples recommend the hardware carrier for long frames.
 
-`study_carrier_ab.py` measures whether that choice costs delivery. The
+`study_irremoteesp8266_carrier_ab.py` measures whether that choice costs delivery. The
 `irremoteesp8266_rx` peer (our TX) takes a runtime `CARRIER pa` / `CARRIER hw`
 command (build-time default `PULSEKIT_CARRIER`, 0 = hardware), and the study sends
 each state under both modes and records the canonical-delivery rate per mode. On
@@ -192,7 +192,7 @@ rate would be reported, not failed. Run it with:
 
 ```sh
 uv run --env-file .env pytest -s -o python_files="study_*.py" \
-  studies/compat_matrix_ac/irremoteesp8266_rx/study_carrier_ab.py
+  studies/compat_matrix_ac/irremoteesp8266_rx/study_irremoteesp8266_carrier_ab.py
 ```
 
 ### Decoder tolerance (timing skew)

@@ -138,7 +138,7 @@ def test_gree_irremoteesp8266_rx(dut, peers, case, record_property):
     # Gree requires the phase-aligned carrier: the free-running hardware carrier's
     # ~1-cycle mark wobble drops ~half of these long frames (zero-space 540us is
     # shorter than the 620us bit mark, so matchGeneric rejects the frame).
-    # Measured PA=50/50 vs HW~55% in study_carrier_ab.py.
+    # Measured PA=50/50 vs HW~55% in study_gree_carrier_ab.py.
     set_carrier(tx, "pa")
 
     our_sent, observed, n_ok = run_trials(tx, rx, case)

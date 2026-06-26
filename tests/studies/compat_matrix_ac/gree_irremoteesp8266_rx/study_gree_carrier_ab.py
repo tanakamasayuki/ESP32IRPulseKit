@@ -4,36 +4,38 @@ from dataclasses import dataclass
 import pytest
 from pexpect import EOF, TIMEOUT
 
-# Carrier A/B experiment for Mitsubishi frames. Our TX (peer) sends the SAME known
-# Mitsubishi state under each carrier mode; the IRremoteESP8266 primary decodes
-# it. We measure the canonical-delivery rate per mode to compare the phase-aligned
+# Carrier A/B experiment for long Gree frames. Our TX (peer) sends the SAME known
+# Gree state under each carrier mode; the IRremoteESP8266 primary decodes it. We
+# measure the canonical-delivery rate per mode to compare the phase-aligned
 # carrier against the free-running hardware carrier.
 #
-# Mitsubishi's zero-space (420us) is shorter than its bit mark (450us) -- the same
-# tight-timing class as Gree -- so the free-running hardware carrier's ~1-cycle
-# mark wobble is expected to push spaces out of tolerance and drop frames. This
-# study quantifies whether the phase-aligned carrier (exact whole-cycle marks)
-# recovers the delivery rate.
+# A Gree burst spans a 9ms header plus two ~20ms inter-block gaps, and the
+# free-running hardware carrier showed a low canonical-delivery rate in the
+# gree_irremoteesp8266_rx run. This study quantifies whether the phase-aligned
+# carrier (exact whole-cycle marks, no ±1-cycle wobble) recovers that rate -- the
+# hypothesis being that the hardware carrier's mark wobble degrades a frame whose
+# zero-space (540us) is shorter than its bit mark (620us).
 #
-# Measurement study, not a pass/fail gate: it asserts only that each mode opens
-# (CARRIER_OK) and that our encoder still emits the canonical bytes in both modes.
+# This is a measurement study, not a pass/fail gate: it asserts only that each
+# mode opens (CARRIER_OK) and that our encoder still emits the canonical bytes in
+# both modes. The delivery ratio per mode is recorded and printed for comparison.
 PEER_IMPL = "ESP32IRPulseKit"
 DUT_IMPL = "IRremoteESP8266"
 
 CARRIERS = ["hw", "pa"]
 TRIALS = 50
 
-TX_OK_AC = re.compile(rb"TX_OK_AC vendor=MITSUBISHI bytes=(?P<bytes>[0-9A-Fa-f]{36})")
+TX_OK_AC = re.compile(rb"TX_OK_AC vendor=GREE bytes=(?P<bytes>[0-9A-Fa-f]{16})")
 
 AC_DECODE = re.compile(
-    rb"AC_DECODE vendor=MITSUBISHI checksum=(?P<checksum>ok|bad) "
+    rb"AC_DECODE vendor=GREE checksum=(?P<checksum>ok|bad) "
     rb"power=(?P<power>\d+) mode=(?P<mode>\d+) temp=(?P<temp>\d+) "
-    rb"fan=(?P<fan>\d+) bytes=(?P<bytes>[0-9A-Fa-f]{36})"
+    rb"fan=(?P<fan>\d+) bytes=(?P<bytes>[0-9A-Fa-f]{16})"
 )
 
 
 @dataclass(frozen=True)
-class Case:
+class GreeCase:
     mode: str
     fan: str
     temp: int
@@ -41,12 +43,12 @@ class Case:
     canonical: str
 
 
-# A few representative states; canonical bytes confirmed by
-# mitsubishi_irremoteesp8266_tx.
+# A few representative states; canonical bytes are confirmed by
+# gree_irremoteesp8266_tx.
 CASES = [
-    Case("COOL", "AUTO", 22, 1, "23cb26010020180636c067000000000000b0"),
-    Case("HEAT", "MAX", 24, 1, "23cb26010020080830446700000000000020"),
-    Case("FAN", "MED", 28, 1, "23cb26010020380c37426700000000000059"),
+    GreeCase("COOL", "AUTO", 25, 1, "09092050002000e0"),
+    GreeCase("HEAT", "MAX", 22, 1, "3c062050002000e0"),
+    GreeCase("COOL", "MED", 18, 1, "2902205000200070"),
 ]
 
 
@@ -65,7 +67,7 @@ def set_carrier(tx, mode: str):
     tx.expect_exact(f"CARRIER_OK mode={mode}", timeout=10)
 
 
-def send_once(tx, case: Case):
+def send_once(tx, case: GreeCase):
     tx.write(
         f"SEND_AC mode={case.mode} fan={case.fan} "
         f"temp={case.temp} power={case.power}\n"
@@ -92,7 +94,7 @@ def decode_once(rx):
 @pytest.mark.parametrize(
     "case", CASES, ids=lambda c: f"{c.mode}_{c.fan}_{c.temp}_p{c.power}"
 )
-def test_carrier_ab(dut, peers, case, carrier, record_property):
+def test_gree_carrier_ab(dut, peers, case, carrier, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     set_carrier(tx, carrier)
 
