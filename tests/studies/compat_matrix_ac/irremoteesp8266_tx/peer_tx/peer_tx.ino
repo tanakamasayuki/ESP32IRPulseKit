@@ -66,6 +66,17 @@ bool mapFan(const String &name, uint8_t &fan)
   return false;
 }
 
+// Optional model= field; absent defaults to JKE (the known-good base layout).
+bool mapModel(const String &name, panasonic_ac_remote_model_t &model)
+{
+  if (name == "" || name == "JKE") { model = kPanasonicJke; return true; }
+  if (name == "DKE") { model = kPanasonicDke; return true; }
+  if (name == "NKE") { model = kPanasonicNke; return true; }
+  if (name == "LKE") { model = kPanasonicLke; return true; }
+  if (name == "RKR") { model = kPanasonicRkr; return true; }
+  return false;
+}
+
 void printStateHex(const uint8_t *state, uint16_t nbytes)
 {
   for (uint16_t i = 0; i < nbytes; ++i)
@@ -98,16 +109,27 @@ void handleSendAc(const String &line)
     Serial.println("TX_ERROR invalid_fan");
     return;
   }
+  panasonic_ac_remote_model_t model;
+  if (!mapModel(fieldValue(line, "model"), model))
+  {
+    Serial.println("TX_ERROR invalid_model");
+    return;
+  }
   const int temp = fieldValue(line, "temp").toInt();
   const bool power = fieldValue(line, "power").toInt() != 0;
 
+  // setModel first: it stamps the model marker bytes (and clears the power bit),
+  // then the logical setters apply on top.
+  ac.setModel(model);
   ac.setPower(power);
   ac.setMode(mode);
   ac.setFan(fan);
   ac.setTemp((uint8_t)temp);
   ac.send();
 
-  Serial.print("TX_OK_AC vendor=PANASONIC bytes=");
+  Serial.print("TX_OK_AC vendor=PANASONIC model=");
+  Serial.print(fieldValue(line, "model").length() ? fieldValue(line, "model") : "JKE");
+  Serial.print(" bytes=");
   printStateHex(ac.getRaw(), kPanasonicAcStateLength);
   Serial.println();
 }

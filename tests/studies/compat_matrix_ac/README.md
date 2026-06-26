@@ -101,7 +101,10 @@ harness are added one variant at a time. In place:
   known state, our RX captures it RAW and decodes with `esp32irpk::ac::Panasonic`.
   Byte equality against the canonical frame is the hard pass/fail; per-field
   comparison against the known state is reported (not asserted) to drive the
-  field map.
+  field map. `test_irremoteesp8266_tx_models` additionally has the peer encode
+  each Panasonic model (`setModel` DKE/NKE/LKE/RKR) and checks our RX recovers
+  the canonical bytes AND self-identifies the same model (`Frame::model`), so the
+  per-model marker bytes and detection are confirmed against IRremoteESP8266.
 - `irremoteesp8266_rx/` -- encoder verification (complement of `_tx`): our TX
   encodes a known state with `esp32irpk::ac::Panasonic` and transmits it;
   IRremoteESP8266 decodes it. The bytes the external library recovers must equal

@@ -9,9 +9,10 @@
 // Frame mechanics (timing, two-frame layout, checksum) follow the documented
 // Kaseikyo/Panasonic format. This wire format has model variants (SPEC §11.2,
 // "two axes of variation"); they are carried as a `Model` parameter on the
-// Frame, not separate types. The implemented model is JKE (its template is
-// byte-identical to IRPanasonicAc's default known-good state); DKE/NKE/LKE/CKP/
-// RKR differ in fixed marker bytes and are reserved for later (no handling). The
+// Frame, not separate types. JKE/DKE/NKE/LKE/RKR are handled — they share the
+// power/mode/temperature/fan field map and differ only in fixed marker bytes
+// (see detail::applyModelMarkers / detectModel). CKP is reserved (toggle power
+// and relocated quiet/powerful bits make its semantics different). The
 // logical field map (which byte/bit holds power/mode/temperature/fan, and the
 // mode/fan codes) is verified byte-for-byte against IRremoteESP8266's
 // IRPanasonicAc encoder (tests/studies/compat_matrix_ac/irremoteesp8266_tx).
@@ -47,11 +48,12 @@ namespace esp32irpk::ac::Panasonic
 
   // Model variants of the one Kaseikyo Panasonic-AC wire format (SPEC §11.2).
   // They share this format and differ only by a few marker bytes, so they are a
-  // parameter on Frame rather than separate types. Only JKE is implemented — its
-  // template is byte-identical to IRPanasonicAc's default known-good state. The
-  // others are reserved (decode is future) and differ in fixed marker bytes,
-  // e.g. DKE sets byte23=0x01 / byte25=0x06 and adds horizontal swing; JKE keeps
-  // byte23=0x81 / byte25=0x00; NKE/LKE set byte17=0x06; RKR sets byte23=0x89.
+  // parameter on Frame rather than separate types. JKE (the default; template
+  // byte-identical to IRPanasonicAc's known-good state), DKE, NKE, LKE and RKR
+  // are handled: DKE sets byte23=0x01 / byte25=0x06 (+ horizontal swing in
+  // byte17); NKE sets byte17=0x06; LKE sets byte17=0x06 and byte13 bit1; RKR
+  // sets byte23=0x89 and byte13 bit3; JKE keeps byte23=0x81. CKP is reserved
+  // (toggle power + relocated quiet/powerful bits); encoding it fails.
   enum class Model : uint8_t
   {
     JKE = 0,
@@ -147,6 +149,52 @@ namespace esp32irpk::ac::Panasonic
       default: return Fan::AUTO;
       }
     }
+
+    // Model is carried in fixed marker bytes of frame 2 (overall indices 13, 17,
+    // 21, 23, 25). The logical fields (power/mode/temperature/fan) sit elsewhere
+    // and are identical across these models, so a model is a parameter, not a
+    // separate Frame type. The marker byte values and the detection order mirror
+    // the documented Panasonic-AC format (cf. IRPanasonicAc setModel/getModel).
+    inline constexpr uint8_t kSwingHMiddle = 0x6; // DKE writes this into byte17 low nibble
+
+    // Stamp the marker bytes for `m`, preserving the logical fields. byte13 holds
+    // power (bit0) and mode (high nibble) alongside model bits 1..3, so only
+    // those marker bits are touched there.
+    inline void applyModelMarkers(uint8_t *b, Model m)
+    {
+      b[13] = static_cast<uint8_t>(b[13] & 0xF1u); // clear byte13 model bits 1..3
+      b[17] = 0x00;
+      b[21] = static_cast<uint8_t>(b[21] & ~0x10u); // clear the CKP-only marker bit
+      b[23] = 0x81;
+      b[25] = 0x00;
+      switch (m)
+      {
+      case Model::DKE: b[23] = 0x01; b[25] = 0x06; b[17] = kSwingHMiddle; break;
+      case Model::NKE: b[17] = 0x06; break;
+      case Model::LKE: b[13] = static_cast<uint8_t>(b[13] | 0x02u); b[17] = 0x06; break;
+      case Model::RKR: b[13] = static_cast<uint8_t>(b[13] | 0x08u); b[23] = 0x89; break;
+      case Model::JKE: default: break; // JKE keeps the base markers
+      }
+    }
+
+    // Classify the model from the marker bytes (detection order mirrors
+    // IRPanasonicAc::getModel). The LKE marker shares byte13's low nibble with
+    // the power bit (bit0), so the power bit is masked out (bits 1..3 only) —
+    // otherwise a powered-on LKE frame would misclassify as NKE. An unrecognized
+    // combination falls back to JKE (the base layout).
+    inline Model detectModel(const uint8_t *b)
+    {
+      if (b[23] == 0x89) return Model::RKR;
+      if (b[17] == 0x00)
+      {
+        if ((b[21] & 0x10u) && (b[23] & 0x01u)) return Model::CKP;
+        if (b[23] & 0x80u) return Model::JKE;
+      }
+      if (b[17] == 0x06 && (b[13] & 0x0Eu) == 0x02u) return Model::LKE;
+      if (b[23] == 0x01) return Model::DKE;
+      if (b[17] == 0x06) return Model::NKE;
+      return Model::JKE;
+    }
   } // namespace detail
 
   struct Frame
@@ -210,10 +258,9 @@ namespace esp32irpk::ac::Panasonic
       for (size_t i = 0; i < detail::kFrame2Bytes; ++i)
         out.bytes[detail::kFrame1Bytes + i] = f2[i];
       out.byte_length = kBytes;
-      // Only JKE is implemented, so the model is JKE (already the default from
-      // `out = Frame{}`). When DKE/NKE/LKE/CKP/RKR are added, classify them here
-      // from the marker bytes (cf. IRPanasonicAc::getModel) and decode deltas.
-      out.model = Model::JKE;
+      // Classify the model from the decoded marker bytes. The logical fields are
+      // shared across models, so decoding is identical; only `model` differs.
+      out.model = detail::detectModel(out.bytes);
       out.checksum_ok = (f2[detail::kFrame2Bytes - 1] == detail::checksum(f2));
       return true;
     }
@@ -222,9 +269,9 @@ namespace esp32irpk::ac::Panasonic
     // checksum, so a frame built from setters renders a valid burst.
     bool toRaw(esp32irpk::IRRawTickBuffer &out) const
     {
-      // Only JKE is implemented; refuse to encode a model whose field map is not
-      // implemented rather than silently emitting a JKE frame.
-      if (model != Model::JKE)
+      // CKP is not implemented (toggle power + relocated quiet/powerful bits);
+      // refuse rather than silently emitting a frame with the wrong semantics.
+      if (model == Model::CKP)
         return false;
 
       uint8_t buf[kBytes];
@@ -234,6 +281,7 @@ namespace esp32irpk::ac::Panasonic
         buf[i] = detail::kFrame1[i];
       for (size_t i = 0; i < sizeof(detail::kFrame2Preamble); ++i)
         buf[detail::kFrame1Bytes + i] = detail::kFrame2Preamble[i];
+      detail::applyModelMarkers(buf, model); // stamp the model's marker bytes
       buf[detail::kOffChecksum] = detail::checksum(buf + detail::kFrame1Bytes);
 
       out.len = 0;

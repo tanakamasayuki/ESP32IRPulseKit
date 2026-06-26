@@ -97,7 +97,10 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
 - `irremoteesp8266_tx/` — フィールドマップ較正: IRremoteESP8266 が既知状態を送信、
   当方RXがRAWキャプチャして `esp32irpk::ac::Panasonic` でデコード。正準フレームとの
   バイト一致が合否判定（hard）、既知状態とのフィールド単位比較は報告のみ（assertし
-  ない）でフィールドマップ確定の材料にする。
+  ない）でフィールドマップ確定の材料にする。`test_irremoteesp8266_tx_models` は加えて、
+  peer に各Panasonicモデル（`setModel` DKE/NKE/LKE/RKR）を送らせ、当方RXが正準バイトを
+  復元し**かつ同じモデルを自己判定**（`Frame::model`）することを確認 — モデル別マーカー
+  バイトと判定を IRremoteESP8266 に対して検証する。
 - `irremoteesp8266_rx/` — encoder検証（`_tx`の対）: 当方TXが `esp32irpk::ac::Panasonic`
   で既知状態をエンコードして送信、IRremoteESP8266 がデコード。外部ライブラリが復元
   したバイトが当方encoderの生成バイトと一致（checksum ok）すること＝当方 `toRaw()` が

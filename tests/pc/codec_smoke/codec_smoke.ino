@@ -1238,20 +1238,14 @@ void testPanasonicAcRoundtrip()
       canonical_match = false;
   EXPECT_TRUE("panasonic/canonical-bytes", canonical_match);
 
-  // JKE is the implemented model (the default), so it must encode; DKE and the
-  // other unimplemented models must fail rather than silently emit a JKE frame
-  // (DKE actually differs on the wire: byte23=0x01/byte25=0x06 + horiz swing).
+  // CKP is not implemented; it must refuse to encode rather than silently emit a
+  // frame with the wrong semantics. The supported models (JKE/DKE/NKE/LKE/RKR)
+  // are covered in testPanasonicAcModels().
   uint16_t m_ticks[esp32irpk::ac::Panasonic::Frame::kMaxTicks];
   esp32irpk::IRRawTickBuffer m_buf{m_ticks, sizeof(m_ticks) / sizeof(m_ticks[0]), 0};
-  esp32irpk::ac::Panasonic::Frame jke{};
-  jke.model = esp32irpk::ac::Panasonic::Model::JKE;
-  EXPECT_TRUE("panasonic/encode-allows-jke", jke.toRaw(m_buf));
-  esp32irpk::ac::Panasonic::Frame dke{};
-  dke.model = esp32irpk::ac::Panasonic::Model::DKE;
-  EXPECT_TRUE("panasonic/encode-rejects-dke", !dke.toRaw(m_buf));
-  esp32irpk::ac::Panasonic::Frame nke{};
-  nke.model = esp32irpk::ac::Panasonic::Model::NKE;
-  EXPECT_TRUE("panasonic/encode-rejects-unimpl-model", !nke.toRaw(m_buf));
+  esp32irpk::ac::Panasonic::Frame ckp{};
+  ckp.model = esp32irpk::ac::Panasonic::Model::CKP;
+  EXPECT_TRUE("panasonic/encode-rejects-ckp", !ckp.toRaw(m_buf));
 
   // A non-Panasonic waveform (NEC) must be rejected.
   esp32irpk::IRRawTickView nec{};
@@ -1259,6 +1253,83 @@ void testPanasonicAcRoundtrip()
   nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
   esp32irpk::ac::Panasonic::Frame nf{};
   EXPECT_TRUE("panasonic/reject-nec", !esp32irpk::ac::Panasonic::Frame::fromRaw(nec, nf));
+}
+
+// Model coverage: JKE/DKE/NKE/LKE/RKR share the power/mode/temperature/fan field
+// map and differ only in fixed marker bytes (13/17/23/25). Each model must
+// encode, decode back to the same logical fields, self-identify on decode, and
+// carry the documented marker bytes. The marker values mirror the documented
+// Panasonic-AC format; the independent byte-level ground truth is the
+// compat_matrix_ac study against IRremoteESP8266 (per-model setModel/getModel).
+void testPanasonicAcModels()
+{
+  using esp32irpk::ac::Panasonic::Fan;
+  using esp32irpk::ac::Panasonic::Frame;
+  using esp32irpk::ac::Panasonic::Mode;
+  using esp32irpk::ac::Panasonic::Model;
+
+  struct ModelCase
+  {
+    const char *name;
+    Model model;
+    uint8_t b13_marker; // expected byte13 marker bits (1..3)
+    uint8_t b17;
+    uint8_t b23;
+    uint8_t b25;
+  };
+  static const ModelCase cases[] = {
+      {"jke", Model::JKE, 0x00, 0x00, 0x81, 0x00},
+      {"dke", Model::DKE, 0x00, 0x06, 0x01, 0x06},
+      {"nke", Model::NKE, 0x00, 0x06, 0x81, 0x00},
+      {"lke", Model::LKE, 0x02, 0x06, 0x81, 0x00},
+      {"rkr", Model::RKR, 0x08, 0x00, 0x89, 0x00},
+  };
+
+  for (const ModelCase &mc : cases)
+  {
+    char lbl[64];
+
+    Frame f{};
+    f.setPower(true);
+    f.setMode(Mode::COOL);
+    f.setTemperatureC(26);
+    f.setFan(Fan::AUTO);
+    f.model = mc.model;
+
+    uint16_t ticks[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-encode", mc.name);
+    EXPECT_TRUE(lbl, f.toRaw(buf));
+
+    esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+    Frame g{};
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-decode", mc.name);
+    EXPECT_TRUE(lbl, Frame::fromRaw(view, g));
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-checksum", mc.name);
+    EXPECT_TRUE(lbl, g.checksum_ok);
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-detect", mc.name);
+    EXPECT_TRUE(lbl, g.model == mc.model);
+
+    // Logical fields survive regardless of model.
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-power", mc.name);
+    EXPECT_TRUE(lbl, g.power());
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-mode", mc.name);
+    EXPECT_TRUE(lbl, g.mode() == Mode::COOL);
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-temp", mc.name);
+    EXPECT_EQ(lbl, 26, g.temperatureC());
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-fan", mc.name);
+    EXPECT_TRUE(lbl, g.fan() == Fan::AUTO);
+
+    // Marker bytes match the documented per-model layout.
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-b13", mc.name);
+    EXPECT_EQ(lbl, mc.b13_marker, static_cast<uint8_t>(g.bytes[13] & 0x0Eu));
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-b17", mc.name);
+    EXPECT_EQ(lbl, mc.b17, g.bytes[17]);
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-b23", mc.name);
+    EXPECT_EQ(lbl, mc.b23, g.bytes[23]);
+    snprintf(lbl, sizeof(lbl), "panasonic/model-%s-b25", mc.name);
+    EXPECT_EQ(lbl, mc.b25, g.bytes[25]);
+  }
 }
 
 // Every state the compat_matrix_ac harness exercises must encode (setters ->
@@ -1630,6 +1701,7 @@ void setup()
   testAcCodecRoundtrip();
   testPanasonicAcRoundtrip();
   testPanasonicAcCanonicalStates();
+  testPanasonicAcModels();
   testPanasonicAcDecodesSkewedTiming();
   testGreeAcRoundtrip();
   testGreeAcStateMatrix();

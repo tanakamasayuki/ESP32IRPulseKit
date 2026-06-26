@@ -79,6 +79,8 @@ void printAcDecode(const esp32irpk::IRRawTickView &raw)
   Serial.print((unsigned)f.temperatureC());
   Serial.print(" fan=");
   Serial.print((unsigned)f.fan());
+  Serial.print(" model=");
+  Serial.print((unsigned)f.model);
   Serial.print(" bytes=");
   printStateHex(f.bytes, f.byte_length);
   Serial.println();
