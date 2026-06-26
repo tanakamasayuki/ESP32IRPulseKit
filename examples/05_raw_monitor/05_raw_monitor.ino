@@ -1,4 +1,5 @@
 #include <ESP32IRPulseKit.h>
+#include <IRDebug.h> // en: optional Serial-formatting helpers / ja: 任意のシリアル整形ヘルパー
 
 // en: RAW-only capture plus receive statistics. No protocol decode runs.
 // ja: RAWのみのキャプチャと受信統計。プロトコルデコードは行いません。
@@ -33,13 +34,7 @@ void loop()
   Serial.print(" rmt_overflow=");
   Serial.println(r.rmtOverflow());
 
-  Serial.print("raw (us):");
-  for (size_t i = 0; i < r.raw.len; ++i)
-  {
-    Serial.print(" ");
-    Serial.print((unsigned)(r.raw.ticks[i] * 10)); // en: ticks are 10us / ja: tickは10us
-  }
-  Serial.println();
+  esp32irpk::debug::printRawMicros(Serial, r.raw);
 
   // en: Cumulative receive health counters. Watch these for dropped data.
   // ja: 受信の健全性を示す累積カウンタ。データ欠落の監視に使えます。

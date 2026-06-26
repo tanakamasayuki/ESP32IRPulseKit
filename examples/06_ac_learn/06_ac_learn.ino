@@ -1,4 +1,5 @@
 #include <ESP32IRPulseKit.h>
+#include <IRDebug.h> // en: optional Serial-formatting helpers / ja: 任意のシリアル整形ヘルパー
 
 // en: Learn an air-conditioner remote: capture it as RAW and print copy-paste
 //     C++ to send it, plus a decoded summary (as comments) when the vendor is
@@ -56,30 +57,17 @@ static void printDecodedComment(const esp32irpk::IRRawTickView &raw)
   Serial.println("// decoded: no AC vendor matched (raw replay still works)");
 }
 
-// en: Print the captured RAW as a ready-to-send tick array. AC frames are long,
-//     so this array is large — that is expected.
-// ja: キャプチャしたRAWを送信用のtick配列として出力します。ACフレームは長いので
-//     配列は大きくなります（想定どおり）。
+// en: AC RAW snippet: a phase-aligned-carrier reminder (AC frames are long, the
+//     large array is expected), then the generic tick array from <IRDebug.h>.
+// ja: AC用RAWスニペット: 位相整合キャリアの注意書き（ACフレームは長く配列が大きく
+//     なるのは想定どおり）の後、<IRDebug.h> の汎用tick配列を出力する。
 static void printRawSnippet(const esp32irpk::IRRawTickView &raw)
 {
-  Serial.println("// send code (raw replay):");
   Serial.println("// en: send with setPhaseAlignedCarrier(true) -- the safe AC default;");
   Serial.println("//     some vendors (e.g. Gree) drop frames on the hardware carrier.");
   Serial.println("// ja: setPhaseAlignedCarrier(true) で送ること（ACの安全な既定。");
   Serial.println("//     一部ベンダ（例: Gree）はハードウェアキャリアだとフレームが落ちる）。");
-  Serial.print("const uint16_t ticks[] = {");
-  for (size_t i = 0; i < raw.len; ++i)
-  {
-    if (i)
-    {
-      Serial.print(", ");
-    }
-    Serial.print((unsigned)raw.ticks[i]); // en: 1 tick = 10us / ja: 1 tick = 10us
-  }
-  Serial.println("};");
-  Serial.print("tx.send({ticks, ");
-  Serial.print((unsigned)raw.len);
-  Serial.println("});");
+  esp32irpk::debug::printRawSendSnippet(Serial, raw);
 }
 } // namespace
 
