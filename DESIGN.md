@@ -226,14 +226,14 @@ measured evidence is in `tests/studies/dump/panasonic_captures.md`.
 - **Special-function buttons (e.g. internal clean) are a separate short command
   frame** (a different `Frame` type, not yet supported). No setter; re-send via
   RAW replay if needed.
-- **Fan setting is one selector across speeds and quiet/powerful.** On the real
-  remote (ACXA75C15870, JKE family) quiet/powerful are mutually exclusive with a
-  fan speed — selecting them forces the fan nibble to auto and sets a byte-21
-  flag. So the existing single `Fan` enum (`AUTO`/speeds/`QUIET`/`POWERFUL`) is a
-  faithful abstraction; only the per-model *encoding* differs: this remote renders
-  QUIET/POWERFUL as fan-nibble=auto + a byte-21 bit, whereas the
-  IRremoteESP8266-style models render them as fan-nibble values 3/7. Keep the one
-  `Fan` enum; make `fromRaw`/`toRaw` translate QUIET/POWERFUL per model (decode
-  maps both encodings back to the same enum value). Do not split them into a
-  separate "quiet/powerful" field — the hardware treats them as part of the fan
-  selector.
+- **Fan is one selector across speeds and quiet/powerful (implemented).** On the
+  real remote (ACXA75C15870, JKE family) quiet/powerful are mutually exclusive
+  with a fan speed — selecting them forces the fan nibble to auto and sets a
+  byte-21 flag. So `Fan` is a single selector
+  `{AUTO, MIN_SPEED..MAX_SPEED, QUIET, POWERFUL}`: the speeds map to the fan-byte
+  high nibble (0x3..0x7, auto=0xA) and `QUIET`/`POWERFUL` map to fan-nibble=auto +
+  byte-21 bit5/bit0. `setFan` writes the nibble and exactly one (or neither) flag;
+  `fan()` checks the byte-21 flags first, then the nibble — so illegal combos
+  (e.g. quiet + a speed) are unrepresentable and there is no separate
+  "quiet/powerful" field to keep in sync. (The earlier `Fan::QUIET`/`POWERFUL`
+  that meant the slowest/fastest *speed* were renamed `MIN_SPEED`/`MAX_SPEED`.)

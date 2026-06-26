@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+- (EN) Panasonic A/C: quiet/powerful comfort modes are now `Fan::QUIET`/`Fan::POWERFUL` (byte21 flags, fan stays auto). **Breaking:** the old `Fan::QUIET`/`POWERFUL` (which were the slowest/fastest fan *speeds*) are renamed `Fan::MIN_SPEED`/`Fan::MAX_SPEED`; the `Fan` enumerator values also shifted.
+- (JA) Panasonic エアコン: しずか/パワフルを `Fan::QUIET`/`Fan::POWERFUL`（byte21 フラグ、fan は auto のまま）として追加。**破壊的変更:** 最弱/最強の*風量*を指していた旧 `Fan::QUIET`/`POWERFUL` は `Fan::MIN_SPEED`/`Fan::MAX_SPEED` に改名（enum の整数値も変化）。
 - (EN) Panasonic A/C: 0.5 °C setpoints and louver. `temperatureC()` and `setTemperatureC()` are now a symmetric `float` pair carrying 0.5 °C steps (e.g. `22.5`); `halfDegree()` is a convenience reader. `louver()`/`setLouver()` with a `Louver` enum sets the vertical swing position. Field offsets confirmed against a real remote (ACXA75C15870).
 - (JA) Panasonic エアコン: 0.5℃設定とルーバーに対応。`temperatureC()` と `setTemperatureC()` を 0.5℃刻みを含む対称な `float` ペアに（例 `22.5`）。`halfDegree()` は簡便な読み取り。`Louver` enum 付きの `louver()`/`setLouver()` で垂直スイング位置を設定。フィールド位置は実機（ACXA75C15870）で確認。
 - (EN) A/C model parameter: each vendor frame can carry a `Model` (format = separate `Frame` type, model = parameter; `fromRaw` auto-detects). Panasonic now supports `Model` JKE/DKE/NKE/LKE/RKR (shared field map, per-model marker bytes), and Gree carries `Model::YBOFB`. Encoding an unimplemented model returns `false`.

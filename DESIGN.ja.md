@@ -215,11 +215,11 @@ ACでは適切なキャリアはベンダのタイミング余裕に依存する
   汚さないことを担保する。読み取り専用アクセサの公開は任意。
 - **内部クリーン等の特殊ボタンは別の短縮コマンドフレーム**（状態フレームと別Frame型・
   未対応）。setter は作らず、必要なら RAW replay で送る。
-- **fan 設定は速度としずか/パワフルを通した1セレクタ**: 実機（ACXA75C15870, JKE系）では
+- **fan は速度としずか/パワフルを通した1セレクタ（実装済）**: 実機（ACXA75C15870, JKE系）では
   しずか/パワフルは fan 速度と排他で、選ぶと fan ニブルが強制的に auto になり byte21 の
-  フラグが立つ。よって既存の単一 `Fan` enum（`AUTO`/速度/`QUIET`/`POWERFUL`）が素直な
-  抽象で、違うのはモデルごとの**符号化**だけ: この実機は QUIET/POWERFUL を
-  fanニブル=auto＋byte21ビットで描き、IRremoteESP8266系は fanニブル値 3/7 で描く。
-  `Fan` enum は1つのまま、`fromRaw`/`toRaw` がモデル別に QUIET/POWERFUL を変換する
-  （デコードは両符号化を同じ enum 値へ戻す）。「fan 速度」と「しずか/パワフル」を別
-  フィールドに分けない——ハードはこれらを fan セレクタの一部として扱う。
+  フラグが立つ。よって `Fan` は単一セレクタ `{AUTO, MIN_SPEED..MAX_SPEED, QUIET, POWERFUL}`:
+  速度は fanバイト上位ニブル（0x3..0x7、auto=0xA）、`QUIET`/`POWERFUL` は
+  fanニブル=auto＋byte21 bit5/bit0 にエンコード。`setFan` はニブルとフラグ1つ（or 無し）を
+  書き、`fan()` は byte21 フラグを先に見てから nibble を読む——「quiet＋速度」のような不正な
+  組み合わせは表現不能で、別フィールドの同期も不要。（速度の最弱/最強を指していた旧
+  `Fan::QUIET`/`POWERFUL` は `MIN_SPEED`/`MAX_SPEED` に改名。）
