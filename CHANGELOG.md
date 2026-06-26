@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+- (EN) A/C: each vendor namespace now provides `toString(...)` overloads mapping its enums (`Mode`/`Fan` and the swing/louver/vane enums) to the bare enumerator name (e.g. `"MIN_SPEED"`; unknown values `"?"`). `printTo` now prints names instead of raw codes (`fan=MIN_SPEED louver=P3`). Prepend the `esp32irpk::ac::<Vendor>::<Enum>::` prefix when generating code.
+- (JA) エアコン: 各ベンダ名前空間に enum（`Mode`/`Fan` と swing/louver/vane 系）を列挙子名（例 `"MIN_SPEED"`、不明値は `"?"`）へ変換する `toString(...)` を追加。`printTo` は生コードではなく名前を出力するように（`fan=MIN_SPEED louver=P3`）。コード生成時は `esp32irpk::ac::<Vendor>::<Enum>::` を前置する。
 - (EN) A/C: `ac::decodeAny(raw, Print* = nullptr)` tries every built-in vendor against a RAW capture and returns the matching `AcVendor` (`UNKNOWN` if none); with a non-null `Print` it also dumps the matched frame via `printTo()`. Centralizes the vendor cascade that `06_ac_learn` and the dump study each repeated, so new vendors flow into both automatically.
 - (JA) エアコン: `ac::decodeAny(raw, Print* = nullptr)` が全内蔵ベンダをRAWキャプチャに当て、一致した `AcVendor` を返す（無ければ `UNKNOWN`）。`Print` が非nullなら一致フレームを `printTo()` でダンプ。`06_ac_learn` とダンプ study が各自繰り返していたベンダ総当たりを一元化し、新ベンダが両方へ自動反映される。
 - (EN) New optional header `<IRDebug.h>` (`esp32irpk::debug`): Serial-formatting helpers shared by the learn/dump sketches — `printRawMicros`, `printDecodedCandidate`, `printDecodedFrame` (per-protocol named fields), `printBitsSendSnippet`, `printRawSendSnippet`, and `printHexU64`/`printHexU64Literal`. Examples 01/04/05/06 and the dump study now use these instead of each re-implementing them (the duplicated ~140-line protocol decode switch is now one helper). Opt-in (`#include <IRDebug.h>`), diagnostics only — not part of the send/receive contract.
