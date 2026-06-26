@@ -78,6 +78,62 @@ namespace esp32irpk::ac::Mitsubishi
     AUTO = 8,
   };
 
+  // Enum-to-name helpers for logging/printf. Return the enumerator name; unknown
+  // values return "?".
+  inline const char *toString(Mode m)
+  {
+    switch (m)
+    {
+    case Mode::AUTO: return "AUTO";
+    case Mode::COOL: return "COOL";
+    case Mode::HEAT: return "HEAT";
+    case Mode::DRY: return "DRY";
+    case Mode::FAN: return "FAN";
+    }
+    return "?";
+  }
+  inline const char *toString(Fan f)
+  {
+    switch (f)
+    {
+    case Fan::AUTO: return "AUTO";
+    case Fan::QUIET: return "QUIET";
+    case Fan::LOW_SPEED: return "LOW_SPEED";
+    case Fan::MED_SPEED: return "MED_SPEED";
+    case Fan::HIGH_SPEED: return "HIGH_SPEED";
+    case Fan::MAX_SPEED: return "MAX_SPEED";
+    }
+    return "?";
+  }
+  inline const char *toString(Vane v)
+  {
+    switch (v)
+    {
+    case Vane::AUTO: return "AUTO";
+    case Vane::P1: return "P1";
+    case Vane::P2: return "P2";
+    case Vane::P3: return "P3";
+    case Vane::P4: return "P4";
+    case Vane::P5: return "P5";
+    case Vane::SWING: return "SWING";
+    }
+    return "?";
+  }
+  inline const char *toString(WideVane v)
+  {
+    switch (v)
+    {
+    case WideVane::LEFT_MAX: return "LEFT_MAX";
+    case WideVane::LEFT: return "LEFT";
+    case WideVane::MIDDLE: return "MIDDLE";
+    case WideVane::RIGHT: return "RIGHT";
+    case WideVane::RIGHT_MAX: return "RIGHT_MAX";
+    case WideVane::WIDE: return "WIDE";
+    case WideVane::AUTO: return "AUTO";
+    }
+    return "?";
+  }
+
   namespace detail
   {
     // Documented Mitsubishi AC pulse-distance timing.
@@ -278,13 +334,13 @@ namespace esp32irpk::ac::Mitsubishi
     // hex line shows every byte.
     void printTo(Print &out) const
     {
-      printAcSummary(out, "Mitsubishi", power(), static_cast<unsigned>(mode()),
-                     temperatureC(), static_cast<unsigned>(fan()), bytes,
+      printAcSummary(out, "Mitsubishi", power(), toString(mode()),
+                     temperatureC(), toString(fan()), bytes,
                      byte_length, checksum_ok);
       out.print("//   vane=");
-      out.print(static_cast<unsigned>(vane()));
+      out.print(toString(vane()));
       out.print(" wideVane=");
-      out.print(static_cast<unsigned>(wideVane()));
+      out.print(toString(wideVane()));
       out.print(" halfDegree=");
       out.println(halfDegree() ? "yes" : "no");
     }

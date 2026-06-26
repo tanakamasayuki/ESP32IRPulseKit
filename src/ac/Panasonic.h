@@ -84,6 +84,49 @@ namespace esp32irpk::ac::Panasonic
     RKR,
   };
 
+  // Enum-to-name helpers for logging/printf. Return a stable identifier string
+  // (the enumerator name); unknown values return "?".
+  inline const char *toString(Mode m)
+  {
+    switch (m)
+    {
+    case Mode::AUTO: return "AUTO";
+    case Mode::COOL: return "COOL";
+    case Mode::HEAT: return "HEAT";
+    case Mode::DRY: return "DRY";
+    case Mode::FAN: return "FAN";
+    }
+    return "?";
+  }
+  inline const char *toString(Fan f)
+  {
+    switch (f)
+    {
+    case Fan::AUTO: return "AUTO";
+    case Fan::MIN_SPEED: return "MIN_SPEED";
+    case Fan::LOW_SPEED: return "LOW_SPEED";
+    case Fan::MED_SPEED: return "MED_SPEED";
+    case Fan::HIGH_SPEED: return "HIGH_SPEED";
+    case Fan::MAX_SPEED: return "MAX_SPEED";
+    case Fan::QUIET: return "QUIET";
+    case Fan::POWERFUL: return "POWERFUL";
+    }
+    return "?";
+  }
+  inline const char *toString(Louver v)
+  {
+    switch (v)
+    {
+    case Louver::AUTO: return "AUTO";
+    case Louver::P1: return "P1";
+    case Louver::P2: return "P2";
+    case Louver::P3: return "P3";
+    case Louver::P4: return "P4";
+    case Louver::P5: return "P5";
+    }
+    return "?";
+  }
+
   namespace detail
   {
     // Documented Kaseikyo/Panasonic pulse-distance timing.
@@ -305,11 +348,11 @@ namespace esp32irpk::ac::Panasonic
     // fields print as their raw code; the hex line shows every byte.
     void printTo(Print &out) const
     {
-      printAcSummary(out, "Panasonic", power(), static_cast<unsigned>(mode()),
-                     temperatureC(), static_cast<unsigned>(fan()), bytes,
+      printAcSummary(out, "Panasonic", power(), toString(mode()),
+                     temperatureC(), toString(fan()), bytes,
                      byte_length, checksum_ok);
       out.print("//   louver=");
-      out.print(static_cast<unsigned>(louver()));
+      out.print(toString(louver()));
       out.print(" halfDegree=");
       out.println(halfDegree() ? "yes" : "no");
     }

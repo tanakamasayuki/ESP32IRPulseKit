@@ -1857,6 +1857,27 @@ void testGreeAcSwing()
   f.setSwingV(SwingV::DOWN);
   EXPECT_TRUE("gree/swingv-clears-autobit", (f.bytes[0] & 0x40u) == 0);
 }
+
+// Each vendor's toString() maps an enum value to its identifier name (used by
+// printTo). Out-of-range values fall back to "?".
+void testAcEnumToString()
+{
+  namespace P = esp32irpk::ac::Panasonic;
+  namespace G = esp32irpk::ac::Gree;
+  namespace M = esp32irpk::ac::Mitsubishi;
+  EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
+  EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
+  EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
+  EXPECT_TRUE("panasonic/tostring-louver", strcmp(P::toString(P::Louver::P3), "P3") == 0);
+  EXPECT_TRUE("gree/tostring-fan-max", strcmp(G::toString(G::Fan::MAX_SPEED), "MAX_SPEED") == 0);
+  EXPECT_TRUE("gree/tostring-swingv", strcmp(G::toString(G::SwingV::MIDDLE), "MIDDLE") == 0);
+  EXPECT_TRUE("gree/tostring-swingh", strcmp(G::toString(G::SwingH::MAX_LEFT), "MAX_LEFT") == 0);
+  EXPECT_TRUE("mitsubishi/tostring-vane", strcmp(M::toString(M::Vane::P3), "P3") == 0);
+  EXPECT_TRUE("mitsubishi/tostring-widevane", strcmp(M::toString(M::WideVane::AUTO), "AUTO") == 0);
+  EXPECT_TRUE("mitsubishi/tostring-fan-quiet", strcmp(M::toString(M::Fan::QUIET), "QUIET") == 0);
+  // Out-of-range value falls back to "?".
+  EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
+}
 } // namespace
 
 void setup()

@@ -91,6 +91,63 @@ namespace esp32irpk::ac::Gree
     YX1FSF,
   };
 
+  // Enum-to-name helpers for logging/printf. Return the enumerator name; unknown
+  // values return "?".
+  inline const char *toString(Mode m)
+  {
+    switch (m)
+    {
+    case Mode::AUTO: return "AUTO";
+    case Mode::COOL: return "COOL";
+    case Mode::HEAT: return "HEAT";
+    case Mode::DRY: return "DRY";
+    case Mode::FAN: return "FAN";
+    }
+    return "?";
+  }
+  inline const char *toString(Fan f)
+  {
+    switch (f)
+    {
+    case Fan::AUTO: return "AUTO";
+    case Fan::MIN_SPEED: return "MIN_SPEED";
+    case Fan::MED_SPEED: return "MED_SPEED";
+    case Fan::MAX_SPEED: return "MAX_SPEED";
+    }
+    return "?";
+  }
+  inline const char *toString(SwingV v)
+  {
+    switch (v)
+    {
+    case SwingV::LAST_POS: return "LAST_POS";
+    case SwingV::AUTO: return "AUTO";
+    case SwingV::UP: return "UP";
+    case SwingV::MIDDLE_UP: return "MIDDLE_UP";
+    case SwingV::MIDDLE: return "MIDDLE";
+    case SwingV::MIDDLE_DOWN: return "MIDDLE_DOWN";
+    case SwingV::DOWN: return "DOWN";
+    case SwingV::DOWN_AUTO: return "DOWN_AUTO";
+    case SwingV::MIDDLE_AUTO: return "MIDDLE_AUTO";
+    case SwingV::UP_AUTO: return "UP_AUTO";
+    }
+    return "?";
+  }
+  inline const char *toString(SwingH v)
+  {
+    switch (v)
+    {
+    case SwingH::OFF: return "OFF";
+    case SwingH::AUTO: return "AUTO";
+    case SwingH::MAX_LEFT: return "MAX_LEFT";
+    case SwingH::LEFT: return "LEFT";
+    case SwingH::MIDDLE: return "MIDDLE";
+    case SwingH::RIGHT: return "RIGHT";
+    case SwingH::MAX_RIGHT: return "MAX_RIGHT";
+    }
+    return "?";
+  }
+
   namespace detail
   {
     // Documented Gree pulse-distance timing. Block 2 carries no header; the
@@ -248,13 +305,13 @@ namespace esp32irpk::ac::Gree
     // fields. Enum fields print as their raw code; the hex line shows every byte.
     void printTo(Print &out) const
     {
-      printAcSummary(out, "Gree", power(), static_cast<unsigned>(mode()),
+      printAcSummary(out, "Gree", power(), toString(mode()),
                      static_cast<float>(temperatureC()),
-                     static_cast<unsigned>(fan()), bytes, byte_length, checksum_ok);
+                     toString(fan()), bytes, byte_length, checksum_ok);
       out.print("//   swingV=");
-      out.print(static_cast<unsigned>(swingV()));
+      out.print(toString(swingV()));
       out.print(" swingH=");
-      out.println(static_cast<unsigned>(swingH()));
+      out.println(toString(swingH()));
     }
 
     // RAW ticks -> state bytes. false if not a Gree two-block burst; checksum
