@@ -84,13 +84,18 @@ void loop()
   Serial.println();
 
   // en: decodeAny tries every built-in AC vendor and dumps the match via printTo.
-  // ja: decodeAny が全内蔵ACベンダを試し、一致を printTo で出力する。
-  esp32irpk::ac::decodeAny(r.raw, &Serial);
-  // en: a recognized AC frame re-sends from its compact, bit-exact state bytes;
-  //     an unrecognized one falls back to the (long) RAW replay.
-  // ja: 認識できたACフレームはコンパクトで完全一致な状態バイトから再送し、未対応
-  //     のものは（長い）RAW replay にフォールバックする。
-  if (esp32irpk::ac::printSendSnippet(r.raw, Serial) == esp32irpk::ac::AcVendor::UNKNOWN)
+  //     A recognized frame then prints two send-code forms: an editable setter
+  //     template (lossy) and the compact bit-exact state bytes. An unrecognized
+  //     remote falls back to the (long) RAW replay.
+  // ja: decodeAny が全内蔵ACベンダを試し、一致を printTo で出力する。認識できたら
+  //     2形式の送信コード（編集テンプレートの setter 版＝lossy、コンパクトで完全一致な
+  //     状態バイト版）を出力。未対応リモコンは（長い）RAW replay にフォールバック。
+  if (esp32irpk::ac::decodeAny(r.raw, &Serial) != esp32irpk::ac::AcVendor::UNKNOWN)
+  {
+    esp32irpk::ac::printSetterSnippet(r.raw, Serial); // editable template (lossy)
+    esp32irpk::ac::printSendSnippet(r.raw, Serial);   // bit-exact state bytes
+  }
+  else
   {
     printRawSnippet(r.raw);
   }

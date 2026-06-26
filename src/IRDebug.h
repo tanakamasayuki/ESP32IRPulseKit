@@ -253,4 +253,234 @@ namespace esp32irpk::debug
     out.println("});");
   }
 
+  // Copy-paste C++ that re-sends a decoded generic-protocol frame two ways: the
+  // one-line bits::* helper and the editable frames::*Frame struct (named fields
+  // you can tweak before sending). Both reproduce the decoded payload; a repeat
+  // frame and protocols without a named frame just print a note.
+  inline void printFrameStructSnippet(Print &out, const esp32irpk::IRDecodeCandidate &c)
+  {
+    const esp32irpk::IRDecodedBits &b = c.decoded;
+    // Header for each send style, so the bits helper and the editable struct are
+    // easy to tell apart (e.g. "// send code (NEC, bits helper):").
+    auto lbl = [&](const char *form)
+    {
+      out.print("// send code (");
+      out.print(c.name);
+      out.print(", ");
+      out.print(form);
+      out.println("):");
+    };
+    switch (b.protocol_id)
+    {
+    case esp32irpk::IRProtocolID::NEC:
+    {
+      esp32irpk::frames::NECFrame f = esp32irpk::frames::NECFrame::fromBits(b);
+      if (f.is_repeat)
+      {
+        out.println("// NEC repeat frame -- resend the previous NEC frame");
+        break;
+      }
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::nec(0x");
+      out.print(f.address, HEX);
+      out.print(", 0x");
+      out.print(f.command, HEX);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::NECFrame f{};");
+      out.print("f.address = 0x");
+      out.print(f.address, HEX);
+      out.println(";");
+      out.print("f.command = 0x");
+      out.print(f.command, HEX);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::AEHA:
+    {
+      esp32irpk::frames::AEHAFrame f = esp32irpk::frames::AEHAFrame::fromBits(b);
+      if (f.is_repeat)
+      {
+        out.println("// AEHA repeat frame -- resend the previous AEHA frame");
+        break;
+      }
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::aeha(");
+      printHexU64Literal(out, f.data);
+      out.print(", ");
+      out.print(f.bit_length);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::AEHAFrame f{};");
+      out.print("f.data = ");
+      printHexU64Literal(out, f.data);
+      out.println(";");
+      out.print("f.bit_length = ");
+      out.print(f.bit_length);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::SONY12:
+    {
+      esp32irpk::frames::Sony12Frame f = esp32irpk::frames::Sony12Frame::fromBits(b);
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::sony12(0x");
+      out.print(f.data, HEX);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::Sony12Frame f{};");
+      out.print("f.data = 0x");
+      out.print(f.data, HEX);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::SONY15:
+    {
+      esp32irpk::frames::Sony15Frame f = esp32irpk::frames::Sony15Frame::fromBits(b);
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::sony15(0x");
+      out.print(f.data, HEX);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::Sony15Frame f{};");
+      out.print("f.data = 0x");
+      out.print(f.data, HEX);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::SONY20:
+    {
+      esp32irpk::frames::Sony20Frame f = esp32irpk::frames::Sony20Frame::fromBits(b);
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::sony20(0x");
+      out.print(f.data, HEX);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::Sony20Frame f{};");
+      out.print("f.data = 0x");
+      out.print(f.data, HEX);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::SAMSUNG32:
+    {
+      esp32irpk::frames::Samsung32Frame f = esp32irpk::frames::Samsung32Frame::fromBits(b);
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::samsung32(0x");
+      out.print(f.address, HEX);
+      out.print(", 0x");
+      out.print(f.command, HEX);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::Samsung32Frame f{};");
+      out.print("f.address = 0x");
+      out.print(f.address, HEX);
+      out.println(";");
+      out.print("f.command = 0x");
+      out.print(f.command, HEX);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::SAMSUNG36:
+    {
+      esp32irpk::frames::Samsung36Frame f = esp32irpk::frames::Samsung36Frame::fromBits(b);
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::samsung36(0x");
+      out.print(f.address, HEX);
+      out.print(", 0x");
+      out.print(f.command, HEX);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::Samsung36Frame f{};");
+      out.print("f.address = 0x");
+      out.print(f.address, HEX);
+      out.println(";");
+      out.print("f.command = 0x");
+      out.print(f.command, HEX);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::JVC:
+    {
+      esp32irpk::frames::JVCFrame f = esp32irpk::frames::JVCFrame::fromBits(b);
+      if (f.is_repeat)
+      {
+        out.println("// JVC repeat frame -- resend the previous JVC frame");
+        break;
+      }
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::jvc(0x");
+      out.print(f.address, HEX);
+      out.print(", 0x");
+      out.print(f.command, HEX);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::JVCFrame f{};");
+      out.print("f.address = 0x");
+      out.print(f.address, HEX);
+      out.println(";");
+      out.print("f.command = 0x");
+      out.print(f.command, HEX);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::RC5:
+    {
+      esp32irpk::frames::RC5Frame f = esp32irpk::frames::RC5Frame::fromBits(b);
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::rc5(0x");
+      out.print(f.data, HEX);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::RC5Frame f{};");
+      out.print("f.data = 0x");
+      out.print(f.data, HEX);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::RC6_M0_16:
+    {
+      esp32irpk::frames::RC6M0Frame f = esp32irpk::frames::RC6M0Frame::fromBits(b);
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::rc6m0(0x");
+      out.print(f.data, HEX);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::RC6M0Frame f{};");
+      out.print("f.data = 0x");
+      out.print(f.data, HEX);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    case esp32irpk::IRProtocolID::RC6_M6_32:
+    {
+      esp32irpk::frames::RC6M6Frame f = esp32irpk::frames::RC6M6Frame::fromBits(b);
+      lbl("bits helper");
+      out.print("tx.send(esp32irpk::bits::rc6m6(");
+      printHexU64Literal(out, f.data);
+      out.println("));");
+      lbl("editable struct");
+      out.println("esp32irpk::frames::RC6M6Frame f{};");
+      out.print("f.data = ");
+      printHexU64Literal(out, f.data);
+      out.println(";");
+      out.println("tx.send(f.toBits());");
+      break;
+    }
+    default:
+      out.println("// (no helper/struct snippet for this protocol -- use the RAW replay)");
+      break;
+    }
+  }
+
 } // namespace esp32irpk::debug

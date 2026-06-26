@@ -142,39 +142,42 @@ void loop()
   }
   Serial.println();
 
-  esp32irpk::debug::printRawMicros(Serial, r.raw);
+  esp32irpk::debug::printRawMicros(Serial, r.raw); // the RAW data lives here (top)
 
-  // en: generic decoded candidates / ja: 汎用デコード候補
-  Serial.println("-- decoded candidates --");
-  if (r.count == 0)
+  // en: AC takes precedence: a Panasonic/Kaseikyo AC frame can also surface as a
+  //     generic AEHA candidate, so when an AC vendor matches we show only the AC
+  //     decode + send code (and vice-versa for generic). The "send code" never
+  //     repeats the RAW array — it is already printed above.
+  // ja: AC優先: Panasonic/Kaseikyo の AC フレームは generic な AEHA 候補としても
+  //     decode され得るため、ACベンダが一致したら AC のデコード＋送信コードだけを出す
+  //     （generic のときは逆）。send code に RAW 配列は出さない（上に出ているため）。
+  if (esp32irpk::ac::decodeAny(r.raw, nullptr) != esp32irpk::ac::AcVendor::UNKNOWN)
   {
+    Serial.println("-- AC vendor decode --");
+    esp32irpk::ac::decodeAny(r.raw, &Serial);
+    Serial.println("-- send code --");
+    esp32irpk::ac::printSetterSnippet(r.raw, Serial); // editable template (lossy)
+    esp32irpk::ac::printSendSnippet(r.raw, Serial);   // bit-exact state bytes
+  }
+  else if (r.count > 0)
+  {
+    Serial.println("-- decoded candidates --");
+    for (uint8_t i = 0; i < r.count; ++i)
+    {
+      const esp32irpk::IRDecodeCandidate &c = r.candidates[i];
+      esp32irpk::debug::printDecodedCandidate(Serial, i, c);
+      esp32irpk::debug::printDecodedFrame(Serial, c.decoded);
+    }
+    Serial.println("-- send code --");
+    esp32irpk::debug::printFrameStructSnippet(Serial, r.candidates[0]); // helper + editable struct
+  }
+  else
+  {
+    // en: nothing decoded -> the RAW replay is the only way to reproduce it.
+    // ja: 何もデコードできない -> RAW replay だけが再現手段。
+    Serial.println("-- decoded candidates --");
     Serial.println("(none)");
-  }
-  for (uint8_t i = 0; i < r.count; ++i)
-  {
-    const esp32irpk::IRDecodeCandidate &c = r.candidates[i];
-    esp32irpk::debug::printDecodedCandidate(Serial, i, c);
-    esp32irpk::debug::printDecodedFrame(Serial, c.decoded);
-  }
-
-  // en: AC vendor decode (heat-pump remotes): decodeAny tries every built-in
-  //     vendor and dumps the match via printTo. / ja: ACベンダデコード: decodeAny が
-  //     全内蔵ベンダを試し、一致を printTo で出力する。
-  Serial.println("-- AC vendor decode --");
-  esp32irpk::ac::decodeAny(r.raw, &Serial);
-
-  // en: copy-paste re-send code / ja: 貼り付け再送コード
-  Serial.println("-- send code --");
-  if (r.count > 0)
-  {
-    esp32irpk::debug::printBitsSendSnippet(Serial, r.candidates[0]);
-  }
-  // en: a recognized AC frame prints as its compact, bit-exact state bytes;
-  //     otherwise fall back to the universal (but long) RAW tick array.
-  // ja: 認識できたACフレームはコンパクトで完全一致な状態バイトとして出力し、
-  //     それ以外は万能だが長い RAW tick 配列にフォールバックする。
-  if (esp32irpk::ac::printSendSnippet(r.raw, Serial) == esp32irpk::ac::AcVendor::UNKNOWN)
-  {
+    Serial.println("-- send code --");
     printRawSnippet(r.raw);
   }
   Serial.println();

@@ -314,6 +314,35 @@ namespace esp32irpk::ac::Gree
       out.println(toString(swingH()));
     }
 
+    // Editable setter template: copy-paste C++ that rebuilds this frame through
+    // the logical setters, ready to tweak before sending. NOTE: lossy — fields
+    // without a setter (timer, comfort flags) reset to template defaults, so it
+    // is not bit-exact (use fromBytes for that). Enum values come from toString.
+    void printSetterSnippet(Print &out) const
+    {
+      out.println("// send code (Gree AC, editable -- lossy: no-setter fields use defaults):");
+      out.println("esp32irpk::ac::Gree::Frame f;");
+      out.print("f.setPower(");
+      out.print(power() ? "true" : "false");
+      out.println(");");
+      out.print("f.setMode(esp32irpk::ac::Gree::Mode::");
+      out.print(toString(mode()));
+      out.println(");");
+      out.print("f.setTemperatureC(");
+      out.print((unsigned)temperatureC());
+      out.println(");");
+      out.print("f.setFan(esp32irpk::ac::Gree::Fan::");
+      out.print(toString(fan()));
+      out.println(");");
+      out.print("f.setSwingV(esp32irpk::ac::Gree::SwingV::");
+      out.print(toString(swingV()));
+      out.println(");");
+      out.print("f.setSwingH(esp32irpk::ac::Gree::SwingH::");
+      out.print(toString(swingH()));
+      out.println(");");
+      out.println("esp32irpk::ac::send(tx, f);");
+    }
+
     // RAW ticks -> state bytes. false if not a Gree two-block burst; checksum
     // validity is reported separately via `checksum_ok`.
     static bool fromRaw(const esp32irpk::IRRawTickView &raw, Frame &out)

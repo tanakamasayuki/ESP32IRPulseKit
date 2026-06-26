@@ -345,6 +345,36 @@ namespace esp32irpk::ac::Mitsubishi
       out.println(halfDegree() ? "yes" : "no");
     }
 
+    // Editable setter template: copy-paste C++ that rebuilds this frame through
+    // the logical setters, ready to tweak before sending. NOTE: lossy — fields
+    // without a setter (clock/timer, diagnostic bits) reset to template
+    // defaults, so it is not bit-exact (use fromBytes for that). setWideVane runs
+    // after setMode because setMode resets the wide vane. Enums from toString.
+    void printSetterSnippet(Print &out) const
+    {
+      out.println("// send code (Mitsubishi AC, editable -- lossy: no-setter fields use defaults):");
+      out.println("esp32irpk::ac::Mitsubishi::Frame f;");
+      out.print("f.setPower(");
+      out.print(power() ? "true" : "false");
+      out.println(");");
+      out.print("f.setMode(esp32irpk::ac::Mitsubishi::Mode::");
+      out.print(toString(mode()));
+      out.println(");");
+      out.print("f.setTemperatureC(");
+      out.print(temperatureC(), 1);
+      out.println(");");
+      out.print("f.setFan(esp32irpk::ac::Mitsubishi::Fan::");
+      out.print(toString(fan()));
+      out.println(");");
+      out.print("f.setVane(esp32irpk::ac::Mitsubishi::Vane::");
+      out.print(toString(vane()));
+      out.println(");");
+      out.print("f.setWideVane(esp32irpk::ac::Mitsubishi::WideVane::");
+      out.print(toString(wideVane()));
+      out.println(");");
+      out.println("esp32irpk::ac::send(tx, f);");
+    }
+
     // RAW ticks -> state bytes. false if not a Mitsubishi AC frame; checksum
     // validity is reported separately via `checksum_ok`.
     static bool fromRaw(const esp32irpk::IRRawTickView &raw, Frame &out)

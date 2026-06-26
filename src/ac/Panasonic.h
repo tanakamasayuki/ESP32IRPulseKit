@@ -357,6 +357,32 @@ namespace esp32irpk::ac::Panasonic
       out.println(halfDegree() ? "yes" : "no");
     }
 
+    // Editable setter template: copy-paste C++ that rebuilds this frame through
+    // the logical setters, ready to tweak before sending. NOTE: lossy — fields
+    // without a setter (timers, vendor flags) reset to template defaults, so it
+    // is not bit-exact (use fromBytes for that). Enum values come from toString.
+    void printSetterSnippet(Print &out) const
+    {
+      out.println("// send code (Panasonic AC, editable -- lossy: no-setter fields use defaults):");
+      out.println("esp32irpk::ac::Panasonic::Frame f;");
+      out.print("f.setPower(");
+      out.print(power() ? "true" : "false");
+      out.println(");");
+      out.print("f.setMode(esp32irpk::ac::Panasonic::Mode::");
+      out.print(toString(mode()));
+      out.println(");");
+      out.print("f.setTemperatureC(");
+      out.print(temperatureC(), 1);
+      out.println(");");
+      out.print("f.setFan(esp32irpk::ac::Panasonic::Fan::");
+      out.print(toString(fan()));
+      out.println(");");
+      out.print("f.setLouver(esp32irpk::ac::Panasonic::Louver::");
+      out.print(toString(louver()));
+      out.println(");");
+      out.println("esp32irpk::ac::send(tx, f);");
+    }
+
     // RAW ticks -> state bytes. false if not a Panasonic two-frame burst;
     // checksum validity is reported separately via `checksum_ok`.
     static bool fromRaw(const esp32irpk::IRRawTickView &raw, Frame &out)

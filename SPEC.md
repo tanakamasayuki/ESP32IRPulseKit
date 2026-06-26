@@ -661,6 +661,11 @@ AcVendor decodeAny(const esp32irpk::IRRawTickView& raw, Print* out = nullptr);
 // matched vendor, or UNKNOWN if none (nothing printed — fall back to RAW).
 AcVendor printSendSnippet(const esp32irpk::IRRawTickView& raw, Print& out);
 
+// Print an editable setter template (f.setMode(...); f.setTemperatureC(...); ...)
+// for the matched frame — easy to tweak before sending, but LOSSY (fields with
+// no setter reset to defaults; not bit-exact — use printSendSnippet for that).
+AcVendor printSetterSnippet(const esp32irpk::IRRawTickView& raw, Print& out);
+
 }
 ```
 
@@ -669,6 +674,7 @@ AcVendor printSendSnippet(const esp32irpk::IRRawTickView& raw, Print& out);
 - `Frame::toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`. It returns `false` if `model` names a variant whose field map is not implemented — encoding an unsupported model fails rather than silently emitting the implemented model's layout. `ac::send` propagates this and also returns `false`.
 - `ac::decodeAny(raw, out)` tries every built-in AC vendor against the RAW capture in registration order and returns the matching `AcVendor` (`UNKNOWN` if none). When `out` is non-null the matched frame is dumped via its `printTo()`. It reports only the vendor identity, not the decoded frame — the per-vendor `Frame`s are heterogeneous types, so decode the specific vendor when you need its fields or to re-encode. Centralizing the cascade here means a learn/dump path picks up new vendors automatically.
 - `ac::printSendSnippet(raw, out)` decodes the matching vendor and prints copy-paste C++ that rebuilds the frame via `Frame::fromBytes` and sends it — the compact, bit-exact alternative to a RAW tick array (a 27/18/8-byte state vs. hundreds of ticks). Returns the matched `AcVendor`, or `UNKNOWN` if none matched (nothing printed; fall back to a RAW snippet). Mirrors `decodeAny` so the vendor list stays in one place.
+- `ac::printSetterSnippet(raw, out)` instead prints an *editable* template built from the logical setters (`f.setMode(...)`, `f.setTemperatureC(...)`, enum values via `toString`) — the practical "tweak a value and re-send" form. It is **lossy**: fields without a setter (timers, vendor flags) revert to template defaults, so it is not bit-exact (use `printSendSnippet` when fidelity matters). Same return convention. Generic protocols have the analogous `esp32irpk::debug::printFrameStructSnippet` (one-line `bits::*` helper plus the editable `frames::*Frame` struct).
 - `ac::send(tx, frame)` is the one-call path: it encodes into a stack buffer of `Frame::kMaxTicks` and transmits, returning `false` on encode or send failure. Use the explicit `toRaw` + `IRSender::send()` pair instead when you need to control the buffer. The sender's carrier mode is configured separately, as usual (use the phase-aligned default for AC; see §11.3).
 - The byte array is the intermediate form. Logical fields (power, mode, temperature, fan, …) are accessors over those bytes.
 - `Frame::printTo(Print& out)` is a diagnostic dump: it writes the common `power/mode/temp/fan/checksum` line, the vendor's own fields (louver / swing / vane), and the full state in hex to any Arduino `Print` (e.g. `Serial`). Enum fields print as their raw code. It is a convenience for learn/dump sketches, not part of the encode/decode contract.

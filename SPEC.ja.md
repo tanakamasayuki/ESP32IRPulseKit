@@ -654,6 +654,11 @@ AcVendor decodeAny(const esp32irpk::IRRawTickView& raw, Print* out = nullptr);
 // しない＝RAWにフォールバック）。
 AcVendor printSendSnippet(const esp32irpk::IRRawTickView& raw, Print& out);
 
+// 論理 setter による編集可能テンプレート（f.setMode(...); f.setTemperatureC(...); ...）を
+// 出力する。値を変えて再送する実用形だが lossy（setter の無いフィールドは既定値に戻り
+// 完全一致しない。忠実さが要るなら printSendSnippet）。
+AcVendor printSetterSnippet(const esp32irpk::IRRawTickView& raw, Print& out);
+
 }
 ```
 
@@ -662,6 +667,7 @@ AcVendor printSendSnippet(const esp32irpk::IRRawTickView& raw, Print& out);
 - `Frame::toRaw(out)` はチェックサムを再計算し、状態を caller提供の `IRRawTickBuffer` にRAW tickとして書き出します。結果は `IRSender::send(const IRRawTickView&)` で送信します。`model` がフィールドマップ未実装のモデルを指す場合は `false` を返します（未対応モデルは、実装済みモデルのレイアウトを黙って出力せず、エンコード失敗にする）。`ac::send` もこれを伝播して `false` を返します。
 - `ac::decodeAny(raw, out)` は全内蔵ACベンダを登録順にRAWキャプチャへ当て、一致した `AcVendor` を返します（無ければ `UNKNOWN`）。`out` が非nullなら一致フレームを `printTo()` でダンプします。返すのはベンダ識別のみで、デコード済みフレームは返しません（各ベンダの `Frame` は不均質な型のため）— フィールド参照や再エンコードが要るなら該当ベンダを個別にデコードします。カスケードをここに集約することで、学習/ダンプ経路が新ベンダを自動的に拾います。
 - `ac::printSendSnippet(raw, out)` は一致ベンダをデコードし、`Frame::fromBytes` でフレームを組み直して送信する貼り付け用C++を出力します — RAW tick 配列（数百個）に対し 27/18/8 バイトで済む、コンパクトかつ完全一致な代替です。一致した `AcVendor` を返し、無ければ `UNKNOWN`（何も出力しない＝RAWスニペットにフォールバック）。`decodeAny` と対でベンダリストを一元化します。
+- `ac::printSetterSnippet(raw, out)` は代わりに論理 setter による**編集可能**テンプレート（`f.setMode(...)`・`f.setTemperatureC(...)`、enum 値は `toString`）を出力します — 「値を変えて再送する」実用形です。ただし **lossy**：setter の無いフィールド（タイマー・ベンダフラグ）はテンプレート既定値に戻るため完全一致しません（忠実さが要るなら `printSendSnippet`）。戻り値の規約は同じ。generic プロトコルには対応する `esp32irpk::debug::printFrameStructSnippet`（1行の `bits::*` ヘルパー＋編集可能な `frames::*Frame` 構造体）があります。
 - `ac::send(tx, frame)` は1呼び出し版です。`Frame::kMaxTicks` のスタックバッファへエンコードして送信し、エンコード/送信失敗時は `false` を返します。バッファを自分で管理したい場合は `toRaw` + `IRSender::send()` を使います。送信機のキャリアモードは従来どおり別に設定します（ACでは位相整合の既定を使う。§11.3参照）。
 - 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサです。
 - `Frame::printTo(Print& out)` は診断用ダンプです。共通の `power/mode/temp/fan/checksum` 行、ベンダ固有フィールド（louver / swing / vane）、状態全体のhexを任意の Arduino `Print`（例 `Serial`）へ書き出します。enumフィールドは生コードで出力。学習/ダンプ用スケッチ向けの便宜機能で、encode/decode 契約の一部ではありません。

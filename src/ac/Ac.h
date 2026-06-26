@@ -103,4 +103,31 @@ namespace esp32irpk::ac
     return AcVendor::UNKNOWN;
   }
 
+  // Decode the matching vendor and print an editable setter template (see each
+  // Frame's printSetterSnippet) — lossy but easy to tweak, the counterpart to
+  // the bit-exact printSendSnippet. Returns the matched vendor (UNKNOWN if none;
+  // nothing printed). Mirrors decodeAny so the vendor list stays in one place.
+  inline AcVendor printSetterSnippet(const esp32irpk::IRRawTickView &raw, Print &out)
+  {
+    Panasonic::Frame pf;
+    if (Panasonic::Frame::fromRaw(raw, pf))
+    {
+      pf.printSetterSnippet(out);
+      return AcVendor::PANASONIC;
+    }
+    Gree::Frame gf;
+    if (Gree::Frame::fromRaw(raw, gf))
+    {
+      gf.printSetterSnippet(out);
+      return AcVendor::GREE;
+    }
+    Mitsubishi::Frame mf;
+    if (Mitsubishi::Frame::fromRaw(raw, mf))
+    {
+      mf.printSetterSnippet(out);
+      return AcVendor::MITSUBISHI;
+    }
+    return AcVendor::UNKNOWN;
+  }
+
 } // namespace esp32irpk::ac
