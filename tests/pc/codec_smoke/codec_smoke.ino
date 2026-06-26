@@ -1315,7 +1315,64 @@ void testPanasonicAcHalfDegreeAndLouver()
   EXPECT_EQ("panasonic/real-temp", 22.5f, d.temperatureC()); // device capture is 22.5C
   EXPECT_TRUE("panasonic/real-half", d.halfDegree());
   EXPECT_TRUE("panasonic/real-louver", d.louver() == Louver::P3);
-  EXPECT_TRUE("panasonic/real-fan", d.fan() == Fan::AUTO);
+  EXPECT_TRUE("panasonic/real-fan", d.fan() == Fan::POWERFUL); // capture has the powerful flag
+}
+
+// Fan selector: speeds (MIN..MAX, fan-byte high nibble) and the quiet/powerful
+// comfort modes (byte21 flags, fan nibble stays auto). They are one selector —
+// setting any clears the others. Offsets validated against real captures (cool +
+// powerful in the test above; heat 23.5 + louver2 + quiet here).
+void testPanasonicAcFanModes()
+{
+  using esp32irpk::ac::Panasonic::Fan;
+  using esp32irpk::ac::Panasonic::Frame;
+  using esp32irpk::ac::Panasonic::Mode;
+
+  Frame f{};
+  f.setMode(Mode::COOL);
+
+  // Quiet: fan nibble auto + byte21 bit5, powerful clear.
+  f.setFan(Fan::QUIET);
+  EXPECT_TRUE("panasonic/quiet-get", f.fan() == Fan::QUIET);
+  EXPECT_EQ("panasonic/quiet-nibble", 0xA, (f.bytes[16] >> 4) & 0x0F);
+  EXPECT_EQ("panasonic/quiet-bit", 0x20, f.bytes[21] & 0x20);
+  EXPECT_EQ("panasonic/quiet-no-powerful", 0x00, f.bytes[21] & 0x01);
+
+  // Powerful is mutually exclusive with quiet.
+  f.setFan(Fan::POWERFUL);
+  EXPECT_TRUE("panasonic/powerful-get", f.fan() == Fan::POWERFUL);
+  EXPECT_EQ("panasonic/powerful-bit", 0x01, f.bytes[21] & 0x01);
+  EXPECT_EQ("panasonic/powerful-no-quiet", 0x00, f.bytes[21] & 0x20);
+
+  // Selecting a speed clears the comfort flags and sets the nibble.
+  f.setFan(Fan::MAX_SPEED);
+  EXPECT_TRUE("panasonic/maxspeed-get", f.fan() == Fan::MAX_SPEED);
+  EXPECT_EQ("panasonic/maxspeed-nibble", 0x7, (f.bytes[16] >> 4) & 0x0F);
+  EXPECT_EQ("panasonic/maxspeed-no-flags", 0x00, f.bytes[21] & 0x21);
+
+  // Encode/decode roundtrip of a comfort mode.
+  f.setPower(true);
+  f.setTemperatureC(24.0f);
+  f.setFan(Fan::QUIET);
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("panasonic/quiet-encode", f.toRaw(buf));
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("panasonic/quiet-decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("panasonic/quiet-decode-checksum", g.checksum_ok);
+  EXPECT_TRUE("panasonic/quiet-decode-fan", g.fan() == Fan::QUIET);
+
+  // Device ground truth: heat / 23.5C / louver P2 / quiet (byte21=0x20).
+  Frame q{};
+  static const uint8_t kHeat235Quiet[Frame::kBytes] = {
+      0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06,
+      0x02, 0x20, 0xE0, 0x04, 0x00, 0x41, 0x2E, 0x80, 0xA2, 0x00,
+      0x00, 0x06, 0x60, 0x20, 0x80, 0x80, 0x00, 0x06, 0x23};
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    q.bytes[i] = kHeat235Quiet[i];
+  EXPECT_TRUE("panasonic/real-quiet", q.fan() == Fan::QUIET);
+  EXPECT_TRUE("panasonic/real-quiet-mode", q.mode() == Mode::HEAT);
 }
 
 // Model coverage: JKE/DKE/NKE/LKE/RKR share the power/mode/temperature/fan field
@@ -1764,6 +1821,7 @@ void setup()
   testAcCodecRoundtrip();
   testPanasonicAcRoundtrip();
   testPanasonicAcHalfDegreeAndLouver();
+  testPanasonicAcFanModes();
   testPanasonicAcCanonicalStates();
   testPanasonicAcModels();
   testPanasonicAcDecodesSkewedTiming();

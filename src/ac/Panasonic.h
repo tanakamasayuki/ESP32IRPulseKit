@@ -36,14 +36,20 @@ namespace esp32irpk::ac::Panasonic
   // NOTE: Arduino defines `LOW`/`HIGH` as preprocessor macros (0/1), so bare
   // LOW/HIGH cannot be enumerators here. Use the `_SPEED` suffix (a single
   // token the `LOW`/`HIGH` macros do not match).
+  // Fan selector. The speeds (MIN..MAX) live in the fan-byte high nibble. QUIET
+  // and POWERFUL are the comfort-mode buttons: they keep the fan nibble at auto
+  // and set a separate byte21 flag, and are mutually exclusive with a speed — so
+  // they are values of this one selector, not an independent field.
   enum class Fan : uint8_t
   {
     AUTO = 0,
-    QUIET,
+    MIN_SPEED,  // weakest airflow
     LOW_SPEED,
     MED_SPEED,
     HIGH_SPEED,
-    POWERFUL,
+    MAX_SPEED,  // strongest airflow
+    QUIET,      // しずか: comfort mode (fan nibble stays auto, byte21 bit5)
+    POWERFUL,   // パワフル: comfort mode (fan nibble stays auto, byte21 bit0)
   };
 
   // Vertical louver (swing) position. Stored in the low nibble of the fan byte
@@ -105,6 +111,9 @@ namespace esp32irpk::ac::Panasonic
     inline constexpr size_t kOffTemp = kFrame1Bytes + 6;     // temperature (integer, c<<1)
     inline constexpr size_t kOffFan = kFrame1Bytes + 8;      // fan nibble (high) + louver nibble (low)
     inline constexpr size_t kOffHalfDegree = kFrame1Bytes + 14; // byte22: +0.5C is bit7
+    inline constexpr size_t kOffQuietPowerful = kFrame1Bytes + 13; // byte21: quiet/powerful flags
+    inline constexpr uint8_t kQuietBit = 0x20;    // byte21 bit5
+    inline constexpr uint8_t kPowerfulBit = 0x01; // byte21 bit0
     inline constexpr size_t kOffChecksum = kFrame1Bytes + kFrame2Bytes - 1;
 
     // Sum checksum over frame 2 excluding the checksum byte itself.
@@ -140,27 +149,30 @@ namespace esp32irpk::ac::Panasonic
       default: return Mode::AUTO;
       }
     }
-    inline uint8_t fanToCode(Fan f)
+    // Fan SPEED <-> fan-byte high nibble (min/low/med/high/max = 0x3..0x7, auto =
+    // 0xA). QUIET/POWERFUL are not speeds: they ride on the auto nibble and a
+    // byte21 flag, so they are handled in fan()/setFan(), not here.
+    inline uint8_t fanToNibble(Fan f)
     {
       switch (f)
       {
-      case Fan::QUIET: return 0x3;
+      case Fan::MIN_SPEED: return 0x3;
       case Fan::LOW_SPEED: return 0x4;
       case Fan::MED_SPEED: return 0x5;
       case Fan::HIGH_SPEED: return 0x6;
-      case Fan::POWERFUL: return 0x7;
-      case Fan::AUTO: default: return 0xA;
+      case Fan::MAX_SPEED: return 0x7;
+      case Fan::AUTO: case Fan::QUIET: case Fan::POWERFUL: default: return 0xA;
       }
     }
-    inline Fan codeToFan(uint8_t c)
+    inline Fan nibbleToFan(uint8_t n)
     {
-      switch (c)
+      switch (n)
       {
-      case 0x3: return Fan::QUIET;
+      case 0x3: return Fan::MIN_SPEED;
       case 0x4: return Fan::LOW_SPEED;
       case 0x5: return Fan::MED_SPEED;
       case 0x6: return Fan::HIGH_SPEED;
-      case 0x7: return Fan::POWERFUL;
+      case 0x7: return Fan::MAX_SPEED;
       default: return Fan::AUTO;
       }
     }
@@ -260,10 +272,24 @@ namespace esp32irpk::ac::Panasonic
           (bytes[detail::kOffHalfDegree] & ~0x80u) | ((half_steps & 1) ? 0x80u : 0x00u));
     }
 
-    Fan fan() const { return detail::codeToFan((bytes[detail::kOffFan] >> 4) & 0x0Fu); }
+    // Quiet/powerful (byte21 flags) take precedence over the speed nibble: a real
+    // remote forces the fan nibble to auto when either is engaged, and they are
+    // mutually exclusive with a speed (one Fan choice). setFan() therefore writes
+    // the nibble and (re)sets exactly one or neither of the two flags.
+    Fan fan() const
+    {
+      uint8_t qp = bytes[detail::kOffQuietPowerful];
+      if (qp & detail::kQuietBit) return Fan::QUIET;
+      if (qp & detail::kPowerfulBit) return Fan::POWERFUL;
+      return detail::nibbleToFan((bytes[detail::kOffFan] >> 4) & 0x0Fu);
+    }
     void setFan(Fan f)
     {
-      bytes[detail::kOffFan] = static_cast<uint8_t>((bytes[detail::kOffFan] & 0x0Fu) | (detail::fanToCode(f) << 4));
+      bytes[detail::kOffFan] = static_cast<uint8_t>((bytes[detail::kOffFan] & 0x0Fu) | (detail::fanToNibble(f) << 4));
+      uint8_t qp = static_cast<uint8_t>(bytes[detail::kOffQuietPowerful] & ~(detail::kQuietBit | detail::kPowerfulBit));
+      if (f == Fan::QUIET) qp |= detail::kQuietBit;
+      else if (f == Fan::POWERFUL) qp |= detail::kPowerfulBit;
+      bytes[detail::kOffQuietPowerful] = qp;
     }
 
     // Vertical louver position, in the low nibble of the fan byte (independent of

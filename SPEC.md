@@ -610,7 +610,12 @@ namespace Panasonic {
 // shared naming convention; this enum does not allow a value Panasonic lacks.
 enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
 // Arduino defines LOW/HIGH as macros, so fan steps use the `_SPEED` suffix.
-enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW_SPEED, MED_SPEED, HIGH_SPEED, POWERFUL };
+// QUIET/POWERFUL are not speeds but comfort modes (fan stays auto + a byte21
+// flag); they are mutually exclusive with a speed, so they are values of the one
+// Fan selector.
+enum class Fan : uint8_t {
+  AUTO = 0, MIN_SPEED, LOW_SPEED, MED_SPEED, HIGH_SPEED, MAX_SPEED, QUIET, POWERFUL
+};
 // Panasonic-specific: vertical louver position (low nibble of the fan byte). AUTO sweeps.
 enum class Louver : uint8_t { AUTO = 0xF, P1 = 1, P2, P3, P4, P5 };
 
@@ -701,11 +706,11 @@ Per-vendor framing of the supported formats:
 | half-degree (0.5 °C) | byte 22 bit 7 | set = +0.5 °C | ✅ |
 | fan (airflow) | byte 16 high nibble | auto=A / 3..7 (low→max) | ✅ |
 | louver (swing) | byte 16 low nibble | 1–5 = fixed / F = auto | ✅ |
-| quiet / powerful | byte 21 bit 5 / bit 0 | quiet=0x20 / powerful=0x01 | 🔜 |
+| quiet / powerful | byte 21 bit 5 / bit 0 | quiet=0x20 / powerful=0x01 | ✅ (as `Fan::QUIET`/`POWERFUL`) |
 | on/off timer | byte 13 bit 1,2 + bytes 18–20 | 11-bit minutes | 🟡 |
 | checksum | byte 26 | sum of frame-2 bytes 8–25 mod 256 | ✅ |
 
-The newly mapped fields (half-degree, louver, quiet/powerful, timer) were reverse-engineered from one real remote (part ACXA75C15870, a JKE-family unit) and are not yet cross-validated across models/libraries, unlike power/mode/temperature/fan/checksum (verified against IRremoteESP8266). Quiet/powerful are mutually exclusive with a fan speed: selecting them on the remote forces the fan nibble to auto and sets the byte-21 flag, so the fan setting is logically one selector (`{auto, speeds…, quiet, powerful}`) whose per-model encoding differs — this remote uses fan-nibble=auto + a byte-21 flag, while the `Fan` enum / IRremoteESP8266 encode quiet/powerful as fan-nibble values 3/7 (reconciliation and the no-setter policy for timers are in [DESIGN.md](DESIGN.md)). Special-function buttons (e.g. internal clean) are sent as a separate, shorter command frame (⛔ a different `Frame` type, not yet supported); RAW replay still reproduces them.
+The newly mapped fields (half-degree, louver, quiet/powerful, timer) were reverse-engineered from one real remote (part ACXA75C15870, a JKE-family unit) and are not yet cross-validated across models/libraries, unlike power/mode/temperature/fan/checksum (verified against IRremoteESP8266). Quiet/powerful are mutually exclusive with a fan speed: selecting them forces the fan nibble to auto and sets the byte-21 flag. They are therefore values of the one `Fan` selector — `Fan::QUIET`/`Fan::POWERFUL` encode to fan-nibble=auto + the byte-21 bit, and the speeds `MIN_SPEED`..`MAX_SPEED` are the nibble (the no-setter policy for timers is in [DESIGN.md](DESIGN.md)). Special-function buttons (e.g. internal clean) are sent as a separate, shorter command frame (⛔ a different `Frame` type, not yet supported); RAW replay still reproduces them.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 

@@ -605,7 +605,11 @@ namespace Panasonic {
 // このenumはPanasonicが持たない値を許さない。
 enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
 // Arduinoが LOW/HIGH をマクロ定義するため、fan段は `_SPEED` サフィックスを使う。
-enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW_SPEED, MED_SPEED, HIGH_SPEED, POWERFUL };
+// QUIET/POWERFUL は風量ではなく快適モード（fanはautoのまま byte21 フラグ）。風量と
+// 排他なので同じ Fan セレクタの値として持つ。
+enum class Fan : uint8_t {
+  AUTO = 0, MIN_SPEED, LOW_SPEED, MED_SPEED, HIGH_SPEED, MAX_SPEED, QUIET, POWERFUL
+};
 // Panasonic固有: 垂直ルーバー位置（fanバイト下位ニブル）。AUTOはスイング。
 enum class Louver : uint8_t { AUTO = 0xF, P1 = 1, P2, P3, P4, P5 };
 
@@ -696,11 +700,11 @@ struct Frame {
 | 0.5℃ | byte22 bit7 | セットで +0.5℃ | ✅ |
 | fan(風量) | byte16 上位ニブル | auto=A / 3..7（弱→最強） | ✅ |
 | 風向(louver) | byte16 下位ニブル | 1–5=固定 / F=auto | ✅ |
-| しずか/パワフル | byte21 bit5 / bit0 | しずか=0x20 / パワフル=0x01 | 🔜 |
+| しずか/パワフル | byte21 bit5 / bit0 | しずか=0x20 / パワフル=0x01 | ✅（`Fan::QUIET`/`POWERFUL`） |
 | タイマー入/切 | byte13 bit1,2 + byte18–20 | 11bit・分単位 | 🟡 |
 | checksum | byte26 | frame2（byte8..25）の総和 mod256 | ✅ |
 
-新規マップ分（0.5℃・風向・しずか/パワフル・タイマー）は実機1台（型番 ACXA75C15870、JKE系）からのリバースエンジニアリングで、power/mode/temperature/fan/checksum（IRremoteESP8266 でクロス検証済み）とは異なりモデル/ライブラリ横断の検証はまだ。しずか/パワフルは fan 速度と排他で、選ぶと fan ニブルが強制的に auto になり byte21 のフラグが立つ。よって fan 設定は論理的に1セレクタ（`{auto, 速度…, しずか, パワフル}`）で、モデルごとに描画が違うだけ——この実機は fanニブル=auto＋byte21フラグ、`Fan` enum / IRremoteESP8266 は しずか/パワフルを fanニブル値 3/7 で表す（整理とタイマーの setter 非作成方針は [DESIGN.ja.md](DESIGN.ja.md)）。内部クリーン等の特殊ボタンは状態フレームと別系統の短縮コマンドフレームで送られる（⛔別Frame型・未対応）。RAW replay で再送は可能。
+新規マップ分（0.5℃・風向・しずか/パワフル・タイマー）は実機1台（型番 ACXA75C15870、JKE系）からのリバースエンジニアリングで、power/mode/temperature/fan/checksum（IRremoteESP8266 でクロス検証済み）とは異なりモデル/ライブラリ横断の検証はまだ。しずか/パワフルは fan 速度と排他で、選ぶと fan ニブルが強制的に auto になり byte21 のフラグが立つ。よって 1つの `Fan` セレクタの値として持つ——`Fan::QUIET`/`POWERFUL` は fanニブル=auto＋byte21ビットに、速度 `MIN_SPEED`..`MAX_SPEED` はニブルにエンコードされる（タイマーの setter 非作成方針は [DESIGN.ja.md](DESIGN.ja.md)）。内部クリーン等の特殊ボタンは状態フレームと別系統の短縮コマンドフレームで送られる（⛔別Frame型・未対応）。RAW replay で再送は可能。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 
