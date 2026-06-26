@@ -1878,6 +1878,110 @@ void testAcEnumToString()
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
+
+// fromBytes rebuilds a frame from decoded state bytes: it matches fromRaw's
+// result and round-trips bit-exactly through toRaw. Wrong length is rejected.
+void testAcFromBytes()
+{
+  // Panasonic: full check incl. model detection, bad-length, and bit-exact replay.
+  {
+    using esp32irpk::ac::Panasonic::Fan;
+    using esp32irpk::ac::Panasonic::Frame;
+    using esp32irpk::ac::Panasonic::Mode;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::COOL);
+    a.setTemperatureC(22.5f);
+    a.setFan(Fan::QUIET);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("panasonic/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("panasonic/frombytes-dec", Frame::fromRaw(v, dec));
+
+    Frame fb{};
+    EXPECT_TRUE("panasonic/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("panasonic/frombytes-checksum", fb.checksum_ok);
+    EXPECT_TRUE("panasonic/frombytes-model", fb.model == dec.model);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("panasonic/frombytes-eq", eq);
+    Frame bad{};
+    EXPECT_TRUE("panasonic/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, bad));
+
+    // Bit-exact replay: fromBytes -> toRaw -> fromRaw reproduces the same bytes.
+    uint16_t t2[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf2{t2, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("panasonic/frombytes-reenc", fb.toRaw(buf2));
+    esp32irpk::IRRawTickView v2{buf2.ticks, buf2.len};
+    Frame dec2{};
+    EXPECT_TRUE("panasonic/frombytes-redec", Frame::fromRaw(v2, dec2));
+    bool replay_eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (dec2.bytes[i] != dec.bytes[i])
+        replay_eq = false;
+    EXPECT_TRUE("panasonic/frombytes-replay-eq", replay_eq);
+  }
+  // Gree
+  {
+    using esp32irpk::ac::Gree::Fan;
+    using esp32irpk::ac::Gree::Frame;
+    using esp32irpk::ac::Gree::Mode;
+    using esp32irpk::ac::Gree::SwingV;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::COOL);
+    a.setTemperatureC(25);
+    a.setFan(Fan::MED_SPEED);
+    a.setSwingV(SwingV::MIDDLE);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("gree/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("gree/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("gree/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("gree/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("gree/frombytes-eq", eq);
+    EXPECT_TRUE("gree/frombytes-badlen", !Frame::fromBytes(dec.bytes, 0, fb));
+  }
+  // Mitsubishi
+  {
+    using esp32irpk::ac::Mitsubishi::Fan;
+    using esp32irpk::ac::Mitsubishi::Frame;
+    using esp32irpk::ac::Mitsubishi::Mode;
+    using esp32irpk::ac::Mitsubishi::Vane;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(22.5f);
+    a.setFan(Fan::QUIET);
+    a.setVane(Vane::P3);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("mitsubishi/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("mitsubishi/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("mitsubishi/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("mitsubishi/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("mitsubishi/frombytes-eq", eq);
+    EXPECT_TRUE("mitsubishi/frombytes-badlen", !Frame::fromBytes(dec.bytes, 99, fb));
+  }
+}
 } // namespace
 
 void setup()
@@ -1934,6 +2038,8 @@ void setup()
   testMitsubishiAcRoundtrip();
   testMitsubishiAcStateMatrix();
   testMitsubishiAcVaneAndHalfDegree();
+  testAcEnumToString();
+  testAcFromBytes();
 
   Serial.print("TEST done ");
   Serial.print(g_passed);

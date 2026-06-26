@@ -169,6 +169,13 @@ void loop()
   {
     esp32irpk::debug::printBitsSendSnippet(Serial, r.candidates[0]);
   }
-  printRawSnippet(r.raw);
+  // en: a recognized AC frame prints as its compact, bit-exact state bytes;
+  //     otherwise fall back to the universal (but long) RAW tick array.
+  // ja: 認識できたACフレームはコンパクトで完全一致な状態バイトとして出力し、
+  //     それ以外は万能だが長い RAW tick 配列にフォールバックする。
+  if (esp32irpk::ac::printSendSnippet(r.raw, Serial) == esp32irpk::ac::AcVendor::UNKNOWN)
+  {
+    printRawSnippet(r.raw);
+  }
   Serial.println();
 }

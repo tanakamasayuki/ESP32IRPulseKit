@@ -387,6 +387,26 @@ namespace esp32irpk::ac::Panasonic
       return true;
     }
 
+    // Decoded state bytes -> Frame, without going through RAW ticks. The
+    // compact, bit-exact counterpart to fromRaw: it copies the `kBytes` state,
+    // classifies the model from the marker bytes, and reports checksum validity
+    // via `checksum_ok` (it does not reject a bad checksum). `len` must equal
+    // `kBytes`. Use it to rebuild a frame from a saved/printed state and re-send
+    // it with toRaw / ac::send.
+    static bool fromBytes(const uint8_t *state, size_t len, Frame &out)
+    {
+      out = Frame{};
+      if (!state || len != kBytes)
+        return false;
+      for (size_t i = 0; i < kBytes; ++i)
+        out.bytes[i] = state[i];
+      out.byte_length = kBytes;
+      out.model = detail::detectModel(out.bytes);
+      out.checksum_ok =
+          (out.bytes[detail::kOffChecksum] == detail::checksum(out.bytes + detail::kFrame1Bytes));
+      return true;
+    }
+
     // state -> RAW ticks. Stamps the fixed signature/preamble and recomputes the
     // checksum, so a frame built from setters renders a valid burst.
     bool toRaw(esp32irpk::IRRawTickBuffer &out) const

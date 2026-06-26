@@ -367,6 +367,22 @@ namespace esp32irpk::ac::Mitsubishi
       return true;
     }
 
+    // Decoded state bytes -> Frame, without going through RAW ticks. The
+    // compact, bit-exact counterpart to fromRaw: copies the `kBytes` state and
+    // reports checksum validity via `checksum_ok` (it does not reject a bad
+    // checksum). `len` must equal `kBytes`.
+    static bool fromBytes(const uint8_t *state, size_t len, Frame &out)
+    {
+      out = Frame{};
+      if (!state || len != kBytes)
+        return false;
+      for (size_t i = 0; i < kBytes; ++i)
+        out.bytes[i] = state[i];
+      out.byte_length = kBytes;
+      out.checksum_ok = (out.bytes[detail::kOffChecksum] == detail::checksum(out.bytes));
+      return true;
+    }
+
     // state -> RAW ticks. Recomputes the checksum and renders the frame twice
     // (as a real remote does), separated by the inter-frame gap.
     bool toRaw(esp32irpk::IRRawTickBuffer &out) const

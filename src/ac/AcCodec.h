@@ -176,4 +176,32 @@ namespace esp32irpk::ac
     out.println();
   }
 
+  // Copy-paste C++ that rebuilds an AC frame from its decoded state bytes and
+  // sends it — the compact, bit-exact alternative to dumping the (much longer)
+  // RAW tick array. `vendor` is the short label for the comment; `typeName` is
+  // the fully-qualified Frame type, e.g. "esp32irpk::ac::Panasonic::Frame".
+  inline void printAcStateSnippet(Print &out, const char *vendor, const char *typeName,
+                                  const uint8_t *bytes, size_t len)
+  {
+    out.print("// send code (");
+    out.print(vendor);
+    out.println(" AC state, bit-exact replay):");
+    out.print(typeName);
+    out.println(" f;");
+    out.print("static const uint8_t state[] = {");
+    for (size_t i = 0; i < len; ++i)
+    {
+      out.print(i ? "," : "");
+      out.print((i % 12 == 0) ? "\n  " : " ");
+      out.print("0x");
+      if (bytes[i] < 0x10)
+        out.print('0');
+      out.print(bytes[i], HEX);
+    }
+    out.println(" };");
+    out.print(typeName);
+    out.println("::fromBytes(state, sizeof(state), f);");
+    out.println("esp32irpk::ac::send(tx, f);");
+  }
+
 } // namespace esp32irpk::ac

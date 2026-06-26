@@ -634,6 +634,7 @@ struct Frame {
   Louver louver() const;       void setLouver(Louver v);
 
   static bool fromRaw(const esp32irpk::IRRawTickView& raw, Frame& out);
+  static bool fromBytes(const uint8_t* state, size_t len, Frame& out); // デコード済み状態から復元
   bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
   void printTo(Print& out) const; // 診断ダンプ: 共通＋ベンダ固有＋hex
 };
@@ -648,12 +649,19 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 // Print が非nullなら一致フレームを printTo() でダンプする（不一致時は注記を出力）。
 AcVendor decodeAny(const esp32irpk::IRRawTickView& raw, Print* out = nullptr);
 
+// 一致フレームをデコード済み状態バイトから復元する貼り付け用C++を出力する（RAW tick
+// ダンプの、コンパクトで完全一致な代替）。一致ベンダを返す（無ければUNKNOWN・何も出力
+// しない＝RAWにフォールバック）。
+AcVendor printSendSnippet(const esp32irpk::IRRawTickView& raw, Print& out);
+
 }
 ```
 
 - `Frame::fromRaw(raw, out)` はRAW tickを状態バイトへ復号し、ベンダのチェックサムを検証します。そのベンダのフレームでない場合は `false` を返し、チェックサムの可否は `out.checksum_ok` で別に報告します。
+- `Frame::fromBytes(state, len, out)` は `kBytes` のデコード済み状態から、RAW tick を経由せずにフレームを復元します（`fromRaw` 同様にモデル判定し `checksum_ok` を報告）。`len` は `Frame::kBytes` と一致が必要。RAW replay のコンパクトで完全一致な対応物で、`fromBytes` → `toRaw`/`ac::send` でキャプチャ元をバイト単位で再現します（再生成されるのは決定的な署名・プリアンブル・マーカー・checksum のみ）。`ac::printSendSnippet` がこれを使った貼り付けスニペットを出力します。（論理 setter から組み直すと setter の無いフィールド（例: タイマー）がテンプレ既定に戻り完全一致しません。）
 - `Frame::toRaw(out)` はチェックサムを再計算し、状態を caller提供の `IRRawTickBuffer` にRAW tickとして書き出します。結果は `IRSender::send(const IRRawTickView&)` で送信します。`model` がフィールドマップ未実装のモデルを指す場合は `false` を返します（未対応モデルは、実装済みモデルのレイアウトを黙って出力せず、エンコード失敗にする）。`ac::send` もこれを伝播して `false` を返します。
 - `ac::decodeAny(raw, out)` は全内蔵ACベンダを登録順にRAWキャプチャへ当て、一致した `AcVendor` を返します（無ければ `UNKNOWN`）。`out` が非nullなら一致フレームを `printTo()` でダンプします。返すのはベンダ識別のみで、デコード済みフレームは返しません（各ベンダの `Frame` は不均質な型のため）— フィールド参照や再エンコードが要るなら該当ベンダを個別にデコードします。カスケードをここに集約することで、学習/ダンプ経路が新ベンダを自動的に拾います。
+- `ac::printSendSnippet(raw, out)` は一致ベンダをデコードし、`Frame::fromBytes` でフレームを組み直して送信する貼り付け用C++を出力します — RAW tick 配列（数百個）に対し 27/18/8 バイトで済む、コンパクトかつ完全一致な代替です。一致した `AcVendor` を返し、無ければ `UNKNOWN`（何も出力しない＝RAWスニペットにフォールバック）。`decodeAny` と対でベンダリストを一元化します。
 - `ac::send(tx, frame)` は1呼び出し版です。`Frame::kMaxTicks` のスタックバッファへエンコードして送信し、エンコード/送信失敗時は `false` を返します。バッファを自分で管理したい場合は `toRaw` + `IRSender::send()` を使います。送信機のキャリアモードは従来どおり別に設定します（ACでは位相整合の既定を使う。§11.3参照）。
 - 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサです。
 - `Frame::printTo(Print& out)` は診断用ダンプです。共通の `power/mode/temp/fan/checksum` 行、ベンダ固有フィールド（louver / swing / vane）、状態全体のhexを任意の Arduino `Print`（例 `Serial`）へ書き出します。enumフィールドは生コードで出力。学習/ダンプ用スケッチ向けの便宜機能で、encode/decode 契約の一部ではありません。

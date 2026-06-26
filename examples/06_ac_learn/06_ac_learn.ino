@@ -86,6 +86,13 @@ void loop()
   // en: decodeAny tries every built-in AC vendor and dumps the match via printTo.
   // ja: decodeAny が全内蔵ACベンダを試し、一致を printTo で出力する。
   esp32irpk::ac::decodeAny(r.raw, &Serial);
-  printRawSnippet(r.raw);
+  // en: a recognized AC frame re-sends from its compact, bit-exact state bytes;
+  //     an unrecognized one falls back to the (long) RAW replay.
+  // ja: 認識できたACフレームはコンパクトで完全一致な状態バイトから再送し、未対応
+  //     のものは（長い）RAW replay にフォールバックする。
+  if (esp32irpk::ac::printSendSnippet(r.raw, Serial) == esp32irpk::ac::AcVendor::UNKNOWN)
+  {
+    printRawSnippet(r.raw);
+  }
   Serial.println();
 }

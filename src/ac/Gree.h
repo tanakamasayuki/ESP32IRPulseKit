@@ -349,6 +349,23 @@ namespace esp32irpk::ac::Gree
       return true;
     }
 
+    // Decoded state bytes -> Frame, without going through RAW ticks. The
+    // compact, bit-exact counterpart to fromRaw: copies the `kBytes` state and
+    // reports checksum validity via `checksum_ok` (it does not reject a bad
+    // checksum). `len` must equal `kBytes`. The implemented model is YBOFB.
+    static bool fromBytes(const uint8_t *state, size_t len, Frame &out)
+    {
+      out = Frame{};
+      if (!state || len != kBytes)
+        return false;
+      for (size_t i = 0; i < kBytes; ++i)
+        out.bytes[i] = state[i];
+      out.byte_length = kBytes;
+      out.model = Model::YBOFB;
+      out.checksum_ok = (((out.bytes[7] >> 4) & 0x0Fu) == detail::checksum(out.bytes));
+      return true;
+    }
+
     // state -> RAW ticks. Recomputes the checksum, so a frame built from setters
     // renders a valid two-block burst.
     bool toRaw(esp32irpk::IRRawTickBuffer &out) const

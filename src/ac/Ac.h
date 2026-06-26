@@ -72,4 +72,35 @@ namespace esp32irpk::ac
     return AcVendor::UNKNOWN;
   }
 
+  // Decode the matching vendor and print copy-paste C++ that rebuilds the frame
+  // from its decoded state bytes (the compact, bit-exact alternative to a RAW
+  // tick dump). Returns the matched vendor, or UNKNOWN if none matched (in which
+  // case nothing is printed — fall back to a RAW snippet). Mirrors decodeAny so
+  // the vendor list stays in one place.
+  inline AcVendor printSendSnippet(const esp32irpk::IRRawTickView &raw, Print &out)
+  {
+    Panasonic::Frame pf;
+    if (Panasonic::Frame::fromRaw(raw, pf))
+    {
+      printAcStateSnippet(out, "Panasonic", "esp32irpk::ac::Panasonic::Frame",
+                          pf.bytes, Panasonic::Frame::kBytes);
+      return AcVendor::PANASONIC;
+    }
+    Gree::Frame gf;
+    if (Gree::Frame::fromRaw(raw, gf))
+    {
+      printAcStateSnippet(out, "Gree", "esp32irpk::ac::Gree::Frame",
+                          gf.bytes, Gree::Frame::kBytes);
+      return AcVendor::GREE;
+    }
+    Mitsubishi::Frame mf;
+    if (Mitsubishi::Frame::fromRaw(raw, mf))
+    {
+      printAcStateSnippet(out, "Mitsubishi", "esp32irpk::ac::Mitsubishi::Frame",
+                          mf.bytes, Mitsubishi::Frame::kBytes);
+      return AcVendor::MITSUBISHI;
+    }
+    return AcVendor::UNKNOWN;
+  }
+
 } // namespace esp32irpk::ac

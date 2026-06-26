@@ -640,6 +640,7 @@ struct Frame {
   Louver louver() const;       void setLouver(Louver v);
 
   static bool fromRaw(const esp32irpk::IRRawTickView& raw, Frame& out);
+  static bool fromBytes(const uint8_t* state, size_t len, Frame& out); // rebuild from decoded state
   bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
   void printTo(Print& out) const; // diagnostic dump: common + vendor fields + hex
 };
@@ -655,12 +656,19 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 // printTo() (and a no-match note is printed).
 AcVendor decodeAny(const esp32irpk::IRRawTickView& raw, Print* out = nullptr);
 
+// Print copy-paste C++ that rebuilds the matched frame from its decoded state
+// bytes (the compact, bit-exact alternative to a RAW tick dump). Returns the
+// matched vendor, or UNKNOWN if none (nothing printed — fall back to RAW).
+AcVendor printSendSnippet(const esp32irpk::IRRawTickView& raw, Print& out);
+
 }
 ```
 
 - `Frame::fromRaw(raw, out)` decodes RAW ticks into the state bytes and validates the vendor checksum. It returns `false` when the waveform is not that vendor's frame; `out.checksum_ok` reports checksum validity separately.
+- `Frame::fromBytes(state, len, out)` rebuilds a frame from its `kBytes` decoded state without going through RAW ticks (it classifies the model and reports `checksum_ok`, like `fromRaw`); `len` must equal `Frame::kBytes`. It is the compact, bit-exact counterpart to a RAW replay: `fromBytes` → `toRaw`/`ac::send` reproduces the captured frame byte-for-byte (only the deterministic signature/preamble/markers/checksum are re-derived). `ac::printSendSnippet` emits a copy-paste snippet built on it. (A frame rebuilt from logical setters instead would *not* be bit-exact — fields without setters, e.g. timers, fall back to template defaults.)
 - `Frame::toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`. It returns `false` if `model` names a variant whose field map is not implemented — encoding an unsupported model fails rather than silently emitting the implemented model's layout. `ac::send` propagates this and also returns `false`.
 - `ac::decodeAny(raw, out)` tries every built-in AC vendor against the RAW capture in registration order and returns the matching `AcVendor` (`UNKNOWN` if none). When `out` is non-null the matched frame is dumped via its `printTo()`. It reports only the vendor identity, not the decoded frame — the per-vendor `Frame`s are heterogeneous types, so decode the specific vendor when you need its fields or to re-encode. Centralizing the cascade here means a learn/dump path picks up new vendors automatically.
+- `ac::printSendSnippet(raw, out)` decodes the matching vendor and prints copy-paste C++ that rebuilds the frame via `Frame::fromBytes` and sends it — the compact, bit-exact alternative to a RAW tick array (a 27/18/8-byte state vs. hundreds of ticks). Returns the matched `AcVendor`, or `UNKNOWN` if none matched (nothing printed; fall back to a RAW snippet). Mirrors `decodeAny` so the vendor list stays in one place.
 - `ac::send(tx, frame)` is the one-call path: it encodes into a stack buffer of `Frame::kMaxTicks` and transmits, returning `false` on encode or send failure. Use the explicit `toRaw` + `IRSender::send()` pair instead when you need to control the buffer. The sender's carrier mode is configured separately, as usual (use the phase-aligned default for AC; see §11.3).
 - The byte array is the intermediate form. Logical fields (power, mode, temperature, fan, …) are accessors over those bytes.
 - `Frame::printTo(Print& out)` is a diagnostic dump: it writes the common `power/mode/temp/fan/checksum` line, the vendor's own fields (louver / swing / vane), and the full state in hex to any Arduino `Print` (e.g. `Serial`). Enum fields print as their raw code. It is a convenience for learn/dump sketches, not part of the encode/decode contract.
