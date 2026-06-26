@@ -663,12 +663,11 @@ struct Frame {
 
 This is why a model is a parameter rather than a type-per-model: a received frame must resolve its own model on `fromRaw`, so the decoder cannot require the caller to pick the class first. A new wire *format* always gets its own `Frame` type because it cannot share a parser.
 
-**Vendor / format / model support matrix.** "Supported" means implemented and hardware-verified (bidirectionally against IRremoteESP8266, plus a HeatpumpIR second reference). "Implemented" means the encode/decode path and host round-trip tests are in place and a hardware study is ready, but it has not yet been confirmed on a physical unit. "Planned" / "Not yet" formats and models are recognized but not implemented; their target models are decided before implementation, not pre-locked here.
+**Vendor / format / model support matrix.** "Supported" means implemented and hardware-verified (bidirectionally against IRremoteESP8266, plus a HeatpumpIR second reference). "Planned" / "Not yet" formats and models are recognized but not implemented; their target models are decided before implementation, not pre-locked here.
 
 | Vendor | Format (protocol) | Frame | Model(s) | Status |
 |---|---|---|---|---|
-| Panasonic | Kaseikyo AC | 27-byte, two frames | JKE | **Supported** |
-| | | | DKE / NKE / LKE / RKR | Implemented |
+| Panasonic | Kaseikyo AC | 27-byte, two frames | JKE / DKE / NKE / LKE / RKR | **Supported** |
 | | | | CKP | Not yet |
 | | Panasonic-AC32 | short 32-bit | — | Not yet |
 | Gree | Gree | 8-byte, two blocks | YBOFB | **Supported** |
@@ -682,7 +681,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 Per-vendor framing of the supported formats:
 
-- `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame. `Model::JKE` (hardware-verified; template byte-identical to IRremoteESP8266's default known-good state), `DKE`, `NKE`, `LKE` and `RKR` are handled — they share the power/mode/temperature/fan field map and differ only in fixed marker bytes (`fromRaw` classifies the model; `toRaw` stamps it). `CKP` is reserved (toggle power + relocated quiet/powerful bits); encoding it returns `false`.
+- `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame. `Model::JKE` (template byte-identical to IRremoteESP8266's default known-good state), `DKE`, `NKE`, `LKE` and `RKR` are supported — they share the power/mode/temperature/fan field map and differ only in fixed marker bytes (`fromRaw` classifies the model; `toRaw` stamps it), verified per-model against IRremoteESP8266. `CKP` is reserved (toggle power + relocated quiet/powerful bits); encoding it returns `false`.
 - `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. The implemented model is YBOFB (`Model::YBOFB`, model bit clear); `Model::YAW1F`/`YX1FSF` are reserved for later. `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`.
 - `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. This format has a single model (no `Model` parameter); the other Mitsubishi wire formats (136 / 112 / Heavy) would be separate `Frame` types. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`.
 

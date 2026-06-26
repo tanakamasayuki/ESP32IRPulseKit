@@ -658,12 +658,11 @@ struct Frame {
 
 モデルを「モデルごとの別型」でなくパラメータにするのは、受信フレームが `fromRaw` で**自分のモデルを自分で解決**する必要があるからです（受信側がクラスを先に選べない）。一方、新しい波形**フォーマット**はパーサを共有できないため常に独自の `Frame` 型になります。
 
-**ベンダ／フォーマット／モデル対応可否一覧。** 「対応」は実装済みかつ実機検証済み（IRremoteESP8266 と双方向＋HeatpumpIR の2系統目参照）。「実装済」はエンコード/デコード経路と host往復テストが揃い実機studyも用意済みだが、実機未確認の状態。「予定」「未対応」のフォーマット／モデルは存在を把握しているが未実装で、対象モデルは実装前に決定し、ここで先に固定はしません。
+**ベンダ／フォーマット／モデル対応可否一覧。** 「対応」は実装済みかつ実機検証済み（IRremoteESP8266 と双方向＋HeatpumpIR の2系統目参照）。「予定」「未対応」のフォーマット／モデルは存在を把握しているが未実装で、対象モデルは実装前に決定し、ここで先に固定はしません。
 
 | ベンダ | フォーマット（プロトコル） | フレーム | モデル | 状態 |
 |---|---|---|---|---|
-| Panasonic | Kaseikyo AC | 27バイト・2フレーム | JKE | **対応** |
-| | | | DKE / NKE / LKE / RKR | 実装済 |
+| Panasonic | Kaseikyo AC | 27バイト・2フレーム | JKE / DKE / NKE / LKE / RKR | **対応** |
 | | | | CKP | 未対応 |
 | | Panasonic-AC32 | 短縮32bit | — | 未対応 |
 | Gree | Gree | 8バイト・2ブロック | YBOFB | **対応** |
@@ -677,7 +676,7 @@ struct Frame {
 
 対応フォーマットのベンダ別構造:
 
-- `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。`Model::JKE`（実機検証済み・テンプレートは IRremoteESP8266 の既定known-good stateとバイト完全一致）、`DKE`/`NKE`/`LKE`/`RKR` に対応 — power/mode/temperature/fan のフィールドマップは共通で、固定マーカーバイトだけが異なる（`fromRaw` がモデル判定、`toRaw` が刻む）。`CKP` は予約（トグル電源＋quiet/powerfulのビット位置が別）でエンコードは `false`。
+- `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。`Model::JKE`（テンプレートは IRremoteESP8266 の既定known-good stateとバイト完全一致）、`DKE`/`NKE`/`LKE`/`RKR` に対応 — power/mode/temperature/fan のフィールドマップは共通で、固定マーカーバイトだけが異なる（`fromRaw` がモデル判定、`toRaw` が刻む）。各モデルを IRremoteESP8266 に対して実機検証済み。`CKP` は予約（トグル電源＋quiet/powerfulのビット位置が別）でエンコードは `false`。
 - `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。実装モデルは YBOFB（`Model::YBOFB`、モデルビットは0）。`Model::YAW1F`/`YX1FSF` は将来用に予約。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。
 - `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。このフォーマットは単一モデル（`Model` パラメータ無し）。他のMitsubishi波形フォーマット（136 / 112 / Heavy）は別の `Frame` 型になる。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。
 

@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+- (EN) A/C model parameter: each vendor frame can carry a `Model` (format = separate `Frame` type, model = parameter; `fromRaw` auto-detects). Panasonic now supports `Model` JKE/DKE/NKE/LKE/RKR (shared field map, per-model marker bytes), and Gree carries `Model::YBOFB`. Encoding an unimplemented model returns `false`.
+- (JA) エアコンのモデルパラメータ: 各ベンダの Frame が `Model` を持てるように（フォーマット＝別 `Frame` 型、モデル＝パラメータ、`fromRaw` が自動判定）。Panasonic は `Model` JKE/DKE/NKE/LKE/RKR に対応（フィールドマップ共通、モデル別マーカーバイト）、Gree は `Model::YBOFB`。未実装モデルのエンコードは `false`。
 - (EN) Mitsubishi air-conditioner support (`esp32irpk::ac::Mitsubishi`): decode/encode of the 18-byte "Mitsubishi AC" state (5-byte signature, sum checksum, frame sent twice), and `Mode`/`Fan` accessors. `06_ac_learn` recognizes it too.
 - (JA) Mitsubishi エアコン対応（`esp32irpk::ac::Mitsubishi`）: 18バイトの「Mitsubishi AC」状態（5バイト署名、総和チェックサム、フレームを2回送信）のデコード/エンコードと `Mode`/`Fan` アクセサを追加。`06_ac_learn` も認識します。
 
