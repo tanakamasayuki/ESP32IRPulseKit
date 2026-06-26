@@ -1255,6 +1255,69 @@ void testPanasonicAcRoundtrip()
   EXPECT_TRUE("panasonic/reject-nec", !esp32irpk::ac::Panasonic::Frame::fromRaw(nec, nf));
 }
 
+// 0.5C half-degree (byte22 bit7) and louver (low nibble of the fan byte) — the
+// two newly mapped Panasonic fields. Offsets are validated against a real remote
+// capture (part ACXA75C15870, cool / 22.5C / louver P3 / powerful) so they are
+// device-confirmed, not just self-consistent.
+void testPanasonicAcHalfDegreeAndLouver()
+{
+  using esp32irpk::ac::Panasonic::Fan;
+  using esp32irpk::ac::Panasonic::Frame;
+  using esp32irpk::ac::Panasonic::Louver;
+  using esp32irpk::ac::Panasonic::Mode;
+
+  // Accessor + encode/decode roundtrip. setTemperatureC takes 0.5C steps in one
+  // call (no separate half-degree setter).
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(22.5f);
+  f.setFan(Fan::AUTO);
+  f.setLouver(Louver::P3);
+  EXPECT_EQ("panasonic/half-temp-get", 22.5f, f.temperatureC()); // get is float, symmetric with set
+  EXPECT_TRUE("panasonic/half-get", f.halfDegree());
+  EXPECT_TRUE("panasonic/louver-get", f.louver() == Louver::P3);
+  EXPECT_EQ("panasonic/half-bit", 0x80, f.bytes[22] & 0x80);
+  EXPECT_EQ("panasonic/half-temp-byte", 0x2C, f.bytes[14]); // 22<<1, the 0.5 is NOT in this byte
+  EXPECT_EQ("panasonic/louver-nibble", 0x03, f.bytes[16] & 0x0F);
+  EXPECT_TRUE("panasonic/louver-keeps-fan", f.fan() == Fan::AUTO); // low nibble didn't disturb fan
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("panasonic/half-encode", f.toRaw(buf));
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("panasonic/half-decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("panasonic/half-decode-checksum", g.checksum_ok);
+  EXPECT_EQ("panasonic/half-decode-temp", 22.5f, g.temperatureC());
+  EXPECT_TRUE("panasonic/half-decode-half", g.halfDegree());
+  EXPECT_TRUE("panasonic/half-decode-louver", g.louver() == Louver::P3);
+
+  // A whole-degree setpoint clears the half bit; louver AUTO is the 0xF nibble.
+  f.setTemperatureC(22.0f);
+  EXPECT_TRUE("panasonic/half-clear", !f.halfDegree());
+  EXPECT_EQ("panasonic/whole-temp-get", 22.0f, f.temperatureC());
+  f.setLouver(Louver::AUTO);
+  EXPECT_EQ("panasonic/louver-auto-nibble", 0x0F, f.bytes[16] & 0x0F);
+
+  // Device ground truth: a real ACXA75C15870 capture of cool / 22.5C / louver P3
+  // / powerful. Validate the field offsets directly on the bytes (independent of
+  // our encoder).
+  Frame d{};
+  static const uint8_t kCool225Louver3[Frame::kBytes] = {
+      0x02, 0x20, 0xE0, 0x04, 0x00, 0x00, 0x00, 0x06,
+      0x02, 0x20, 0xE0, 0x04, 0x00, 0x31, 0x2C, 0x80, 0xA3, 0x00,
+      0x00, 0x06, 0x60, 0x41, 0x80, 0x80, 0x00, 0x06, 0x33};
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    d.bytes[i] = kCool225Louver3[i];
+  EXPECT_TRUE("panasonic/real-power", d.power());
+  EXPECT_TRUE("panasonic/real-mode", d.mode() == Mode::COOL);
+  EXPECT_EQ("panasonic/real-temp", 22.5f, d.temperatureC()); // device capture is 22.5C
+  EXPECT_TRUE("panasonic/real-half", d.halfDegree());
+  EXPECT_TRUE("panasonic/real-louver", d.louver() == Louver::P3);
+  EXPECT_TRUE("panasonic/real-fan", d.fan() == Fan::AUTO);
+}
+
 // Model coverage: JKE/DKE/NKE/LKE/RKR share the power/mode/temperature/fan field
 // map and differ only in fixed marker bytes (13/17/23/25). Each model must
 // encode, decode back to the same logical fields, self-identify on decode, and
@@ -1700,6 +1763,7 @@ void setup()
   testFrameConversions();
   testAcCodecRoundtrip();
   testPanasonicAcRoundtrip();
+  testPanasonicAcHalfDegreeAndLouver();
   testPanasonicAcCanonicalStates();
   testPanasonicAcModels();
   testPanasonicAcDecodesSkewedTiming();

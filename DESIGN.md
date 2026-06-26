@@ -210,8 +210,11 @@ Which fields get accessors (setters) is decided by the remote-control library's
 role. The field map (byte/bit layout and confidence) lives in SPEC §11.2; the
 measured evidence is in `tests/studies/dump/panasonic_captures.md`.
 
-- **Everyday control fields get accessors**: power/mode/temperature (integer)/fan
-  are implemented; half-degree, louver, and quiet/powerful are planned.
+- **Everyday control fields get accessors**: power/mode/temperature/fan are
+  implemented; temperature is a symmetric `float` pair (`temperatureC()` /
+  `setTemperatureC(float)`) carrying 0.5 °C steps (the +0.5 lives in byte 22
+  bit 7; `halfDegree()` is a convenience reader), and `louver()` is implemented.
+  Quiet/powerful is still pending (see last bullet).
 - **Timers (on/off) get no setter.** Scheduling is the sender's (controller's)
   job — emitting a power ON/OFF frame at the right time is the natural model. The
   timer is likely absolute-time, so using it correctly would also need a

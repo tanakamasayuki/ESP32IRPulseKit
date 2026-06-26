@@ -46,6 +46,20 @@ namespace esp32irpk::ac::Panasonic
     POWERFUL,
   };
 
+  // Vertical louver (swing) position. Stored in the low nibble of the fan byte
+  // (the fan speed is the high nibble), so it is independent of the fan setting.
+  // AUTO is the swing-everything sweep; P1..P5 are the fixed positions (P1 most
+  // horizontal). Values are the on-air nibble.
+  enum class Louver : uint8_t
+  {
+    AUTO = 0xF,
+    P1 = 1,
+    P2 = 2,
+    P3 = 3,
+    P4 = 4,
+    P5 = 5,
+  };
+
   // Model variants of the one Kaseikyo Panasonic-AC wire format (SPEC §11.2).
   // They share this format and differ only by a few marker bytes, so they are a
   // parameter on Frame rather than separate types. JKE (the default; template
@@ -88,8 +102,9 @@ namespace esp32irpk::ac::Panasonic
 
     // Overall byte offsets (frame 2 begins at kFrame1Bytes).
     inline constexpr size_t kOffMode = kFrame1Bytes + 5;     // power bit + mode nibble
-    inline constexpr size_t kOffTemp = kFrame1Bytes + 6;     // temperature
-    inline constexpr size_t kOffFan = kFrame1Bytes + 8;      // fan nibble + swing nibble
+    inline constexpr size_t kOffTemp = kFrame1Bytes + 6;     // temperature (integer, c<<1)
+    inline constexpr size_t kOffFan = kFrame1Bytes + 8;      // fan nibble (high) + louver nibble (low)
+    inline constexpr size_t kOffHalfDegree = kFrame1Bytes + 14; // byte22: +0.5C is bit7
     inline constexpr size_t kOffChecksum = kFrame1Bytes + kFrame2Bytes - 1;
 
     // Sum checksum over frame 2 excluding the checksum byte itself.
@@ -227,12 +242,36 @@ namespace esp32irpk::ac::Panasonic
     {
       bytes[detail::kOffMode] = static_cast<uint8_t>((bytes[detail::kOffMode] & 0x0Fu) | (detail::modeToCode(m) << 4));
     }
-    uint8_t temperatureC() const { return static_cast<uint8_t>(bytes[detail::kOffTemp] >> 1); }
-    void setTemperatureC(uint8_t c) { bytes[detail::kOffTemp] = static_cast<uint8_t>(c << 1); }
+    // Temperature supports 0.5C steps, stored as an integer part in the temp byte
+    // (c<<1) plus a +0.5 bit in byte22 bit7. setTemperatureC() and temperatureC()
+    // are a symmetric float pair: both carry the 0.5. halfDegree() is a
+    // convenience for just the +0.5 bit.
+    float temperatureC() const
+    {
+      return static_cast<float>(bytes[detail::kOffTemp] >> 1) +
+             ((bytes[detail::kOffHalfDegree] & 0x80u) ? 0.5f : 0.0f);
+    }
+    bool halfDegree() const { return (bytes[detail::kOffHalfDegree] & 0x80u) != 0; }
+    void setTemperatureC(float c)
+    {
+      int half_steps = static_cast<int>(c * 2.0f + 0.5f); // nearest 0.5C, e.g. 22.5 -> 45
+      bytes[detail::kOffTemp] = static_cast<uint8_t>((half_steps / 2) << 1);
+      bytes[detail::kOffHalfDegree] = static_cast<uint8_t>(
+          (bytes[detail::kOffHalfDegree] & ~0x80u) | ((half_steps & 1) ? 0x80u : 0x00u));
+    }
+
     Fan fan() const { return detail::codeToFan((bytes[detail::kOffFan] >> 4) & 0x0Fu); }
     void setFan(Fan f)
     {
       bytes[detail::kOffFan] = static_cast<uint8_t>((bytes[detail::kOffFan] & 0x0Fu) | (detail::fanToCode(f) << 4));
+    }
+
+    // Vertical louver position, in the low nibble of the fan byte (independent of
+    // the fan speed in the high nibble).
+    Louver louver() const { return static_cast<Louver>(bytes[detail::kOffFan] & 0x0Fu); }
+    void setLouver(Louver v)
+    {
+      bytes[detail::kOffFan] = static_cast<uint8_t>((bytes[detail::kOffFan] & 0xF0u) | (static_cast<uint8_t>(v) & 0x0Fu));
     }
 
     // RAW ticks -> state bytes. false if not a Panasonic two-frame burst;

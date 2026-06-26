@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+- (EN) Panasonic A/C: 0.5 °C setpoints and louver. `temperatureC()` and `setTemperatureC()` are now a symmetric `float` pair carrying 0.5 °C steps (e.g. `22.5`); `halfDegree()` is a convenience reader. `louver()`/`setLouver()` with a `Louver` enum sets the vertical swing position. Field offsets confirmed against a real remote (ACXA75C15870).
+- (JA) Panasonic エアコン: 0.5℃設定とルーバーに対応。`temperatureC()` と `setTemperatureC()` を 0.5℃刻みを含む対称な `float` ペアに（例 `22.5`）。`halfDegree()` は簡便な読み取り。`Louver` enum 付きの `louver()`/`setLouver()` で垂直スイング位置を設定。フィールド位置は実機（ACXA75C15870）で確認。
 - (EN) A/C model parameter: each vendor frame can carry a `Model` (format = separate `Frame` type, model = parameter; `fromRaw` auto-detects). Panasonic now supports `Model` JKE/DKE/NKE/LKE/RKR (shared field map, per-model marker bytes), and Gree carries `Model::YBOFB`. Encoding an unimplemented model returns `false`.
 - (JA) エアコンのモデルパラメータ: 各ベンダの Frame が `Model` を持てるように（フォーマット＝別 `Frame` 型、モデル＝パラメータ、`fromRaw` が自動判定）。Panasonic は `Model` JKE/DKE/NKE/LKE/RKR に対応（フィールドマップ共通、モデル別マーカーバイト）、Gree は `Model::YBOFB`。未実装モデルのエンコードは `false`。
 - (EN) Mitsubishi air-conditioner support (`esp32irpk::ac::Mitsubishi`): decode/encode of the 18-byte "Mitsubishi AC" state (5-byte signature, sum checksum, frame sent twice), and `Mode`/`Fan` accessors. `06_ac_learn` recognizes it too.

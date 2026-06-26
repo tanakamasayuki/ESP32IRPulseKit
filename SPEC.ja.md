@@ -606,6 +606,8 @@ namespace Panasonic {
 enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
 // Arduinoが LOW/HIGH をマクロ定義するため、fan段は `_SPEED` サフィックスを使う。
 enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW_SPEED, MED_SPEED, HIGH_SPEED, POWERFUL };
+// Panasonic固有: 垂直ルーバー位置（fanバイト下位ニブル）。AUTOはスイング。
+enum class Louver : uint8_t { AUTO = 0xF, P1 = 1, P2, P3, P4, P5 };
 
 struct Frame {
   static constexpr size_t kMaxTicks = /* ベンダフレームの上限 */;
@@ -620,8 +622,12 @@ struct Frame {
   // `bytes` 上の論理アクセサ
   bool power() const;          void setPower(bool on);
   Mode mode() const;           void setMode(Mode m);
-  uint8_t temperatureC() const; void setTemperatureC(uint8_t c);
+  float temperatureC() const; void setTemperatureC(float c); // 0.5℃刻み、get/set対称
   Fan fan() const;             void setFan(Fan f);
+  // Panasonic固有: temperatureC()/setTemperatureC は 0.5℃を含む float で対称。
+  // halfDegree() は +0.5 ビットだけを見る簡便アクセサ。
+  bool halfDegree() const;
+  Louver louver() const;       void setLouver(Louver v);
 
   static bool fromRaw(const esp32irpk::IRRawTickView& raw, Frame& out);
   bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
@@ -687,9 +693,9 @@ struct Frame {
 | power | byte13 bit0 | on=1 / off=0 | ✅ |
 | mode | byte13 上位ニブル | cool=3 / dry=2 / heat=4（auto=0 / fan=6） | ✅ |
 | 温度(整数) | byte14 | `floor(℃) << 1`、16–30℃ | ✅ |
-| 0.5℃ | byte22 bit7 | セットで +0.5℃ | 🔜 |
+| 0.5℃ | byte22 bit7 | セットで +0.5℃ | ✅ |
 | fan(風量) | byte16 上位ニブル | auto=A / 3..7（弱→最強） | ✅ |
-| 風向(louver) | byte16 下位ニブル | 1–5=固定 / F=auto | 🔜 |
+| 風向(louver) | byte16 下位ニブル | 1–5=固定 / F=auto | ✅ |
 | しずか/パワフル | byte21 bit5 / bit0 | しずか=0x20 / パワフル=0x01 | 🔜 |
 | タイマー入/切 | byte13 bit1,2 + byte18–20 | 11bit・分単位 | 🟡 |
 | checksum | byte26 | frame2（byte8..25）の総和 mod256 | ✅ |

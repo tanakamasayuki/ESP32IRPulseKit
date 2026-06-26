@@ -611,6 +611,8 @@ namespace Panasonic {
 enum class Mode : uint8_t { AUTO = 0, COOL, HEAT, DRY, FAN };
 // Arduino defines LOW/HIGH as macros, so fan steps use the `_SPEED` suffix.
 enum class Fan  : uint8_t { AUTO = 0, QUIET, LOW_SPEED, MED_SPEED, HIGH_SPEED, POWERFUL };
+// Panasonic-specific: vertical louver position (low nibble of the fan byte). AUTO sweeps.
+enum class Louver : uint8_t { AUTO = 0xF, P1 = 1, P2, P3, P4, P5 };
 
 struct Frame {
   static constexpr size_t kMaxTicks = /* vendor frame upper bound */;
@@ -625,8 +627,12 @@ struct Frame {
   // logical accessors over `bytes`
   bool power() const;          void setPower(bool on);
   Mode mode() const;           void setMode(Mode m);
-  uint8_t temperatureC() const; void setTemperatureC(uint8_t c);
+  float temperatureC() const; void setTemperatureC(float c); // 0.5C steps, symmetric get/set
   Fan fan() const;             void setFan(Fan f);
+  // Panasonic-specific: temperatureC()/setTemperatureC are a symmetric float pair
+  // carrying the 0.5C. halfDegree() is a convenience for just the +0.5 bit.
+  bool halfDegree() const;
+  Louver louver() const;       void setLouver(Louver v);
 
   static bool fromRaw(const esp32irpk::IRRawTickView& raw, Frame& out);
   bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
@@ -692,9 +698,9 @@ Per-vendor framing of the supported formats:
 | power | byte 13 bit 0 | on=1 / off=0 | ✅ |
 | mode | byte 13 high nibble | cool=3 / dry=2 / heat=4 (auto=0 / fan=6) | ✅ |
 | temperature (integer) | byte 14 | `floor(°C) << 1`, 16–30 °C | ✅ |
-| half-degree (0.5 °C) | byte 22 bit 7 | set = +0.5 °C | 🔜 |
+| half-degree (0.5 °C) | byte 22 bit 7 | set = +0.5 °C | ✅ |
 | fan (airflow) | byte 16 high nibble | auto=A / 3..7 (low→max) | ✅ |
-| louver (swing) | byte 16 low nibble | 1–5 = fixed / F = auto | 🔜 |
+| louver (swing) | byte 16 low nibble | 1–5 = fixed / F = auto | ✅ |
 | quiet / powerful | byte 21 bit 5 / bit 0 | quiet=0x20 / powerful=0x01 | 🔜 |
 | on/off timer | byte 13 bit 1,2 + bytes 18–20 | 11-bit minutes | 🟡 |
 | checksum | byte 26 | sum of frame-2 bytes 8–25 mod 256 | ✅ |

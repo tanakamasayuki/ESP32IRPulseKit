@@ -29,10 +29,10 @@ byte8..12 の preamble、byte20=0x60、byte23=0x80 はこの取得では常に�
 | power | byte13 bit0 | on=1 / off=0 | 実装済（`kOffMode`） |
 | mode | byte13 上位ニブル | cool=3 / dry=2 / heat=4（auto=0 想定） | 実装済 |
 | 整数℃ | byte14 | `floor(temp) << 1`、範囲 **16–30℃** | 実装済（`kOffTemp`） |
-| **0.5℃** | **byte22 bit7 (0x80)** | セットで +0.5℃ | **未実装** |
+| 0.5℃ | byte22 bit7 (0x80) | セットで +0.5℃ | 実装済（`temperatureC()`/`setTemperatureC()` 対称float、0.5刻み） |
 | fan（風量） | byte16 上位ニブル | auto=A / 弱=3 / 弱+=4 / 中=5 / 強=6 / 最強=7 | 実装済（`kOffFan`） |
-| **風向(louver)** | **byte16 下位ニブル** | 1〜5=固定位置 / F=auto | **未実装（同 byte16 の下位）** |
-| **しずか/パワフル** | **byte21 bit5 / bit0** | しずか=0x20 / パワフル=0x01（fanニブルは0xAのまま） | **未実装** |
+| 風向(louver) | byte16 下位ニブル | 1〜5=固定位置 / F=auto | 実装済（`Louver`/`louver`/`setLouver`） |
+| **しずか/パワフル** | **byte21 bit5 / bit0** | しずか=0x20 / パワフル=0x01（fanニブルは0xAのまま） | **未実装（要判断, 下記）** |
 | checksum | byte26 | frame2（byte8..25）の総和 mod 256 | 実装済 |
 
 - 0.5℃: .5 の温度は byte22 が必ず `0x80`、.0 は bit7=0。`temperatureC()` は
