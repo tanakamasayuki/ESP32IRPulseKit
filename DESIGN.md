@@ -223,10 +223,14 @@ measured evidence is in `tests/studies/dump/panasonic_captures.md`.
 - **Special-function buttons (e.g. internal clean) are a separate short command
   frame** (a different `Frame` type, not yet supported). No setter; re-send via
   RAW replay if needed.
-- **Reconciling the `Fan` enum's `QUIET`/`POWERFUL` with the remote's
-  quiet/powerful**: the current `Fan` enum (IRremoteESP8266-derived) models
-  QUIET/POWERFUL as fan-nibble values (byte 16 high nibble 3/7), but on the real
-  remote (ACXA75C15870, JKE family) quiet/powerful keep the fan at auto and are a
-  separate bit set in byte 21. When implementing, treat "fan speed" and
-  "quiet/powerful" as distinct fields (keep the fan-nibble QUIET/POWERFUL for now
-  for other-model compatibility).
+- **Fan setting is one selector across speeds and quiet/powerful.** On the real
+  remote (ACXA75C15870, JKE family) quiet/powerful are mutually exclusive with a
+  fan speed — selecting them forces the fan nibble to auto and sets a byte-21
+  flag. So the existing single `Fan` enum (`AUTO`/speeds/`QUIET`/`POWERFUL`) is a
+  faithful abstraction; only the per-model *encoding* differs: this remote renders
+  QUIET/POWERFUL as fan-nibble=auto + a byte-21 bit, whereas the
+  IRremoteESP8266-style models render them as fan-nibble values 3/7. Keep the one
+  `Fan` enum; make `fromRaw`/`toRaw` translate QUIET/POWERFUL per model (decode
+  maps both encodings back to the same enum value). Do not split them into a
+  separate "quiet/powerful" field — the hardware treats them as part of the fan
+  selector.

@@ -694,7 +694,7 @@ struct Frame {
 | タイマー入/切 | byte13 bit1,2 + byte18–20 | 11bit・分単位 | 🟡 |
 | checksum | byte26 | frame2（byte8..25）の総和 mod256 | ✅ |
 
-新規マップ分（0.5℃・風向・しずか/パワフル・タイマー）は実機1台（型番 ACXA75C15870、JKE系）からのリバースエンジニアリングで、power/mode/temperature/fan/checksum（IRremoteESP8266 でクロス検証済み）とは異なりモデル/ライブラリ横断の検証はまだ。しずか/パワフルは fan ニブルを auto に保つ専用ボタンで、fan 速度ではない——`Fan` enum の `QUIET`/`POWERFUL` とは別系統（理由とタイマーの setter 非作成方針は [DESIGN.ja.md](DESIGN.ja.md)）。内部クリーン等の特殊ボタンは状態フレームと別系統の短縮コマンドフレームで送られる（⛔別Frame型・未対応）。RAW replay で再送は可能。
+新規マップ分（0.5℃・風向・しずか/パワフル・タイマー）は実機1台（型番 ACXA75C15870、JKE系）からのリバースエンジニアリングで、power/mode/temperature/fan/checksum（IRremoteESP8266 でクロス検証済み）とは異なりモデル/ライブラリ横断の検証はまだ。しずか/パワフルは fan 速度と排他で、選ぶと fan ニブルが強制的に auto になり byte21 のフラグが立つ。よって fan 設定は論理的に1セレクタ（`{auto, 速度…, しずか, パワフル}`）で、モデルごとに描画が違うだけ——この実機は fanニブル=auto＋byte21フラグ、`Fan` enum / IRremoteESP8266 は しずか/パワフルを fanニブル値 3/7 で表す（整理とタイマーの setter 非作成方針は [DESIGN.ja.md](DESIGN.ja.md)）。内部クリーン等の特殊ボタンは状態フレームと別系統の短縮コマンドフレームで送られる（⛔別Frame型・未対応）。RAW replay で再送は可能。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 
