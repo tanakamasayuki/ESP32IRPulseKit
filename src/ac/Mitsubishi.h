@@ -273,6 +273,22 @@ namespace esp32irpk::ac::Mitsubishi
           (bytes[detail::kOffWideVane] & 0x0Fu) | (static_cast<uint8_t>(v) << 4));
     }
 
+    // Human-readable dump for diagnostics: the shared summary plus Mitsubishi's
+    // vane fields and half-degree flag. Enum fields print as their raw code; the
+    // hex line shows every byte.
+    void printTo(Print &out) const
+    {
+      printAcSummary(out, "Mitsubishi", power(), static_cast<unsigned>(mode()),
+                     temperatureC(), static_cast<unsigned>(fan()), bytes,
+                     byte_length, checksum_ok);
+      out.print("//   vane=");
+      out.print(static_cast<unsigned>(vane()));
+      out.print(" wideVane=");
+      out.print(static_cast<unsigned>(wideVane()));
+      out.print(" halfDegree=");
+      out.println(halfDegree() ? "yes" : "no");
+    }
+
     // RAW ticks -> state bytes. false if not a Mitsubishi AC frame; checksum
     // validity is reported separately via `checksum_ok`.
     static bool fromRaw(const esp32irpk::IRRawTickView &raw, Frame &out)

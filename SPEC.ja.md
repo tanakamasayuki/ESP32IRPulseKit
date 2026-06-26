@@ -635,6 +635,7 @@ struct Frame {
 
   static bool fromRaw(const esp32irpk::IRRawTickView& raw, Frame& out);
   bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
+  void printTo(Print& out) const; // 診断ダンプ: 共通＋ベンダ固有＋hex
 };
 
 } // namespace Panasonic
@@ -650,6 +651,7 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 - `Frame::toRaw(out)` はチェックサムを再計算し、状態を caller提供の `IRRawTickBuffer` にRAW tickとして書き出します。結果は `IRSender::send(const IRRawTickView&)` で送信します。`model` がフィールドマップ未実装のモデルを指す場合は `false` を返します（未対応モデルは、実装済みモデルのレイアウトを黙って出力せず、エンコード失敗にする）。`ac::send` もこれを伝播して `false` を返します。
 - `ac::send(tx, frame)` は1呼び出し版です。`Frame::kMaxTicks` のスタックバッファへエンコードして送信し、エンコード/送信失敗時は `false` を返します。バッファを自分で管理したい場合は `toRaw` + `IRSender::send()` を使います。送信機のキャリアモードは従来どおり別に設定します（ACでは位相整合の既定を使う。§11.3参照）。
 - 中間形式はバイト配列です。power / mode / temperature / fan などの論理フィールドはそのバイト上のアクセサです。
+- `Frame::printTo(Print& out)` は診断用ダンプです。共通の `power/mode/temp/fan/checksum` 行、ベンダ固有フィールド（louver / swing / vane）、状態全体のhexを任意の Arduino `Print`（例 `Serial`）へ書き出します。enumフィールドは生コードで出力。学習/ダンプ用スケッチ向けの便宜機能で、encode/decode 契約の一部ではありません。
 - どのベンダもこの同じ構造を自分の `esp32irpk::ac::<Vendor>` 名前空間で提供します。enum→名前の文字列化（例 `Panasonic::toString(Mode)`）はベンダ単位で後から追加可能で、コア契約には必須ではありません。
 **分岐の2軸。** あるベンダのリモコンは独立した2つの軸で異なり、本レイヤーはそれぞれ別の表現で扱います。
 

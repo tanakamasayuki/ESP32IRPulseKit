@@ -641,6 +641,7 @@ struct Frame {
 
   static bool fromRaw(const esp32irpk::IRRawTickView& raw, Frame& out);
   bool toRaw(esp32irpk::IRRawTickBuffer& out) const;
+  void printTo(Print& out) const; // diagnostic dump: common + vendor fields + hex
 };
 
 } // namespace Panasonic
@@ -656,6 +657,7 @@ bool send(esp32irpk::IRSender& tx, const Frame& frame);
 - `Frame::toRaw(out)` recomputes the checksum and renders the state to RAW ticks in the caller-provided `IRRawTickBuffer`. Send the result with `IRSender::send(const IRRawTickView&)`. It returns `false` if `model` names a variant whose field map is not implemented — encoding an unsupported model fails rather than silently emitting the implemented model's layout. `ac::send` propagates this and also returns `false`.
 - `ac::send(tx, frame)` is the one-call path: it encodes into a stack buffer of `Frame::kMaxTicks` and transmits, returning `false` on encode or send failure. Use the explicit `toRaw` + `IRSender::send()` pair instead when you need to control the buffer. The sender's carrier mode is configured separately, as usual (use the phase-aligned default for AC; see §11.3).
 - The byte array is the intermediate form. Logical fields (power, mode, temperature, fan, …) are accessors over those bytes.
+- `Frame::printTo(Print& out)` is a diagnostic dump: it writes the common `power/mode/temp/fan/checksum` line, the vendor's own fields (louver / swing / vane), and the full state in hex to any Arduino `Print` (e.g. `Serial`). Enum fields print as their raw code. It is a convenience for learn/dump sketches, not part of the encode/decode contract.
 - Every vendor follows this same structure under its own `esp32irpk::ac::<Vendor>` namespace. A per-vendor enum-to-name helper (e.g. `Panasonic::toString(Mode)`) may be added later; it is not required by the core contract.
 **Two axes of variation.** A vendor's remotes differ in two independent ways, and the layer represents them differently:
 

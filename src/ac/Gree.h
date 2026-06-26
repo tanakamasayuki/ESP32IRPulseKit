@@ -244,6 +244,19 @@ namespace esp32irpk::ac::Gree
       bytes[4] = static_cast<uint8_t>((bytes[4] & ~0x70u) | (static_cast<uint8_t>(v) << 4));
     }
 
+    // Human-readable dump for diagnostics: the shared summary plus Gree's swing
+    // fields. Enum fields print as their raw code; the hex line shows every byte.
+    void printTo(Print &out) const
+    {
+      printAcSummary(out, "Gree", power(), static_cast<unsigned>(mode()),
+                     static_cast<float>(temperatureC()),
+                     static_cast<unsigned>(fan()), bytes, byte_length, checksum_ok);
+      out.print("//   swingV=");
+      out.print(static_cast<unsigned>(swingV()));
+      out.print(" swingH=");
+      out.println(static_cast<unsigned>(swingH()));
+    }
+
     // RAW ticks -> state bytes. false if not a Gree two-block burst; checksum
     // validity is reported separately via `checksum_ok`.
     static bool fromRaw(const esp32irpk::IRRawTickView &raw, Frame &out)

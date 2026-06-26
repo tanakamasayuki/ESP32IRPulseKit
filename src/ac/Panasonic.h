@@ -300,6 +300,20 @@ namespace esp32irpk::ac::Panasonic
       bytes[detail::kOffFan] = static_cast<uint8_t>((bytes[detail::kOffFan] & 0xF0u) | (static_cast<uint8_t>(v) & 0x0Fu));
     }
 
+    // Human-readable dump for diagnostics: the shared summary plus Panasonic's
+    // louver and half-degree flag (quiet/powerful already show via fan). Enum
+    // fields print as their raw code; the hex line shows every byte.
+    void printTo(Print &out) const
+    {
+      printAcSummary(out, "Panasonic", power(), static_cast<unsigned>(mode()),
+                     temperatureC(), static_cast<unsigned>(fan()), bytes,
+                     byte_length, checksum_ok);
+      out.print("//   louver=");
+      out.print(static_cast<unsigned>(louver()));
+      out.print(" halfDegree=");
+      out.println(halfDegree() ? "yes" : "no");
+    }
+
     // RAW ticks -> state bytes. false if not a Panasonic two-frame burst;
     // checksum validity is reported separately via `checksum_ok`.
     static bool fromRaw(const esp32irpk::IRRawTickView &raw, Frame &out)

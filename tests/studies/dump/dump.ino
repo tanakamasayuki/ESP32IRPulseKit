@@ -40,13 +40,13 @@ const size_t kMaxSymbols = (size_t)strtoul(IR_RX_MAX_SYMBOLS, nullptr, 10);
 
 esp32irpk::IRReceiver rx(kIrRxGpio, kIrRxInverted);
 
-// en: All helpers live in an anonymous namespace. The Arduino .ino preprocessor
-//     does not auto-generate prototypes for namespaced functions, which is what
-//     the printAcFrame template needs (a generated prototype would drop the
-//     `template` line and fail to compile). Define before use, call from loop().
-// ja: ヘルパは全て無名名前空間に置く。Arduinoの.ino前処理は名前空間内の関数に自動
-//     プロトタイプを生成しない。これがテンプレート printAcFrame に必要（生成された
-//     プロトタイプは `template` 行を落として壊れる）。使用前に定義し、loop()から呼ぶ。
+// en: All helpers live in an anonymous namespace and are defined before use, so
+//     the Arduino .ino preprocessor does not need to auto-generate prototypes
+//     for them (its generated prototypes mishandle templates/overloads). Call
+//     them from loop().
+// ja: ヘルパは全て無名名前空間に置き、使用前に定義する。こうすればArduinoの.ino
+//     前処理が自動プロトタイプを生成する必要がなく（生成プロトタイプはテンプレート
+//     やオーバーロードを壊すことがある）、loop()から呼べる。
 namespace
 {
 // en: Print a uint64_t as a valid C++ literal (e.g. 0x1234ULL).
@@ -214,61 +214,33 @@ void printFrame(const esp32irpk::IRDecodedBits &b)
   }
 }
 
-// en: print "power/mode/temp/fan/checksum" plus the full state in hex. The hex
-//     line is handy for inspecting fields the named accessors do not expose yet
-//     (e.g. half-degree or vendor flags). Shared by all AC vendors.
-// ja: power/mode/temp/fan/checksum とデコード状態全体のhexを出力する。hex行は
-//     名前付きアクセサが未公開のフィールド（0.5℃やベンダ固有フラグ等）の確認に便利。
-//     全ACベンダ共通。
-template <class Frame>
-void printAcFrame(const char *vendor, const Frame &f)
-{
-  Serial.print("// decoded: ");
-  Serial.print(vendor);
-  Serial.print(" AC  power=");
-  Serial.print(f.power() ? "on" : "off");
-  Serial.print(" mode=");
-  Serial.print((unsigned)f.mode());
-  Serial.print(" temp=");
-  Serial.print((unsigned)f.temperatureC());
-  Serial.print("C fan=");
-  Serial.print((unsigned)f.fan());
-  Serial.print("  checksum=");
-  Serial.println(f.checksum_ok ? "ok" : "BAD");
-  Serial.print("// bytes:");
-  for (size_t i = 0; i < f.byte_length; ++i)
-  {
-    Serial.print(' ');
-    if (f.bytes[i] < 0x10)
-      Serial.print('0');
-    Serial.print(f.bytes[i], HEX);
-  }
-  Serial.println();
-}
-
-// en: Try each AC vendor on the RAW capture and print the decoded settings as a
-//     comment. Vendors are added incrementally; when none match, the RAW replay
-//     snippet still reproduces the frame.
-// ja: RAWキャプチャに各ACベンダを試し、デコードした設定をコメント出力する。ベンダは
-//     順次追加。どれにも当たらなくても下のRAWスニペットでフレームは再現できる。
+// en: Try each AC vendor on the RAW capture and, on a match, let the Frame dump
+//     itself via Frame::printTo(Print&) — the common power/mode/temp/fan/checksum
+//     line, the vendor's own fields (louver/swing/vane), and the full hex state.
+//     Vendors are added incrementally; when none match, the RAW replay snippet
+//     still reproduces the frame.
+// ja: RAWキャプチャに各ACベンダを試し、一致したら Frame::printTo(Print&) に自分を
+//     ダンプさせる。共通の power/mode/temp/fan/checksum 行＋ベンダ固有フィールド
+//     （louver/swing/vane）＋状態全体のhexを出力。ベンダは順次追加。どれにも当たら
+//     なくても下のRAWスニペットでフレームは再現できる。
 void printAcDecode(const esp32irpk::IRRawTickView &raw)
 {
   esp32irpk::ac::Panasonic::Frame pf;
   if (esp32irpk::ac::Panasonic::Frame::fromRaw(raw, pf))
   {
-    printAcFrame("Panasonic", pf);
+    pf.printTo(Serial);
     return;
   }
   esp32irpk::ac::Gree::Frame gf;
   if (esp32irpk::ac::Gree::Frame::fromRaw(raw, gf))
   {
-    printAcFrame("Gree", gf);
+    gf.printTo(Serial);
     return;
   }
   esp32irpk::ac::Mitsubishi::Frame mf;
   if (esp32irpk::ac::Mitsubishi::Frame::fromRaw(raw, mf))
   {
-    printAcFrame("Mitsubishi", mf);
+    mf.printTo(Serial);
     return;
   }
   Serial.println("// decoded: no AC vendor matched (raw replay still works)");

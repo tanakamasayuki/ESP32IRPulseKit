@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+- (EN) A/C: every vendor `Frame` now has `printTo(Print& out)` — a diagnostic dump of the common `power/mode/temp/fan/checksum` line, the vendor's own fields (louver / swing / vane), and the full state in hex, to any Arduino `Print` (e.g. `Serial`). `06_ac_learn` and the dump study use it instead of their own per-sketch print helpers.
+- (JA) エアコン: 各ベンダの `Frame` に `printTo(Print& out)` を追加 — 共通の `power/mode/temp/fan/checksum` 行・ベンダ固有フィールド（louver / swing / vane）・状態全体のhexを任意の Arduino `Print`（例 `Serial`）へダンプする診断用。`06_ac_learn` とダンプ study はスケッチ独自の print ヘルパーをやめてこれを使用。
 - (EN) Mitsubishi A/C: vane (vertical swing, `Vane` enum `P1`..`P5`/`AUTO`/`SWING`), wide vane (horizontal, `WideVane`), and 0.5 °C setpoints. `temperatureC()`/`setTemperatureC()` are now a symmetric `float` pair carrying 0.5 °C steps (byte 7 bit 4), with `halfDegree()` as a convenience reader. **Breaking:** `setTemperatureC` takes `float` and `temperatureC()` returns `float` (was `uint8_t`). `setVane` asserts the vane-valid bit; `setMode` resets the wide vane to MIDDLE, so set the mode first.
 - (JA) Mitsubishi エアコン: ベーン（上下スイング、`Vane` enum `P1`..`P5`/`AUTO`/`SWING`）・ワイドベーン（左右、`WideVane`）・0.5℃設定に対応。`temperatureC()`/`setTemperatureC()` を 0.5℃刻みを含む対称な `float` ペアに（byte7 bit4）、`halfDegree()` は簡便な読み取り。**破壊的変更:** `setTemperatureC` は `float` 引数、`temperatureC()` は `float` を返す（旧 `uint8_t`）。`setVane` はベーン有効ビットを立てる。`setMode` はワイドベーンを MIDDLE にリセットするので先に mode を設定する。
 - (EN) Gree A/C: vertical swing (`SwingV` / `setSwingV`) and horizontal swing (`SwingH` / `setSwingH`). `setSwingV` keeps the byte-0 SwingAuto bit consistent with the chosen value, so an auto-mode/position mismatch cannot be expressed.

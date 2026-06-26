@@ -143,4 +143,37 @@ namespace esp32irpk::ac
     return true;
   }
 
+  // Debug formatting shared by the vendor Frames' printTo(): emits the common
+  // "power/mode/temp/fan/checksum" line plus the full decoded state in hex. The
+  // vendor Frame calls this, then appends its own fields. It takes Arduino's
+  // Print (Serial is one) rather than hardcoding an output, so a caller can dump
+  // to any stream and it still compiles on the host test core. Enum fields are
+  // passed as their raw code; mapping to names is left to the caller.
+  inline void printAcSummary(Print &out, const char *vendor, bool power,
+                             unsigned mode, float temp_c, unsigned fan,
+                             const uint8_t *bytes, size_t len, bool checksum_ok)
+  {
+    out.print("// decoded: ");
+    out.print(vendor);
+    out.print(" AC  power=");
+    out.print(power ? "on" : "off");
+    out.print(" mode=");
+    out.print(mode);
+    out.print(" temp=");
+    out.print(temp_c, 1); // one decimal: shows 0.5C steps where supported
+    out.print("C fan=");
+    out.print(fan);
+    out.print("  checksum=");
+    out.println(checksum_ok ? "ok" : "BAD");
+    out.print("// bytes:");
+    for (size_t i = 0; i < len; ++i)
+    {
+      out.print(' ');
+      if (bytes[i] < 0x10)
+        out.print('0');
+      out.print(bytes[i], HEX);
+    }
+    out.println();
+  }
+
 } // namespace esp32irpk::ac
