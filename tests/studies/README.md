@@ -25,6 +25,7 @@ uv run python studies/jvc_timing_sweep/analyze.py studies/jvc_timing_sweep/data/
 | `tx_jitter/` | TX envelope jitter across PulseKit and external libraries (over the air) |
 | `tx_jitter_loopback/` | Same, on a wired single-board loopback rig |
 | `link_quality/` | Live link-quality meter |
+| `dump/` | Manual IR dump (generic + AC) driven from `.env`, no GPIO edits |
 | `compat_matrix/` | Protocol differences, bit order, and external-library compatibility |
 | `compat_matrix_ac/` | Air-conditioner state-field compatibility vs external AC libraries (calibrates the Panasonic field map) |
 

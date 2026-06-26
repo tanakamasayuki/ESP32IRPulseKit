@@ -25,6 +25,7 @@ uv run python studies/jvc_timing_sweep/analyze.py studies/jvc_timing_sweep/data/
 | `tx_jitter/` | PulseKitと外部ライブラリのTX包絡線ジッター（無線） |
 | `tx_jitter_loopback/` | 同上、1台有線loopback治具で |
 | `link_quality/` | リンク品質のライブメーター |
+| `dump/` | `.env`駆動の手動IRダンプ（汎用+AC）、GPIO直書き不要 |
 | `compat_matrix/` | protocol差分、bit order、外部ライブラリ互換 |
 | `compat_matrix_ac/` | エアコン状態フィールドの外部ACライブラリ互換（Panasonicフィールドマップの較正） |
 
