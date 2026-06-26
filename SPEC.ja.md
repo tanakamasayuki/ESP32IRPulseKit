@@ -687,8 +687,8 @@ struct Frame {
 対応フォーマットのベンダ別構造:
 
 - `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。`Model::JKE`（テンプレートは IRremoteESP8266 の既定known-good stateとバイト完全一致）、`DKE`/`NKE`/`LKE`/`RKR` に対応 — power/mode/temperature/fan のフィールドマップは共通で、固定マーカーバイトだけが異なる（`fromRaw` がモデル判定、`toRaw` が刻む）。各モデルを IRremoteESP8266 に対して実機検証済み。`CKP` は予約（トグル電源＋quiet/powerfulのビット位置が別）でエンコードは `false`。
-- `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。実装モデルは YBOFB（`Model::YBOFB`、モデルビットは0）。`Model::YAW1F`/`YX1FSF` は将来用に予約。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。
-- `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。このフォーマットは単一モデル（`Model` パラメータ無し）。他のMitsubishi波形フォーマット（136 / 112 / Heavy）は別の `Frame` 型になる。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。
+- `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。実装モデルは YBOFB（`Model::YBOFB`、モデルビットは0）。`Model::YAW1F`/`YX1FSF` は将来用に予約。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。`SwingV`/`SwingH` で上下・左右スイングを設定。
+- `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。このフォーマットは単一モデル（`Model` パラメータ無し）。他のMitsubishi波形フォーマット（136 / 112 / Heavy）は別の `Frame` 型になる。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。`Vane`（上下、`P1`..`P5`）と `WideVane`（左右）で気流方向を設定し、`temperatureC()`/`setTemperatureC()` は 0.5℃刻みを含む対称な `float` ペア。
 
 **Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
 
@@ -713,7 +713,7 @@ struct Frame {
 | mode | byte0 bit0-2 | auto=0 / cool=1 / dry=2 / fan=3 / heat=4 | ✅ |
 | power | byte0 bit3 | on=1 / off=0 | ✅ |
 | fan(風量) | byte0 bit4-5 | auto=0 / 1–3（弱→最強） | ✅ |
-| 上下スイング | byte0 bit6(auto) + byte4 bit0-3(位置) | auto / 位置 1–7, 9, 11 | 🔜 |
+| 上下スイング | byte0 bit6(auto) + byte4 bit0-3(位置) | auto / 位置 1–7, 9, 11 | ✅ |
 | sleep | byte0 bit7 | on=1 | 🟡 |
 | 温度 | byte1 bit0-3 | `℃ − 16`、16–30℃ | ✅ |
 | タイマー | byte1 bit4-7 + byte2 bit0-3 | 有効＋10時間/30分/時間 | 🟡 |
@@ -722,14 +722,14 @@ struct Frame {
 | モデルマーカー | byte2 bit6 | YAW1F=1（YBOFB=0） | model param |
 | xfan | byte2 bit7 | on=1 | 🟡 |
 | 華氏 | byte3 bit3（＋bit2 で +0.5°F） | ℃/℉ 単位 | 🟡 |
-| 左右スイング | byte4 bit4-6 | off / auto / 左…右 | 🔜 |
+| 左右スイング | byte4 bit4-6 | off / auto / 左…右 | ✅ |
 | 表示温度ソース | byte5 bit0-1 | off / 設定 / 室内 / 室外 | 🟡 |
 | iFeel | byte5 bit2 | on=1 | 🟡 |
 | WiFi | byte5 bit6 | on=1 | 🟡 |
 | econo | byte7 bit2 | on=1 | 🟡 |
 | checksum | byte7 bit4-7 | Kelvinator ブロックのニブル総和 | ✅ |
 
-byte3 の上位ニブル（`0b0101`）と byte5 bit3-5（`0b100`）はリモコンが常に持つ固定マーカー（フレームテンプレートに保持）。日常操作の未実装分は上下/左右スイングの2軸（🔜）。コンフォート系トグル（sleep / turbo / light / xfan / econo / iFeel / WiFi）・タイマー・華氏モードは記載のみで setter は未作成 — キャプチャしたフレームを RAW replay で再送すれば再現できる。
+byte3 の上位ニブル（`0b0101`）と byte5 bit3-5（`0b100`）はリモコンが常に持つ固定マーカー（フレームテンプレートに保持）。上下/左右スイングは両軸とも setter 実装済み（`SwingV`/`setSwingV`・`SwingH`/`setSwingH`）。`setSwingV` は選んだ値に応じて byte0 の SwingAuto ビットを整合させるので、auto モードと位置の食い違いは表現できない。コンフォート系トグル（sleep / turbo / light / xfan / econo / iFeel / WiFi）・タイマー・華氏モードは記載のみで setter は未作成 — キャプチャしたフレームを RAW replay で再送すれば再現できる。
 
 **Mitsubishi AC フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが18バイト状態のどこに入るか。ステータス凡例は上と同じ。byte0–4 は固定署名。
 
@@ -739,17 +739,17 @@ byte3 の上位ニブル（`0b0101`）と byte5 bit3-5（`0b100`）はリモコ�
 | mode | byte6 bit3-5 | heat=1 / dry=2 / cool=3 / auto=4 / fan=7 | ✅ |
 | iSee センサ | byte6 bit6 | on=1 | 🟡 |
 | 温度(整数) | byte7 bit0-3 | `℃ − 16`、16–31℃ | ✅ |
-| 0.5℃ | byte7 bit4 | セットで +0.5℃ | 🔜 |
-| ワイドベーン(左右) | byte8 bit4-7 | 1–5（左→右）/ 6=ワイド / 8=auto | 🔜 |
+| 0.5℃ | byte7 bit4 | セットで +0.5℃ | ✅ |
+| ワイドベーン(左右) | byte8 bit4-7 | 1–5（左→右）/ 6=ワイド / 8=auto | ✅ |
 | fan(風量) | byte9 bit0-2 + bit7(auto) | 1–4（弱→最強）/ 5=しずか、bit7=auto | ✅ |
-| ベーン(上下スイング) | byte9 bit3-5（＋bit6 有効） | auto=0 / 1–5（最上→最下）/ 7=スイング | 🔜 |
+| ベーン(上下スイング) | byte9 bit3-5（＋bit6 有効） | auto=0 / 1–5（最上→最下）/ 7=スイング | ✅ |
 | 時計 / 入切タイマー | byte10-13 | 現在/停止/開始時刻＋タイマーモードビット | 🟡 |
 | ecocool | byte14 bit5 | on=1 | 🟡 |
 | 直接/間接・i-save | byte15 | 気流方向 / i-save ビット | 🟡 |
 | ナチュラルフロー・左ベーン | byte16 bit1 / bit3-5 | 左側のデュアルベーン | 🟡 |
 | checksum | byte17 | byte0–16 の総和 mod256 | ✅ |
 
-日常操作の未実装分はベーン（上下スイング）・ワイドベーン（左右）・0.5℃（🔜）。時計/タイマーブロックとコンフォート/診断系ビット（iSee・ecocool・直接/間接・i-save・ナチュラルフロー・左ベーン）は記載のみで setter は未作成 — タイマーの setter 非作成方針（[DESIGN.ja.md](DESIGN.ja.md) §13）が同様に当てはまる。RAW replay で再現可能。
+ベーン（上下スイング、`Vane` enum。位置は Panasonic のルーバーに倣い `P1`..`P5`——Arduino の `HIGH`/`LOW` マクロのため方向名は使えない）・ワイドベーン（左右、`WideVane`）・0.5℃（`temperatureC()`/`setTemperatureC()` を 0.5℃刻みの対称な `float` ペアに、`halfDegree()` は簡便な読み取り）はいずれも setter 実装済み。`setVane` は byte9 の「ベーン有効」ビットを立てる。`setMode` は byte8 を書き換えてワイドベーンを MIDDLE にリセットするので、先に mode、後からワイドベーンを設定する。時計/タイマーブロックとコンフォート/診断系ビット（iSee・ecocool・直接/間接・i-save・ナチュラルフロー・左ベーン）は記載のみで setter は未作成 — タイマーの setter 非作成方針（[DESIGN.ja.md](DESIGN.ja.md) §13）が同様に当てはまる。RAW replay で再現可能。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 

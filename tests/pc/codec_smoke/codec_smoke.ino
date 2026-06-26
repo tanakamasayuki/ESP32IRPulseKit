@@ -1775,6 +1775,88 @@ void testMitsubishiAcStateMatrix()
         }
   EXPECT_TRUE("mitsubishi/state-matrix", all_ok);
 }
+
+// Vane (vertical), wide vane (horizontal), and the 0.5C half-degree bit survive
+// a setter -> toRaw -> fromRaw roundtrip and land in the documented bits.
+void testMitsubishiAcVaneAndHalfDegree()
+{
+  using esp32irpk::ac::Mitsubishi::Frame;
+  using esp32irpk::ac::Mitsubishi::Mode;
+  using esp32irpk::ac::Mitsubishi::Vane;
+  using esp32irpk::ac::Mitsubishi::WideVane;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::HEAT);
+  f.setTemperatureC(22.5f);
+  f.setVane(Vane::P3);
+  f.setWideVane(WideVane::RIGHT); // after setMode, which resets the wide vane
+
+  EXPECT_EQ("mitsubishi/half-temp-get", 22.5f, f.temperatureC());
+  EXPECT_TRUE("mitsubishi/half-flag", f.halfDegree());
+  EXPECT_TRUE("mitsubishi/vane-get", f.vane() == Vane::P3);
+  EXPECT_TRUE("mitsubishi/widevane-get", f.wideVane() == WideVane::RIGHT);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("mitsubishi/vane-encode", f.toRaw(buf));
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("mitsubishi/vane-decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("mitsubishi/vane-decode-checksum", g.checksum_ok);
+  EXPECT_EQ("mitsubishi/vane-decode-temp", 22.5f, g.temperatureC());
+  EXPECT_TRUE("mitsubishi/vane-decode-vane", g.vane() == Vane::P3);
+  EXPECT_TRUE("mitsubishi/vane-decode-widevane", g.wideVane() == WideVane::RIGHT);
+
+  // A whole-degree setpoint clears the half-degree bit.
+  f.setTemperatureC(24.0f);
+  EXPECT_EQ("mitsubishi/whole-temp-get", 24.0f, f.temperatureC());
+  EXPECT_TRUE("mitsubishi/whole-flag", !f.halfDegree());
+
+  // setMode rewrites byte 8 and resets the wide vane to MIDDLE (documented).
+  Frame m{};
+  m.setWideVane(WideVane::RIGHT);
+  m.setMode(Mode::COOL);
+  EXPECT_TRUE("mitsubishi/setmode-resets-widevane", m.wideVane() == WideVane::MIDDLE);
+}
+
+// Vertical/horizontal swing survive a setter -> toRaw -> fromRaw roundtrip, and
+// setSwingV keeps the byte-0 SwingAuto bit consistent with the chosen value.
+void testGreeAcSwing()
+{
+  using esp32irpk::ac::Gree::Frame;
+  using esp32irpk::ac::Gree::Mode;
+  using esp32irpk::ac::Gree::SwingH;
+  using esp32irpk::ac::Gree::SwingV;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setSwingV(SwingV::MIDDLE);
+  f.setSwingH(SwingH::LEFT);
+
+  EXPECT_TRUE("gree/swingv-get", f.swingV() == SwingV::MIDDLE);
+  EXPECT_TRUE("gree/swingh-get", f.swingH() == SwingH::LEFT);
+  // A fixed position leaves the SwingAuto bit (byte 0 bit 6) clear.
+  EXPECT_TRUE("gree/swingv-fixed-autobit", (f.bytes[0] & 0x40u) == 0);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("gree/swing-encode", f.toRaw(buf));
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("gree/swing-decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("gree/swing-decode-checksum", g.checksum_ok);
+  EXPECT_TRUE("gree/swing-decode-v", g.swingV() == SwingV::MIDDLE);
+  EXPECT_TRUE("gree/swing-decode-h", g.swingH() == SwingH::LEFT);
+
+  // An *_AUTO value asserts the SwingAuto bit; a fixed position clears it again.
+  f.setSwingV(SwingV::UP_AUTO);
+  EXPECT_TRUE("gree/swingv-auto-get", f.swingV() == SwingV::UP_AUTO);
+  EXPECT_TRUE("gree/swingv-auto-autobit", (f.bytes[0] & 0x40u) != 0);
+  f.setSwingV(SwingV::DOWN);
+  EXPECT_TRUE("gree/swingv-clears-autobit", (f.bytes[0] & 0x40u) == 0);
+}
 } // namespace
 
 void setup()
@@ -1827,8 +1909,10 @@ void setup()
   testPanasonicAcDecodesSkewedTiming();
   testGreeAcRoundtrip();
   testGreeAcStateMatrix();
+  testGreeAcSwing();
   testMitsubishiAcRoundtrip();
   testMitsubishiAcStateMatrix();
+  testMitsubishiAcVaneAndHalfDegree();
 
   Serial.print("TEST done ");
   Serial.print(g_passed);

@@ -49,6 +49,35 @@ namespace esp32irpk::ac::Mitsubishi
     MAX_SPEED,
   };
 
+  // Vertical airflow vane (byte 9 bits 3-5). AUTO lets the unit decide; SWING
+  // sweeps. The fixed positions P1..P5 run highest (P1) to lowest (P5), matching
+  // the P1..P5 convention used for Panasonic's louver (Arduino's HIGH/LOW macros
+  // rule out directional names here).
+  enum class Vane : uint8_t
+  {
+    AUTO = 0,
+    P1 = 1, // highest
+    P2 = 2,
+    P3 = 3, // middle
+    P4 = 4,
+    P5 = 5, // lowest
+    SWING = 7,
+  };
+
+  // Horizontal wide vane (byte 8 high nibble). Positions run left to right;
+  // WIDE spreads the airflow and AUTO sweeps. NOTE: setMode rewrites byte 8 and
+  // resets the wide vane to MIDDLE, so set the mode first, then the wide vane.
+  enum class WideVane : uint8_t
+  {
+    LEFT_MAX = 1,
+    LEFT = 2,
+    MIDDLE = 3,
+    RIGHT = 4,
+    RIGHT_MAX = 5,
+    WIDE = 6,
+    AUTO = 8,
+  };
+
   namespace detail
   {
     // Documented Mitsubishi AC pulse-distance timing.
@@ -74,9 +103,14 @@ namespace esp32irpk::ac::Mitsubishi
     inline constexpr uint8_t kPowerMask = 0x20;
     inline constexpr size_t kOffMode = 6;     // bits 3-5
     inline constexpr size_t kOffTemp = 7;     // bits 0-3 (+ bit 4 = half degree)
+    inline constexpr uint8_t kHalfDegreeBit = 0x10; // byte 7 bit 4 = +0.5C
     inline constexpr size_t kOffMode8 = 8;    // mode-specific byte (WideVane | mode)
+    inline constexpr size_t kOffWideVane = 8; // same byte: high nibble = wide vane
     inline constexpr size_t kOffFan = 9;      // bits 0-2 + bit 7 (FanAuto)
     inline constexpr uint8_t kFanAutoMask = 0x80;
+    inline constexpr size_t kOffVane = 9;     // same byte: bits 3-5 vane, bit 6 valid
+    inline constexpr uint8_t kVaneMask = 0x38; // byte 9 bits 3-5
+    inline constexpr uint8_t kVaneBit = 0x40;  // byte 9 bit 6 (vane value is valid)
     inline constexpr size_t kOffChecksum = 17;
 
     inline constexpr uint8_t kMinTempC = 16;
@@ -156,17 +190,31 @@ namespace esp32irpk::ac::Mitsubishi
           (bytes[detail::kOffMode] & ~(0x07u << 3)) | (detail::modeToCode(m) << 3));
       bytes[detail::kOffMode8] = detail::modeToByte8(m);
     }
-    uint8_t temperatureC() const
+    // Temperature is a symmetric float pair carrying 0.5C steps: the integer
+    // part is byte 7's low nibble (C - 16) and the +0.5 is byte 7 bit 4.
+    float temperatureC() const
     {
-      return static_cast<uint8_t>((bytes[detail::kOffTemp] & 0x0Fu) + detail::kMinTempC);
+      float c = static_cast<float>((bytes[detail::kOffTemp] & 0x0Fu) + detail::kMinTempC);
+      if (bytes[detail::kOffTemp] & detail::kHalfDegreeBit) c += 0.5f;
+      return c;
     }
-    void setTemperatureC(uint8_t c)
+    bool halfDegree() const
     {
-      if (c < detail::kMinTempC) c = detail::kMinTempC;
-      if (c > detail::kMaxTempC) c = detail::kMaxTempC;
-      // Set the 4-bit temperature, clear the half-degree bit (bit 4), keep the rest.
+      return (bytes[detail::kOffTemp] & detail::kHalfDegreeBit) != 0;
+    }
+    void setTemperatureC(float c)
+    {
+      if (c < detail::kMinTempC) c = static_cast<float>(detail::kMinTempC);
+      if (c > detail::kMaxTempC) c = static_cast<float>(detail::kMaxTempC);
+      // Round to the nearest 0.5C, then split into whole degrees + the half bit.
+      uint8_t halfSteps = static_cast<uint8_t>(c * 2.0f + 0.5f);
+      uint8_t whole = static_cast<uint8_t>(halfSteps / 2);
+      bool half = (halfSteps & 1u) != 0;
+      // Write bits 0-4 (temperature + half), keep bits 5-7.
       bytes[detail::kOffTemp] = static_cast<uint8_t>(
-          (bytes[detail::kOffTemp] & 0xE0u) | ((c - detail::kMinTempC) & 0x0Fu));
+          (bytes[detail::kOffTemp] & 0xE0u) |
+          ((whole - detail::kMinTempC) & 0x0Fu) |
+          (half ? detail::kHalfDegreeBit : 0));
     }
     Fan fan() const
     {
@@ -198,6 +246,31 @@ namespace esp32irpk::ac::Mitsubishi
       bytes[detail::kOffFan] = static_cast<uint8_t>(
           (bytes[detail::kOffFan] & ~(0x07u | detail::kFanAutoMask)) | code |
           (fan_auto ? detail::kFanAutoMask : 0));
+    }
+    // Vertical vane (byte 9 bits 3-5). Setting any position also asserts the
+    // "vane valid" bit (bit 6), as a real remote does.
+    Vane vane() const
+    {
+      return static_cast<Vane>((bytes[detail::kOffVane] & detail::kVaneMask) >> 3);
+    }
+    void setVane(Vane v)
+    {
+      bytes[detail::kOffVane] = static_cast<uint8_t>(
+          (bytes[detail::kOffVane] & ~(detail::kVaneMask | detail::kVaneBit)) |
+          (static_cast<uint8_t>(v) << 3) | detail::kVaneBit);
+    }
+    // Horizontal wide vane (byte 8 high nibble). The low nibble is the mode
+    // marker that setMode owns, so only the high nibble is touched here. Because
+    // setMode rewrites the whole byte (resetting the wide vane to MIDDLE), call
+    // setMode first and setWideVane after.
+    WideVane wideVane() const
+    {
+      return static_cast<WideVane>((bytes[detail::kOffWideVane] >> 4) & 0x0Fu);
+    }
+    void setWideVane(WideVane v)
+    {
+      bytes[detail::kOffWideVane] = static_cast<uint8_t>(
+          (bytes[detail::kOffWideVane] & 0x0Fu) | (static_cast<uint8_t>(v) << 4));
     }
 
     // RAW ticks -> state bytes. false if not a Mitsubishi AC frame; checksum

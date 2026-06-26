@@ -49,6 +49,37 @@ namespace esp32irpk::ac::Gree
     MAX_SPEED,
   };
 
+  // Vertical swing (byte 4 low nibble). The value set splits into "auto" modes
+  // (the unit keeps moving toward a target) and fixed positions; selecting an
+  // *_AUTO value also asserts the byte-0 SwingAuto bit, so the two stay
+  // consistent and an illegal combination cannot be expressed.
+  enum class SwingV : uint8_t
+  {
+    LAST_POS = 0,    // resume last position
+    AUTO = 1,        // full sweep
+    UP = 2,
+    MIDDLE_UP = 3,
+    MIDDLE = 4,
+    MIDDLE_DOWN = 5,
+    DOWN = 6,
+    DOWN_AUTO = 7,   // sweep within the lower range
+    MIDDLE_AUTO = 9, // sweep within the middle range
+    UP_AUTO = 11,    // sweep within the upper range
+  };
+
+  // Horizontal swing (byte 4 bits 4-6). OFF holds, AUTO sweeps, the rest are
+  // fixed positions from the far left to the far right.
+  enum class SwingH : uint8_t
+  {
+    OFF = 0,
+    AUTO = 1,
+    MAX_LEFT = 2,
+    LEFT = 3,
+    MIDDLE = 4,
+    RIGHT = 5,
+    MAX_RIGHT = 6,
+  };
+
   // Model variants of the one Gree 8-byte wire format (SPEC §11.2). They share
   // this format and differ only by a model marker / a few fields, so they are a
   // parameter on Frame rather than separate types. Only YBOFB is implemented;
@@ -86,6 +117,15 @@ namespace esp32irpk::ac::Gree
     inline constexpr size_t kBlock1Bits = kBlockBytes * 8 + 3; // 35
 
     inline constexpr uint8_t kChecksumStart = 10;
+
+    inline constexpr uint8_t kSwingAutoBit = 0x40; // byte 0 bit 6
+
+    // Vertical-swing values that pair with the byte-0 SwingAuto bit.
+    inline bool swingVIsAuto(Gree::SwingV v)
+    {
+      return v == Gree::SwingV::AUTO || v == Gree::SwingV::DOWN_AUTO ||
+             v == Gree::SwingV::MIDDLE_AUTO || v == Gree::SwingV::UP_AUTO;
+    }
 
     // Temperature range (Celsius) stored as (C - 16) in byte 1's low nibble.
     inline constexpr uint8_t kMinTempC = 16;
@@ -186,6 +226,22 @@ namespace esp32irpk::ac::Gree
     void setFan(Fan f)
     {
       bytes[0] = static_cast<uint8_t>((bytes[0] & ~0x30u) | (detail::fanToCode(f) << 4));
+    }
+    // Vertical swing (byte 4 low nibble). setSwingV also keeps the byte-0
+    // SwingAuto bit consistent with the chosen value (set for the *_AUTO modes).
+    SwingV swingV() const { return static_cast<SwingV>(bytes[4] & 0x0Fu); }
+    void setSwingV(SwingV v)
+    {
+      bytes[4] = static_cast<uint8_t>((bytes[4] & 0xF0u) | (static_cast<uint8_t>(v) & 0x0Fu));
+      bytes[0] = static_cast<uint8_t>(
+          (bytes[0] & ~detail::kSwingAutoBit) |
+          (detail::swingVIsAuto(v) ? detail::kSwingAutoBit : 0));
+    }
+    // Horizontal swing (byte 4 bits 4-6).
+    SwingH swingH() const { return static_cast<SwingH>((bytes[4] >> 4) & 0x07u); }
+    void setSwingH(SwingH v)
+    {
+      bytes[4] = static_cast<uint8_t>((bytes[4] & ~0x70u) | (static_cast<uint8_t>(v) << 4));
     }
 
     // RAW ticks -> state bytes. false if not a Gree two-block burst; checksum

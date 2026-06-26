@@ -1,6 +1,10 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+- (EN) Mitsubishi A/C: vane (vertical swing, `Vane` enum `P1`..`P5`/`AUTO`/`SWING`), wide vane (horizontal, `WideVane`), and 0.5 °C setpoints. `temperatureC()`/`setTemperatureC()` are now a symmetric `float` pair carrying 0.5 °C steps (byte 7 bit 4), with `halfDegree()` as a convenience reader. **Breaking:** `setTemperatureC` takes `float` and `temperatureC()` returns `float` (was `uint8_t`). `setVane` asserts the vane-valid bit; `setMode` resets the wide vane to MIDDLE, so set the mode first.
+- (JA) Mitsubishi エアコン: ベーン（上下スイング、`Vane` enum `P1`..`P5`/`AUTO`/`SWING`）・ワイドベーン（左右、`WideVane`）・0.5℃設定に対応。`temperatureC()`/`setTemperatureC()` を 0.5℃刻みを含む対称な `float` ペアに（byte7 bit4）、`halfDegree()` は簡便な読み取り。**破壊的変更:** `setTemperatureC` は `float` 引数、`temperatureC()` は `float` を返す（旧 `uint8_t`）。`setVane` はベーン有効ビットを立てる。`setMode` はワイドベーンを MIDDLE にリセットするので先に mode を設定する。
+- (EN) Gree A/C: vertical swing (`SwingV` / `setSwingV`) and horizontal swing (`SwingH` / `setSwingH`). `setSwingV` keeps the byte-0 SwingAuto bit consistent with the chosen value, so an auto-mode/position mismatch cannot be expressed.
+- (JA) Gree エアコン: 上下スイング（`SwingV`/`setSwingV`）と左右スイング（`SwingH`/`setSwingH`）に対応。`setSwingV` は選んだ値に応じて byte0 の SwingAuto ビットを整合させるため、auto モードと位置の食い違いは表現できない。
 - (EN) Panasonic A/C: quiet/powerful comfort modes are now `Fan::QUIET`/`Fan::POWERFUL` (byte21 flags, fan stays auto). **Breaking:** the old `Fan::QUIET`/`POWERFUL` (which were the slowest/fastest fan *speeds*) are renamed `Fan::MIN_SPEED`/`Fan::MAX_SPEED`; the `Fan` enumerator values also shifted.
 - (JA) Panasonic エアコン: しずか/パワフルを `Fan::QUIET`/`Fan::POWERFUL`（byte21 フラグ、fan は auto のまま）として追加。**破壊的変更:** 最弱/最強の*風量*を指していた旧 `Fan::QUIET`/`POWERFUL` は `Fan::MIN_SPEED`/`Fan::MAX_SPEED` に改名（enum の整数値も変化）。
 - (EN) Panasonic A/C: 0.5 °C setpoints and louver. `temperatureC()` and `setTemperatureC()` are now a symmetric `float` pair carrying 0.5 °C steps (e.g. `22.5`); `halfDegree()` is a convenience reader. `louver()`/`setLouver()` with a `Louver` enum sets the vertical swing position. Field offsets confirmed against a real remote (ACXA75C15870).

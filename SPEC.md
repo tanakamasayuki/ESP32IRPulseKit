@@ -693,8 +693,8 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 Per-vendor framing of the supported formats:
 
 - `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame. `Model::JKE` (template byte-identical to IRremoteESP8266's default known-good state), `DKE`, `NKE`, `LKE` and `RKR` are supported — they share the power/mode/temperature/fan field map and differ only in fixed marker bytes (`fromRaw` classifies the model; `toRaw` stamps it), verified per-model against IRremoteESP8266. `CKP` is reserved (toggle power + relocated quiet/powerful bits); encoding it returns `false`.
-- `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. The implemented model is YBOFB (`Model::YBOFB`, model bit clear); `Model::YAW1F`/`YX1FSF` are reserved for later. `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`.
-- `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. This format has a single model (no `Model` parameter); the other Mitsubishi wire formats (136 / 112 / Heavy) would be separate `Frame` types. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`.
+- `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. The implemented model is YBOFB (`Model::YBOFB`, model bit clear); `Model::YAW1F`/`YX1FSF` are reserved for later. `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`; `SwingV` and `SwingH` set the vertical and horizontal swing.
+- `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. This format has a single model (no `Model` parameter); the other Mitsubishi wire formats (136 / 112 / Heavy) would be separate `Frame` types. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`; `Vane` (vertical, `P1`..`P5`) and `WideVane` (horizontal) set the airflow direction, and `temperatureC()`/`setTemperatureC()` are a symmetric `float` pair carrying 0.5 °C steps.
 
 **Panasonic field map (decoded logical fields).** Where each control field lives in the 27-byte state. Status legend: ✅ implemented (decode + encode) · 🔜 planned · 🟡 documented, no setter (re-send via RAW replay) · ⛔ out of scope (separate frame type).
 
@@ -719,7 +719,7 @@ The newly mapped fields (half-degree, louver, quiet/powerful, timer) were revers
 | mode | byte 0 bits 0-2 | auto=0 / cool=1 / dry=2 / fan=3 / heat=4 | ✅ |
 | power | byte 0 bit 3 | on=1 / off=0 | ✅ |
 | fan (airflow) | byte 0 bits 4-5 | auto=0 / 1–3 (min→max) | ✅ |
-| swing vertical | byte 0 bit 6 (auto) + byte 4 bits 0-3 (position) | auto / pos 1–7, 9, 11 | 🔜 |
+| swing vertical | byte 0 bit 6 (auto) + byte 4 bits 0-3 (position) | auto / pos 1–7, 9, 11 | ✅ |
 | sleep | byte 0 bit 7 | on=1 | 🟡 |
 | temperature | byte 1 bits 0-3 | `°C − 16`, 16–30 °C | ✅ |
 | timer | byte 1 bits 4-7 + byte 2 bits 0-3 | enabled + tens-hour / half-hour / hours | 🟡 |
@@ -728,14 +728,14 @@ The newly mapped fields (half-degree, louver, quiet/powerful, timer) were revers
 | model marker | byte 2 bit 6 | YAW1F=1 (YBOFB=0) | model param |
 | xfan | byte 2 bit 7 | on=1 | 🟡 |
 | Fahrenheit | byte 3 bit 3 (+ bit 2 extra 0.5 °F) | °C / °F unit | 🟡 |
-| swing horizontal | byte 4 bits 4-6 | off / auto / left…right | 🔜 |
+| swing horizontal | byte 4 bits 4-6 | off / auto / left…right | ✅ |
 | display-temp source | byte 5 bits 0-1 | off / set / inside / outside | 🟡 |
 | iFeel | byte 5 bit 2 | on=1 | 🟡 |
 | WiFi | byte 5 bit 6 | on=1 | 🟡 |
 | econo | byte 7 bit 2 | on=1 | 🟡 |
 | checksum | byte 7 bits 4-7 | Kelvinator block nibble-sum | ✅ |
 
-Byte 3's high nibble (`0b0101`) and byte 5 bits 3-5 (`0b100`) are fixed markers the remote always carries (kept in the frame template). The everyday-control gaps are the two swing axes (🔜); the comfort toggles (sleep / turbo / light / xfan / econo / iFeel / WiFi), the timer, and Fahrenheit mode are documented but have no setter yet — replay a captured frame via RAW to reproduce them.
+Byte 3's high nibble (`0b0101`) and byte 5 bits 3-5 (`0b100`) are fixed markers the remote always carries (kept in the frame template). Both swing axes have setters (`SwingV` / `setSwingV`, `SwingH` / `setSwingH`); `setSwingV` keeps the byte-0 SwingAuto bit consistent with the chosen value so an auto-mode/position mismatch cannot be expressed. The comfort toggles (sleep / turbo / light / xfan / econo / iFeel / WiFi), the timer, and Fahrenheit mode are documented but have no setter yet — replay a captured frame via RAW to reproduce them.
 
 **Mitsubishi AC field map (decoded logical fields).** Where each control field lives in the 18-byte state. Same status legend. Bytes 0–4 are the fixed signature.
 
@@ -745,17 +745,17 @@ Byte 3's high nibble (`0b0101`) and byte 5 bits 3-5 (`0b100`) are fixed markers 
 | mode | byte 6 bits 3-5 | heat=1 / dry=2 / cool=3 / auto=4 / fan=7 | ✅ |
 | iSee sensor | byte 6 bit 6 | on=1 | 🟡 |
 | temperature (integer) | byte 7 bits 0-3 | `°C − 16`, 16–31 °C | ✅ |
-| half-degree (0.5 °C) | byte 7 bit 4 | set = +0.5 °C | 🔜 |
-| wide vane (horizontal) | byte 8 bits 4-7 | 1–5 (L→R) / 6=wide / 8=auto | 🔜 |
+| half-degree (0.5 °C) | byte 7 bit 4 | set = +0.5 °C | ✅ |
+| wide vane (horizontal) | byte 8 bits 4-7 | 1–5 (L→R) / 6=wide / 8=auto | ✅ |
 | fan (airflow) | byte 9 bits 0-2 + bit 7 (auto) | 1–4 (low→max) / 5=quiet; bit 7=auto | ✅ |
-| vane (vertical swing) | byte 9 bits 3-5 (+ bit 6 valid) | auto=0 / 1–5 (highest→lowest) / 7=swing | 🔜 |
+| vane (vertical swing) | byte 9 bits 3-5 (+ bit 6 valid) | auto=0 / 1–5 (highest→lowest) / 7=swing | ✅ |
 | clock / on / off timer | bytes 10-13 | current / stop / start clock + timer-mode bits | 🟡 |
 | ecocool | byte 14 bit 5 | on=1 | 🟡 |
 | direct/indirect, i-save | byte 15 | airflow-direction / i-save bits | 🟡 |
 | natural flow, vane-left | byte 16 bit 1 / bits 3-5 | dual-vane left side | 🟡 |
 | checksum | byte 17 | sum of bytes 0–16 mod 256 | ✅ |
 
-The everyday-control gaps are vane (vertical swing), wide vane (horizontal), and 0.5 °C (🔜). The timer/clock block and the comfort/diagnostic bits (iSee, ecocool, direct/indirect, i-save, natural-flow, dual-vane-left) are documented but have no setter yet — the no-setter-for-timers rationale in [DESIGN.md](DESIGN.md) §13 applies the same way; RAW replay reproduces them.
+Vane (vertical swing, `Vane` enum with positions `P1`..`P5` after the Panasonic louver convention — Arduino's `HIGH`/`LOW` macros rule out directional names), wide vane (horizontal, `WideVane`), and 0.5 °C (a symmetric `float` `temperatureC()`/`setTemperatureC()` pair, with `halfDegree()` as a convenience reader) all have setters. `setVane` asserts the byte-9 "vane valid" bit; `setMode` rewrites byte 8 and resets the wide vane to MIDDLE, so set the mode first and the wide vane after. The timer/clock block and the comfort/diagnostic bits (iSee, ecocool, direct/indirect, i-save, natural-flow, dual-vane-left) are documented but have no setter yet — the no-setter-for-timers rationale in [DESIGN.md](DESIGN.md) §13 applies the same way; RAW replay reproduces them.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
