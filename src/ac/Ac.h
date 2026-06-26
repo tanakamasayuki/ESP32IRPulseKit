@@ -36,4 +36,40 @@ namespace esp32irpk::ac
     return tx.send(esp32irpk::IRRawTickView{buf.ticks, buf.len});
   }
 
+  // Try each built-in AC vendor against the RAW capture, in registration order,
+  // and return which one matched (UNKNOWN if none). When `out` is non-null the
+  // matched frame is also dumped via its printTo() (and a no-match note is
+  // printed). This centralizes the vendor list so a learn/dump path picks up new
+  // vendors automatically. It reports only the vendor identity, not the decoded
+  // frame, because the per-vendor Frames are heterogeneous types — decode the
+  // specific vendor (Vendor::Frame::fromRaw) when you need its fields or to
+  // re-encode.
+  inline AcVendor decodeAny(const esp32irpk::IRRawTickView &raw, Print *out = nullptr)
+  {
+    Panasonic::Frame pf;
+    if (Panasonic::Frame::fromRaw(raw, pf))
+    {
+      if (out)
+        pf.printTo(*out);
+      return AcVendor::PANASONIC;
+    }
+    Gree::Frame gf;
+    if (Gree::Frame::fromRaw(raw, gf))
+    {
+      if (out)
+        gf.printTo(*out);
+      return AcVendor::GREE;
+    }
+    Mitsubishi::Frame mf;
+    if (Mitsubishi::Frame::fromRaw(raw, mf))
+    {
+      if (out)
+        mf.printTo(*out);
+      return AcVendor::MITSUBISHI;
+    }
+    if (out)
+      out->println("// decoded: no AC vendor matched (raw replay still works)");
+    return AcVendor::UNKNOWN;
+  }
+
 } // namespace esp32irpk::ac

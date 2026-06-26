@@ -28,35 +28,6 @@ esp32irpk::IRReceiver rx(32, true); // en: most receiver modules output inverted
 //     ヘルパを壊すことがある）安全。
 namespace
 {
-// en: Try each AC vendor and, on a match, let the Frame dump itself via
-//     Frame::printTo(Print&) — the common power/mode/temp/fan/checksum line, the
-//     vendor's own fields (louver/swing/vane), and the full state in hex.
-// ja: 各ACベンダを試し、一致したら Frame::printTo(Print&) に自分をダンプさせる。
-//     共通の power/mode/temp/fan/checksum 行＋ベンダ固有フィールド（louver/swing/
-//     vane）＋状態全体のhexを出力。
-static void printDecodedComment(const esp32irpk::IRRawTickView &raw)
-{
-  esp32irpk::ac::Panasonic::Frame pf;
-  if (esp32irpk::ac::Panasonic::Frame::fromRaw(raw, pf))
-  {
-    pf.printTo(Serial);
-    return;
-  }
-  esp32irpk::ac::Gree::Frame gf;
-  if (esp32irpk::ac::Gree::Frame::fromRaw(raw, gf))
-  {
-    gf.printTo(Serial);
-    return;
-  }
-  esp32irpk::ac::Mitsubishi::Frame mf;
-  if (esp32irpk::ac::Mitsubishi::Frame::fromRaw(raw, mf))
-  {
-    mf.printTo(Serial);
-    return;
-  }
-  Serial.println("// decoded: no AC vendor matched (raw replay still works)");
-}
-
 // en: AC RAW snippet: a phase-aligned-carrier reminder (AC frames are long, the
 //     large array is expected), then the generic tick array from <IRDebug.h>.
 // ja: AC用RAWスニペット: 位相整合キャリアの注意書き（ACフレームは長く配列が大きく
@@ -112,7 +83,9 @@ void loop()
   }
   Serial.println();
 
-  printDecodedComment(r.raw); // en: decoded summary as a comment / ja: デコード結果をコメント出力
+  // en: decodeAny tries every built-in AC vendor and dumps the match via printTo.
+  // ja: decodeAny が全内蔵ACベンダを試し、一致を printTo で出力する。
+  esp32irpk::ac::decodeAny(r.raw, &Serial);
   printRawSnippet(r.raw);
   Serial.println();
 }

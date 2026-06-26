@@ -53,38 +53,6 @@ esp32irpk::IRReceiver rx(kIrRxGpio, kIrRxInverted);
 //     自動プロトタイプを生成する必要がない。loop()から呼ぶ。
 namespace
 {
-// en: Try each AC vendor on the RAW capture and, on a match, let the Frame dump
-//     itself via Frame::printTo(Print&) — the common power/mode/temp/fan/checksum
-//     line, the vendor's own fields (louver/swing/vane), and the full hex state.
-//     Vendors are added incrementally; when none match, the RAW replay snippet
-//     still reproduces the frame.
-// ja: RAWキャプチャに各ACベンダを試し、一致したら Frame::printTo(Print&) に自分を
-//     ダンプさせる。共通の power/mode/temp/fan/checksum 行＋ベンダ固有フィールド
-//     （louver/swing/vane）＋状態全体のhexを出力。ベンダは順次追加。どれにも当たら
-//     なくても下のRAWスニペットでフレームは再現できる。
-void printAcDecode(const esp32irpk::IRRawTickView &raw)
-{
-  esp32irpk::ac::Panasonic::Frame pf;
-  if (esp32irpk::ac::Panasonic::Frame::fromRaw(raw, pf))
-  {
-    pf.printTo(Serial);
-    return;
-  }
-  esp32irpk::ac::Gree::Frame gf;
-  if (esp32irpk::ac::Gree::Frame::fromRaw(raw, gf))
-  {
-    gf.printTo(Serial);
-    return;
-  }
-  esp32irpk::ac::Mitsubishi::Frame mf;
-  if (esp32irpk::ac::Mitsubishi::Frame::fromRaw(raw, mf))
-  {
-    mf.printTo(Serial);
-    return;
-  }
-  Serial.println("// decoded: no AC vendor matched (raw replay still works)");
-}
-
 // en: AC RAW snippet: a phase-aligned-carrier reminder (AC frames are long, the
 //     large array is expected), then the generic tick array from <IRDebug.h>.
 // ja: AC用RAWスニペット: 位相整合キャリアの注意書き（ACフレームは長く配列が大きく
@@ -189,9 +157,11 @@ void loop()
     esp32irpk::debug::printDecodedFrame(Serial, c.decoded);
   }
 
-  // en: AC vendor decode (heat-pump remotes) / ja: ACベンダデコード（エアコンリモコン）
+  // en: AC vendor decode (heat-pump remotes): decodeAny tries every built-in
+  //     vendor and dumps the match via printTo. / ja: ACベンダデコード: decodeAny が
+  //     全内蔵ベンダを試し、一致を printTo で出力する。
   Serial.println("-- AC vendor decode --");
-  printAcDecode(r.raw);
+  esp32irpk::ac::decodeAny(r.raw, &Serial);
 
   // en: copy-paste re-send code / ja: 貼り付け再送コード
   Serial.println("-- send code --");
