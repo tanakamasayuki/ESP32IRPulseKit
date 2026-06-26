@@ -712,6 +712,51 @@ Per-vendor framing of the supported formats:
 
 The newly mapped fields (half-degree, louver, quiet/powerful, timer) were reverse-engineered from one real remote (part ACXA75C15870, a JKE-family unit) and are not yet cross-validated across models/libraries, unlike power/mode/temperature/fan/checksum (verified against IRremoteESP8266). Quiet/powerful are mutually exclusive with a fan speed: selecting them forces the fan nibble to auto and sets the byte-21 flag. They are therefore values of the one `Fan` selector — `Fan::QUIET`/`Fan::POWERFUL` encode to fan-nibble=auto + the byte-21 bit, and the speeds `MIN_SPEED`..`MAX_SPEED` are the nibble (the no-setter policy for timers is in [DESIGN.md](DESIGN.md)). Special-function buttons (e.g. internal clean) are sent as a separate, shorter command frame (⛔ a different `Frame` type, not yet supported); RAW replay still reproduces them.
 
+**Gree field map (decoded logical fields).** Where each control field lives in the 8-byte state (two 4-byte blocks). Same status legend.
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| mode | byte 0 bits 0-2 | auto=0 / cool=1 / dry=2 / fan=3 / heat=4 | ✅ |
+| power | byte 0 bit 3 | on=1 / off=0 | ✅ |
+| fan (airflow) | byte 0 bits 4-5 | auto=0 / 1–3 (min→max) | ✅ |
+| swing vertical | byte 0 bit 6 (auto) + byte 4 bits 0-3 (position) | auto / pos 1–7, 9, 11 | 🔜 |
+| sleep | byte 0 bit 7 | on=1 | 🟡 |
+| temperature | byte 1 bits 0-3 | `°C − 16`, 16–30 °C | ✅ |
+| timer | byte 1 bits 4-7 + byte 2 bits 0-3 | enabled + tens-hour / half-hour / hours | 🟡 |
+| turbo | byte 2 bit 4 | on=1 | 🟡 |
+| light | byte 2 bit 5 | on=1 | 🟡 |
+| model marker | byte 2 bit 6 | YAW1F=1 (YBOFB=0) | model param |
+| xfan | byte 2 bit 7 | on=1 | 🟡 |
+| Fahrenheit | byte 3 bit 3 (+ bit 2 extra 0.5 °F) | °C / °F unit | 🟡 |
+| swing horizontal | byte 4 bits 4-6 | off / auto / left…right | 🔜 |
+| display-temp source | byte 5 bits 0-1 | off / set / inside / outside | 🟡 |
+| iFeel | byte 5 bit 2 | on=1 | 🟡 |
+| WiFi | byte 5 bit 6 | on=1 | 🟡 |
+| econo | byte 7 bit 2 | on=1 | 🟡 |
+| checksum | byte 7 bits 4-7 | Kelvinator block nibble-sum | ✅ |
+
+Byte 3's high nibble (`0b0101`) and byte 5 bits 3-5 (`0b100`) are fixed markers the remote always carries (kept in the frame template). The everyday-control gaps are the two swing axes (🔜); the comfort toggles (sleep / turbo / light / xfan / econo / iFeel / WiFi), the timer, and Fahrenheit mode are documented but have no setter yet — replay a captured frame via RAW to reproduce them.
+
+**Mitsubishi AC field map (decoded logical fields).** Where each control field lives in the 18-byte state. Same status legend. Bytes 0–4 are the fixed signature.
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| power | byte 5 bit 5 | on=1 / off=0 | ✅ |
+| mode | byte 6 bits 3-5 | heat=1 / dry=2 / cool=3 / auto=4 / fan=7 | ✅ |
+| iSee sensor | byte 6 bit 6 | on=1 | 🟡 |
+| temperature (integer) | byte 7 bits 0-3 | `°C − 16`, 16–31 °C | ✅ |
+| half-degree (0.5 °C) | byte 7 bit 4 | set = +0.5 °C | 🔜 |
+| wide vane (horizontal) | byte 8 bits 4-7 | 1–5 (L→R) / 6=wide / 8=auto | 🔜 |
+| fan (airflow) | byte 9 bits 0-2 + bit 7 (auto) | 1–4 (low→max) / 5=quiet; bit 7=auto | ✅ |
+| vane (vertical swing) | byte 9 bits 3-5 (+ bit 6 valid) | auto=0 / 1–5 (highest→lowest) / 7=swing | 🔜 |
+| clock / on / off timer | bytes 10-13 | current / stop / start clock + timer-mode bits | 🟡 |
+| ecocool | byte 14 bit 5 | on=1 | 🟡 |
+| direct/indirect, i-save | byte 15 | airflow-direction / i-save bits | 🟡 |
+| natural flow, vane-left | byte 16 bit 1 / bits 3-5 | dual-vane left side | 🟡 |
+| checksum | byte 17 | sum of bytes 0–16 mod 256 | ✅ |
+
+The everyday-control gaps are vane (vertical swing), wide vane (horizontal), and 0.5 °C (🔜). The timer/clock block and the comfort/diagnostic bits (iSee, ecocool, direct/indirect, i-save, natural-flow, dual-vane-left) are documented but have no setter yet — the no-setter-for-timers rationale in [DESIGN.md](DESIGN.md) §13 applies the same way; RAW replay reproduces them.
+
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
 ### 11.3 Carrier For Long Frames

@@ -706,6 +706,51 @@ struct Frame {
 
 新規マップ分（0.5℃・風向・しずか/パワフル・タイマー）は実機1台（型番 ACXA75C15870、JKE系）からのリバースエンジニアリングで、power/mode/temperature/fan/checksum（IRremoteESP8266 でクロス検証済み）とは異なりモデル/ライブラリ横断の検証はまだ。しずか/パワフルは fan 速度と排他で、選ぶと fan ニブルが強制的に auto になり byte21 のフラグが立つ。よって 1つの `Fan` セレクタの値として持つ——`Fan::QUIET`/`POWERFUL` は fanニブル=auto＋byte21ビットに、速度 `MIN_SPEED`..`MAX_SPEED` はニブルにエンコードされる（タイマーの setter 非作成方針は [DESIGN.ja.md](DESIGN.ja.md)）。内部クリーン等の特殊ボタンは状態フレームと別系統の短縮コマンドフレームで送られる（⛔別Frame型・未対応）。RAW replay で再送は可能。
 
+**Gree フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが8バイト状態（4バイト×2ブロック）のどこに入るか。ステータス凡例は上と同じ。
+
+| フィールド | 位置 (byte/bit) | コード/値域 | ステータス |
+|---|---|---|---|
+| mode | byte0 bit0-2 | auto=0 / cool=1 / dry=2 / fan=3 / heat=4 | ✅ |
+| power | byte0 bit3 | on=1 / off=0 | ✅ |
+| fan(風量) | byte0 bit4-5 | auto=0 / 1–3（弱→最強） | ✅ |
+| 上下スイング | byte0 bit6(auto) + byte4 bit0-3(位置) | auto / 位置 1–7, 9, 11 | 🔜 |
+| sleep | byte0 bit7 | on=1 | 🟡 |
+| 温度 | byte1 bit0-3 | `℃ − 16`、16–30℃ | ✅ |
+| タイマー | byte1 bit4-7 + byte2 bit0-3 | 有効＋10時間/30分/時間 | 🟡 |
+| turbo | byte2 bit4 | on=1 | 🟡 |
+| light | byte2 bit5 | on=1 | 🟡 |
+| モデルマーカー | byte2 bit6 | YAW1F=1（YBOFB=0） | model param |
+| xfan | byte2 bit7 | on=1 | 🟡 |
+| 華氏 | byte3 bit3（＋bit2 で +0.5°F） | ℃/℉ 単位 | 🟡 |
+| 左右スイング | byte4 bit4-6 | off / auto / 左…右 | 🔜 |
+| 表示温度ソース | byte5 bit0-1 | off / 設定 / 室内 / 室外 | 🟡 |
+| iFeel | byte5 bit2 | on=1 | 🟡 |
+| WiFi | byte5 bit6 | on=1 | 🟡 |
+| econo | byte7 bit2 | on=1 | 🟡 |
+| checksum | byte7 bit4-7 | Kelvinator ブロックのニブル総和 | ✅ |
+
+byte3 の上位ニブル（`0b0101`）と byte5 bit3-5（`0b100`）はリモコンが常に持つ固定マーカー（フレームテンプレートに保持）。日常操作の未実装分は上下/左右スイングの2軸（🔜）。コンフォート系トグル（sleep / turbo / light / xfan / econo / iFeel / WiFi）・タイマー・華氏モードは記載のみで setter は未作成 — キャプチャしたフレームを RAW replay で再送すれば再現できる。
+
+**Mitsubishi AC フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが18バイト状態のどこに入るか。ステータス凡例は上と同じ。byte0–4 は固定署名。
+
+| フィールド | 位置 (byte/bit) | コード/値域 | ステータス |
+|---|---|---|---|
+| power | byte5 bit5 | on=1 / off=0 | ✅ |
+| mode | byte6 bit3-5 | heat=1 / dry=2 / cool=3 / auto=4 / fan=7 | ✅ |
+| iSee センサ | byte6 bit6 | on=1 | 🟡 |
+| 温度(整数) | byte7 bit0-3 | `℃ − 16`、16–31℃ | ✅ |
+| 0.5℃ | byte7 bit4 | セットで +0.5℃ | 🔜 |
+| ワイドベーン(左右) | byte8 bit4-7 | 1–5（左→右）/ 6=ワイド / 8=auto | 🔜 |
+| fan(風量) | byte9 bit0-2 + bit7(auto) | 1–4（弱→最強）/ 5=しずか、bit7=auto | ✅ |
+| ベーン(上下スイング) | byte9 bit3-5（＋bit6 有効） | auto=0 / 1–5（最上→最下）/ 7=スイング | 🔜 |
+| 時計 / 入切タイマー | byte10-13 | 現在/停止/開始時刻＋タイマーモードビット | 🟡 |
+| ecocool | byte14 bit5 | on=1 | 🟡 |
+| 直接/間接・i-save | byte15 | 気流方向 / i-save ビット | 🟡 |
+| ナチュラルフロー・左ベーン | byte16 bit1 / bit3-5 | 左側のデュアルベーン | 🟡 |
+| checksum | byte17 | byte0–16 の総和 mod256 | ✅ |
+
+日常操作の未実装分はベーン（上下スイング）・ワイドベーン（左右）・0.5℃（🔜）。時計/タイマーブロックとコンフォート/診断系ビット（iSee・ecocool・直接/間接・i-save・ナチュラルフロー・左ベーン）は記載のみで setter は未作成 — タイマーの setter 非作成方針（[DESIGN.ja.md](DESIGN.ja.md) §13）が同様に当てはまる。RAW replay で再現可能。
+
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 
 ### 11.3 長尺フレームのキャリア
