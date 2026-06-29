@@ -1858,6 +1858,154 @@ void testGreeAcSwing()
   EXPECT_TRUE("gree/swingv-clears-autobit", (f.bytes[0] & 0x40u) == 0);
 }
 
+// Fujitsu AC: build a long frame, render it, decode it back, and confirm the
+// logical fields and complement checksum survive the roundtrip. The canonical
+// bytes are derived from the documented ARRAH2E field layout; the hardware study
+// verifies them against IRFujitsuAC.
+void testFujitsuAcRoundtrip()
+{
+  using esp32irpk::ac::Fujitsu::Fan;
+  using esp32irpk::ac::Fujitsu::Frame;
+  using esp32irpk::ac::Fujitsu::Mode;
+  using esp32irpk::ac::Fujitsu::Swing;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(26);
+  f.setFan(Fan::AUTO);
+  f.setSwing(Swing::OFF);
+
+  EXPECT_TRUE("fujitsu/power-get", f.power());
+  EXPECT_TRUE("fujitsu/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("fujitsu/temp-get", 26, f.temperatureC());
+  EXPECT_TRUE("fujitsu/fan-get", f.fan() == Fan::AUTO);
+  EXPECT_TRUE("fujitsu/swing-get", f.swing() == Swing::OFF);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("fujitsu/encode", f.toRaw(buf));
+  EXPECT_TRUE("fujitsu/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("fujitsu/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("fujitsu/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("fujitsu/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("fujitsu/decode-power", g.power());
+  EXPECT_TRUE("fujitsu/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("fujitsu/decode-temp", 26, g.temperatureC());
+  EXPECT_TRUE("fujitsu/decode-fan", g.fan() == Fan::AUTO);
+  EXPECT_TRUE("fujitsu/decode-swing", g.swing() == Swing::OFF);
+
+  // Power on / cool / 26C / fan auto / swing off (ARRAH2E long frame: byte 5 =
+  // 0xFE marker, byte 6 = rest-length 0x09, byte 7 = protocol 0x30, byte 15 =
+  // complement checksum over bytes 7..14).
+  static const uint8_t kCanonicalCool26[Frame::kBytes] = {
+      0x14, 0x63, 0x00, 0x10, 0x10, 0xFE, 0x09, 0x30,
+      0xA0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2F};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool26[i])
+      canonical_match = false;
+  EXPECT_TRUE("fujitsu/canonical-bytes", canonical_match);
+
+  // Temperature clamps to the supported range.
+  Frame t{};
+  t.setTemperatureC(40);
+  EXPECT_EQ("fujitsu/temp-clamp-high", 30, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("fujitsu/temp-clamp-low", 16, t.temperatureC());
+
+  // A non-Fujitsu waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("fujitsu/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Power-off renders the 7-byte short frame {14 63 00 10 10 02 FD}; decoding it
+// reports power=off with a valid (inverted-command) checksum, and a 7-byte
+// fromBytes reconstructs it. Mode/temp/fan are vendor don't-cares on power-off.
+void testFujitsuAcPowerOff()
+{
+  using esp32irpk::ac::Fujitsu::Frame;
+  using esp32irpk::ac::Fujitsu::Mode;
+
+  Frame f{};
+  f.setMode(Mode::HEAT); // a no-setter field on the OFF path; must be ignored
+  f.setPower(false);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("fujitsu/off-encode", f.toRaw(buf));
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("fujitsu/off-decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("fujitsu/off-decode-checksum", g.checksum_ok);
+  EXPECT_EQ("fujitsu/off-decode-bytelen", 7, g.byte_length);
+  EXPECT_TRUE("fujitsu/off-decode-power", !g.power());
+
+  static const uint8_t kShortOff[7] = {0x14, 0x63, 0x00, 0x10, 0x10, 0x02, 0xFD};
+  bool short_match = true;
+  for (size_t i = 0; i < 7; ++i)
+    if (g.bytes[i] != kShortOff[i])
+      short_match = false;
+  EXPECT_TRUE("fujitsu/off-short-bytes", short_match);
+
+  // A 7-byte short state round-trips through fromBytes.
+  Frame fb{};
+  EXPECT_TRUE("fujitsu/off-frombytes", Frame::fromBytes(kShortOff, 7, fb));
+  EXPECT_TRUE("fujitsu/off-frombytes-power", !fb.power());
+  EXPECT_TRUE("fujitsu/off-frombytes-checksum", fb.checksum_ok);
+}
+
+// Every mode/fan/swing/temperature combination must encode (setters -> toRaw ->
+// fromRaw) back to itself with a valid checksum, exercising the full field map.
+void testFujitsuAcStateMatrix()
+{
+  using esp32irpk::ac::Fujitsu::Fan;
+  using esp32irpk::ac::Fujitsu::Frame;
+  using esp32irpk::ac::Fujitsu::Mode;
+  using esp32irpk::ac::Fujitsu::Swing;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::COOL, Mode::DRY, Mode::FAN, Mode::HEAT};
+  static const Fan fans[] = {Fan::AUTO, Fan::HIGH_SPEED, Fan::MED_SPEED,
+                             Fan::LOW_SPEED, Fan::QUIET};
+  static const Swing swings[] = {Swing::OFF, Swing::VERTICAL, Swing::HORIZONTAL, Swing::BOTH};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (Swing sw : swings)
+        for (uint8_t temp = 16; temp <= 30; ++temp)
+        {
+          Frame f{};
+          f.setPower(true);
+          f.setMode(m);
+          f.setFan(fan);
+          f.setSwing(sw);
+          f.setTemperatureC(temp);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok || !g.power() ||
+              g.mode() != m || g.fan() != fan || g.swing() != sw ||
+              g.temperatureC() != temp)
+            all_ok = false;
+        }
+  EXPECT_TRUE("fujitsu/state-matrix", all_ok);
+}
+
 // Each vendor's toString() maps an enum value to its identifier name (used by
 // printTo). Out-of-range values fall back to "?".
 void testAcEnumToString()
@@ -1865,6 +2013,7 @@ void testAcEnumToString()
   namespace P = esp32irpk::ac::Panasonic;
   namespace G = esp32irpk::ac::Gree;
   namespace M = esp32irpk::ac::Mitsubishi;
+  namespace F = esp32irpk::ac::Fujitsu;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -1875,6 +2024,9 @@ void testAcEnumToString()
   EXPECT_TRUE("mitsubishi/tostring-vane", strcmp(M::toString(M::Vane::P3), "P3") == 0);
   EXPECT_TRUE("mitsubishi/tostring-widevane", strcmp(M::toString(M::WideVane::AUTO), "AUTO") == 0);
   EXPECT_TRUE("mitsubishi/tostring-fan-quiet", strcmp(M::toString(M::Fan::QUIET), "QUIET") == 0);
+  EXPECT_TRUE("fujitsu/tostring-mode", strcmp(F::toString(F::Mode::HEAT), "HEAT") == 0);
+  EXPECT_TRUE("fujitsu/tostring-fan-quiet", strcmp(F::toString(F::Fan::QUIET), "QUIET") == 0);
+  EXPECT_TRUE("fujitsu/tostring-swing", strcmp(F::toString(F::Swing::BOTH), "BOTH") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -1981,6 +2133,34 @@ void testAcFromBytes()
     EXPECT_TRUE("mitsubishi/frombytes-eq", eq);
     EXPECT_TRUE("mitsubishi/frombytes-badlen", !Frame::fromBytes(dec.bytes, 99, fb));
   }
+  // Fujitsu (long frame): bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Fujitsu::Fan;
+    using esp32irpk::ac::Fujitsu::Frame;
+    using esp32irpk::ac::Fujitsu::Mode;
+    using esp32irpk::ac::Fujitsu::Swing;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::LOW_SPEED);
+    a.setSwing(Swing::VERTICAL);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("fujitsu/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("fujitsu/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("fujitsu/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("fujitsu/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("fujitsu/frombytes-eq", eq);
+    EXPECT_TRUE("fujitsu/frombytes-badlen", !Frame::fromBytes(dec.bytes, 99, fb));
+  }
 }
 } // namespace
 
@@ -2038,6 +2218,9 @@ void setup()
   testMitsubishiAcRoundtrip();
   testMitsubishiAcStateMatrix();
   testMitsubishiAcVaneAndHalfDegree();
+  testFujitsuAcRoundtrip();
+  testFujitsuAcPowerOff();
+  testFujitsuAcStateMatrix();
   testAcEnumToString();
   testAcFromBytes();
 

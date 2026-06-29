@@ -39,6 +39,10 @@ heatpumpir_tx/             # TX: HeatpumpIR（既知状態） -> RX: ESP32IRPuls
 # Gree（esp32irpk::ac::Gree に合わせて IRGreeAC の YBOFB モデルを使用）
 gree_irremoteesp8266_tx/   # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
 gree_irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
+
+# Fujitsu（esp32irpk::ac::Fujitsu に合わせて IRFujitsuAC の ARRAH2E モデルを使用）
+fujitsu_irremoteesp8266_tx/  # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+fujitsu_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
 ```
 
 各ベンダは同じ `<extlib>_<role>` バリアントを使う。バリアントのフォルダ名は
@@ -135,6 +139,18 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   bitマーク（450us）より短いので位相整合キャリアで送る（`rx` study が設定。
   `study_mitsubishi_carrier_ab.py` で位相整合 vs ハードウェアを計測）。
 
+- `fujitsu_irremoteesp8266_tx/` + `fujitsu_irremoteesp8266_rx/` — 「Fujitsu AC」
+  protocol（モデル ARRAH2E）用の較正＋encoder検証の対。IRremoteESP8266 の
+  `IRFujitsuAC` を使う。全設定は16バイトの長フレーム（固定 `14 63 00 10 10`、byte5
+  = `0xFE`、byte15 に補数チェックサム）、電源OFFは7バイトの短フレーム
+  （`14 63 00 10 10 02 FD`）なので、ケースには短フレームを通す `power=0` を含める。
+  フレームは1回送信で、`rx` primary は50msタイムアウトを使う。Gree/Mitsubishi同様、
+  zeroスペース（390us）がbitマーク（448us）より短いので位相整合キャリアで送る。当方
+  `esp32irpk::ac::Fujitsu` のenum値は IRremoteESP8266 のワイヤコードと一致するので、
+  フィールド比較は直接の数値一致になる。HeatpumpIR の2系統目参照
+  （`fujitsu_heatpumpir_tx`）が、SPEC §11.2 で Fujitsu を **実装済** から **対応** へ
+  昇格させる前の残ステップ。
+
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` — それぞれの2系統目の独立参照
   （`heatpumpir_tx` と同型）。HeatpumpIR（`GreeGenericHeatpumpIR` /
   `MitsubishiFEHeatpumpIR`、別コードベース、LEDCキャリア）が既知状態を送信し当方RXが
@@ -144,7 +160,7 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   無しで符号化するので、それらのデコード経路も検証できる。
 
 所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` /
-`src/ac/Mitsubishi.h` に反映します。
+`src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` に反映します。
 
 `irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
 IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを確認: 当方のRAW

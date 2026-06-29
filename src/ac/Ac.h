@@ -5,6 +5,7 @@
 #include "Panasonic.h"
 #include "Gree.h"
 #include "Mitsubishi.h"
+#include "Fujitsu.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -19,6 +20,7 @@ namespace esp32irpk::ac
     PANASONIC = 1,
     GREE = 2,
     MITSUBISHI = 3,
+    FUJITSU = 4,
     // further vendors added incrementally
   };
 
@@ -67,6 +69,13 @@ namespace esp32irpk::ac
         mf.printTo(*out);
       return AcVendor::MITSUBISHI;
     }
+    Fujitsu::Frame ff;
+    if (Fujitsu::Frame::fromRaw(raw, ff))
+    {
+      if (out)
+        ff.printTo(*out);
+      return AcVendor::FUJITSU;
+    }
     if (out)
       out->println("// decoded: no AC vendor matched (raw replay still works)");
     return AcVendor::UNKNOWN;
@@ -100,6 +109,14 @@ namespace esp32irpk::ac
                           mf.bytes, Mitsubishi::Frame::kBytes);
       return AcVendor::MITSUBISHI;
     }
+    Fujitsu::Frame ff;
+    if (Fujitsu::Frame::fromRaw(raw, ff))
+    {
+      // Dump byte_length, not kBytes: a power-off capture is a 7-byte short frame.
+      printAcStateSnippet(out, "Fujitsu", "esp32irpk::ac::Fujitsu::Frame",
+                          ff.bytes, ff.byte_length);
+      return AcVendor::FUJITSU;
+    }
     return AcVendor::UNKNOWN;
   }
 
@@ -126,6 +143,12 @@ namespace esp32irpk::ac
     {
       mf.printSetterSnippet(out);
       return AcVendor::MITSUBISHI;
+    }
+    Fujitsu::Frame ff;
+    if (Fujitsu::Frame::fromRaw(raw, ff))
+    {
+      ff.printSetterSnippet(out);
+      return AcVendor::FUJITSU;
     }
     return AcVendor::UNKNOWN;
   }

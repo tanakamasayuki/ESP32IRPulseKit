@@ -40,6 +40,10 @@ heatpumpir_tx/             # TX: HeatpumpIR (known state) -> RX: ESP32IRPulseKit
 # Gree (IRGreeAC with the YBOFB model, matching esp32irpk::ac::Gree)
 gree_irremoteesp8266_tx/   # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
 gree_irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+
+# Fujitsu (IRFujitsuAC with the ARRAH2E model, matching esp32irpk::ac::Fujitsu)
+fujitsu_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+fujitsu_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
 Each vendor uses the same `<extlib>_<role>` variants. The variant folders are
@@ -146,6 +150,19 @@ harness are added one variant at a time. In place:
   its bit mark (450 µs), so it is sent on the phase-aligned carrier (the `rx`
   study sets it; `study_mitsubishi_carrier_ab.py` quantifies phase-aligned vs hardware).
 
+- `fujitsu_irremoteesp8266_tx/` + `fujitsu_irremoteesp8266_rx/` -- the same
+  calibration and encoder-verification pair for the "Fujitsu AC" protocol (model
+  ARRAH2E), using IRremoteESP8266's `IRFujitsuAC`. A full setting is a 16-byte
+  long frame (fixed `14 63 00 10 10`, byte 5 = `0xFE`, complement checksum in byte
+  15); a power-off is a 7-byte short frame (`14 63 00 10 10 02 FD`), so the cases
+  include a `power=0` case that exercises the short frame. The frame is sent once;
+  the `rx` primary uses a 50 ms timeout. Like Gree/Mitsubishi, Fujitsu's zero-space
+  (390 µs) is shorter than its bit mark (448 µs), so it is sent on the
+  phase-aligned carrier. Our `esp32irpk::ac::Fujitsu` enum values equal the
+  IRremoteESP8266 wire codes, so the field comparison is a direct numeric match. A
+  HeatpumpIR second reference (`fujitsu_heatpumpir_tx`) is the remaining step
+  before Fujitsu is promoted from **Implemented** to **Supported** in SPEC §11.2.
+
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`
   / `MitsubishiFEHeatpumpIR`, a separate codebase over an LEDC carrier) transmits
@@ -156,7 +173,7 @@ harness are added one variant at a time. In place:
   FanAuto bit, so this variant also exercises those decode paths.
 
 Findings and the confirmed field maps are recorded back here and into
-`src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h`.
+`src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h`.
 
 The `irremoteesp8266_tx/` run confirms the Panasonic field map in
 `src/ac/Panasonic.h` matches IRremoteESP8266's `IRPanasonicAc` byte-for-byte:

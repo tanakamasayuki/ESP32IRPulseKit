@@ -702,14 +702,18 @@ struct Frame {
 | | Mitsubishi 136 | 17バイト | — | 未対応 |
 | | Mitsubishi 112 | 14バイト | — | 未対応 |
 | | Mitsubishi Heavy | 88 / 152bit | — | 未対応 |
-| Fujitsu | Fujitsu AC | 長16バイト / 短7バイト | ARRAH2E … ARREW4E | 予定（モデル未定） |
+| Fujitsu | Fujitsu AC | 長16バイト / 短7バイト | ARRAH2E | **実装済**¹ |
+| | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | 未対応 |
 | Daikin | Daikin（＋サイズ別） | 35バイト＋他 | — | 予定（モデル未定） |
+
+¹ Fujitsu ARRAH2E: フィールドマップは host `codec_smoke` に加え、IRremoteESP8266 に対して実機で双方向に検証済み（`fujitsu_irremoteesp8266_tx` / `_rx` compat studies が pass — 当方のRAW捕捉が正準バイトを再現し、独立デコーダが当方のバーストをバイト単位で受理）。HeatpumpIR の2系統目参照（`fujitsu_heatpumpir_tx`）が **対応** へ昇格する前の残ステップ。
 
 対応フォーマットのベンダ別構造:
 
 - `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。`Model::JKE`（テンプレートは IRremoteESP8266 の既定known-good stateとバイト完全一致）、`DKE`/`NKE`/`LKE`/`RKR` に対応 — power/mode/temperature/fan のフィールドマップは共通で、固定マーカーバイトだけが異なる（`fromRaw` がモデル判定、`toRaw` が刻む）。各モデルを IRremoteESP8266 に対して実機検証済み。`CKP` は予約（トグル電源＋quiet/powerfulのビット位置が別）でエンコードは `false`。
 - `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。実装モデルは YBOFB（`Model::YBOFB`、モデルビットは0）。`Model::YAW1F`/`YX1FSF` は将来用に予約。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。`SwingV`/`SwingH` で上下・左右スイングを設定。
 - `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。このフォーマットは単一モデル（`Model` パラメータ無し）。他のMitsubishi波形フォーマット（136 / 112 / Heavy）は別の `Frame` 型になる。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。`Vane`（上下、`P1`..`P5`）と `WideVane`（左右）で気流方向を設定し、`temperatureC()`/`setTemperatureC()` は 0.5℃刻みを含む対称な `float` ペア。
+- `Fujitsu` — 「Fujitsu AC」protocol（ARシリーズリモコン）、対象モデルは ARRAH2E。全設定は16バイトのpulse-distance「長」フレームで、固定バイト `14 63 00 10 10` で始まり、byte5 = `0xFE`（長フレームマーカー）、byte15 に補数チェックサム。電源OFFは7バイトの「短」フレーム `14 63 00 10 10 02 FD`（byte6 = `~`byte5）。各フレームは1回送信。電源は状態ビットでなくフレーム種別が表す（長=ON、短OFF=OFF）ので、`setPower(false)` は短フレームを送り、デコードしたOFFフレームの mode/temp/fan はベンダ的にdon't-careでテンプレート既定値を保持する。単一モデル（`Model` パラメータはまだ無し）。ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E は長さ・マーカー・チェックサム補数・（ARREW4E は）温度エンコードが異なり、後でモデル分岐または `Frame` 型として追加する。`Fan` は `AUTO`/`HIGH_SPEED`/`MED_SPEED`/`LOW_SPEED`/`QUIET`。`Swing` は `OFF`/`VERTICAL`/`HORIZONTAL`/`BOTH`。
 
 **Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
 
@@ -772,6 +776,24 @@ byte3 の上位ニブル（`0b0101`）と byte5 bit3-5（`0b100`）はリモコ�
 
 ベーン（上下スイング、`Vane` enum。位置は Panasonic のルーバーに倣い `P1`..`P5`——Arduino の `HIGH`/`LOW` マクロのため方向名は使えない）・ワイドベーン（左右、`WideVane`）・0.5℃（`temperatureC()`/`setTemperatureC()` を 0.5℃刻みの対称な `float` ペアに、`halfDegree()` は簡便な読み取り）はいずれも setter 実装済み。`setVane` は byte9 の「ベーン有効」ビットを立てる。`setMode` は byte8 を書き換えてワイドベーンを MIDDLE にリセットするので、先に mode、後からワイドベーンを設定する。時計/タイマーブロックとコンフォート/診断系ビット（iSee・ecocool・直接/間接・i-save・ナチュラルフロー・左ベーン）は記載のみで setter は未作成 — タイマーの setter 非作成方針（[DESIGN.ja.md](DESIGN.ja.md) §13）が同様に当てはまる。RAW replay で再現可能。
 
+**Fujitsu AC フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが16バイト長フレーム状態（ARRAH2E）のどこに入るか。ステータス凡例は上と同じ。byte0–7 は固定/フレーミング: `14 63`（ヘッダ）、byte2=デバイスID、`10 10`、byte5=`0xFE` 長マーカー、byte6=残バイト長 `0x09`、byte7=protocol `0x30`。
+
+| フィールド | 位置 (byte/bit) | コード/値域 | ステータス |
+|---|---|---|---|
+| power | フレーム種別 | 長フレーム=ON / 7バイト短 `…02 FD`=OFF | ✅ |
+| 温度(整数) | byte8 bit2-7 | `(℃ − 16) × 4`（整数部は上位ニブル）、16–30℃ | ✅ |
+| mode | byte9 bit0-2 | auto=0 / cool=1 / dry=2 / fan=3 / heat=4 | ✅ |
+| fan(風量) | byte10 bit0-2 | auto=0 / high=1 / med=2 / low=3 / quiet=4 | ✅ |
+| swing | byte10 bit4-5 | off=0 / 上下=1 / 左右=2 / 両方=3 | ✅ |
+| 華氏 | byte8 bit1 | ℃/℉ 単位 | 🟡 |
+| クリーン / 10℃暖房 | byte9 bit3 | on=1 | 🟡 |
+| 入切タイマー | byte11-13 | 11bit・分単位＋有効ビット | 🟡 |
+| フィルタ / 外部静音 | byte14 bit3, 7 | on=1 | 🟡 |
+| checksum(長) | byte15 | `−(byte7…14 の総和)` mod256 | ✅ |
+| checksum(短) | byte6 | `~`byte5（コマンドの反転） | ✅ |
+
+電源は状態ビットでなく長/短フレームのセレクタ（長フレームでは byte8 の Power ビットは0のまま）: `setPower(true)` は全16バイト状態を、`setPower(false)` は短OFFコマンドを描画し、その mode/temp/fan はベンダ的にdon't-care（デコードしたOFFフレームは `power=off` を報告し残りはテンプレート既定値を保持）。`temperatureC()`/`setTemperatureC()` は 16–30℃ にクランプ。6bitのTempフィールドは `(℃ − 16) × 4` を格納するので整数度は byte8 の上位ニブルに乗る。華氏単位・クリーン/10℃暖房・タイマー・フィルタ/外部静音は記載のみで setter は未作成 — キャプチャしたフレームを RAW replay で再送すれば再現できる。実装モデルは ARRAH2E のみ。他のARシリーズは予約（対応一覧を参照）。
+
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 
 ### 11.3 長尺フレームのキャリア
@@ -785,5 +807,6 @@ ACフレームは長く、確実に届くキャリアはベンダのタイミン
 - **Panasonic** はどちらのキャリアでも問題ありません（実機治具で両方とも全フレーム到達）。ハードウェアキャリアで十分かつ省メモリです。
 - **Gree** は位相整合キャリアが必須です。zeroスペース（540us）がbitマーク（620us）より短いため、ハードウェアキャリアのマーク揺れでスペースが許容範囲を外れ、受信側がフレームの約半数を棄却します（実測: 位相整合 50/50 vs ハードウェア 約55%）。
 - **Mitsubishi** も同じタイミング余裕の狭い例（zeroスペース420us < bitマーク450us）で、同様に位相整合キャリアを使います。
+- **Fujitsu** も同じタイミング余裕の狭い例（zeroスペース390us < bitマーク448us）で、既定で位相整合キャリアを使います。`fujitsu_*` compat studies は実機での到達率を確認するためのものです。
 
 推奨: ACでは位相整合キャリアが安全な既定で、`setPhaseAlignedCarrier` を呼ばなければこれになります。ハードウェアキャリア（`setPhaseAlignedCarrier(false)`）は、Panasonic のようなタイミング余裕の広いベンダでの省メモリ最適化としてのみ使ってください。キャリアはバイト整合性ではなく到達率に影響します——受信できたフレームは常にバイト正確（チェックサム検証済み）で、位相整合キャリアにサイズ上限はありません（15bitフィールドを超える時間は複数シンボルに分割）。

@@ -709,14 +709,18 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | Mitsubishi 136 | 17-byte | — | Not yet |
 | | Mitsubishi 112 | 14-byte | — | Not yet |
 | | Mitsubishi Heavy | 88 / 152-bit | — | Not yet |
-| Fujitsu | Fujitsu AC | 16-byte long / 7-byte short | ARRAH2E … ARREW4E | Planned (model TBD) |
+| Fujitsu | Fujitsu AC | 16-byte long / 7-byte short | ARRAH2E | **Implemented**¹ |
+| | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | Not yet |
 | Daikin | Daikin (+ size variants) | 35-byte + others | — | Planned (model TBD) |
+
+¹ Fujitsu ARRAH2E: field map verified in host `codec_smoke` and bidirectionally on hardware against IRremoteESP8266 (the `fujitsu_irremoteesp8266_tx` / `_rx` compat studies pass — our RAW capture reproduces the canonical bytes and an independent decoder accepts our burst byte-for-byte). A HeatpumpIR second reference (`fujitsu_heatpumpir_tx`) is the remaining step before promotion to **Supported**.
 
 Per-vendor framing of the supported formats:
 
 - `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame. `Model::JKE` (template byte-identical to IRremoteESP8266's default known-good state), `DKE`, `NKE`, `LKE` and `RKR` are supported — they share the power/mode/temperature/fan field map and differ only in fixed marker bytes (`fromRaw` classifies the model; `toRaw` stamps it), verified per-model against IRremoteESP8266. `CKP` is reserved (toggle power + relocated quiet/powerful bits); encoding it returns `false`.
 - `Gree` — one 8-byte state sent as two pulse-distance blocks. The first block carries bytes 0–3 plus a fixed 3-bit footer; the second carries bytes 4–7 with no header of its own. A Kelvinator-style block checksum occupies the high nibble of byte 7. The implemented model is YBOFB (`Model::YBOFB`, model bit clear); `Model::YAW1F`/`YX1FSF` are reserved for later. `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`; `SwingV` and `SwingH` set the vertical and horizontal swing.
 - `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. This format has a single model (no `Model` parameter); the other Mitsubishi wire formats (136 / 112 / Heavy) would be separate `Frame` types. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`; `Vane` (vertical, `P1`..`P5`) and `WideVane` (horizontal) set the airflow direction, and `temperatureC()`/`setTemperatureC()` are a symmetric `float` pair carrying 0.5 °C steps.
+- `Fujitsu` — the "Fujitsu AC" protocol (AR-series remotes), targeting model ARRAH2E. A full setting is a 16-byte pulse-distance "long" frame beginning with the fixed bytes `14 63 00 10 10`, byte 5 = `0xFE` (the long-frame marker), and a complement checksum in byte 15; a power-off is the 7-byte "short" frame `14 63 00 10 10 02 FD` (byte 6 = `~`byte 5). Each frame is sent once. Power is carried by the frame type (long = on, short OFF = off), not a state bit, so `setPower(false)` emits the short frame and the don't-care mode/temp/fan fields of a decoded OFF frame keep the template defaults. Single model (no `Model` parameter yet); ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E differ in length, marker, checksum complement, and (ARREW4E) temperature encoding and would be added as model branches or `Frame` types later. `Fan` is `AUTO`/`HIGH_SPEED`/`MED_SPEED`/`LOW_SPEED`/`QUIET`; `Swing` is `OFF`/`VERTICAL`/`HORIZONTAL`/`BOTH`.
 
 **Panasonic field map (decoded logical fields).** Where each control field lives in the 27-byte state. Status legend: ✅ implemented (decode + encode) · 🔜 planned · 🟡 documented, no setter (re-send via RAW replay) · ⛔ out of scope (separate frame type).
 
@@ -779,6 +783,24 @@ Byte 3's high nibble (`0b0101`) and byte 5 bits 3-5 (`0b100`) are fixed markers 
 
 Vane (vertical swing, `Vane` enum with positions `P1`..`P5` after the Panasonic louver convention — Arduino's `HIGH`/`LOW` macros rule out directional names), wide vane (horizontal, `WideVane`), and 0.5 °C (a symmetric `float` `temperatureC()`/`setTemperatureC()` pair, with `halfDegree()` as a convenience reader) all have setters. `setVane` asserts the byte-9 "vane valid" bit; `setMode` rewrites byte 8 and resets the wide vane to MIDDLE, so set the mode first and the wide vane after. The timer/clock block and the comfort/diagnostic bits (iSee, ecocool, direct/indirect, i-save, natural-flow, dual-vane-left) are documented but have no setter yet — the no-setter-for-timers rationale in [DESIGN.md](DESIGN.md) §13 applies the same way; RAW replay reproduces them.
 
+**Fujitsu AC field map (decoded logical fields).** Where each control field lives in the 16-byte long-frame state (ARRAH2E). Same status legend. Bytes 0–7 are fixed/framing: `14 63` (header), byte 2 = device id, `10 10`, byte 5 = `0xFE` long marker, byte 6 = rest-length `0x09`, byte 7 = protocol `0x30`.
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| power | frame type | long frame = on / 7-byte short `…02 FD` = off | ✅ |
+| temperature (integer) | byte 8 bits 2-7 | `(°C − 16) × 4` (degrees in the high nibble), 16–30 °C | ✅ |
+| mode | byte 9 bits 0-2 | auto=0 / cool=1 / dry=2 / fan=3 / heat=4 | ✅ |
+| fan (airflow) | byte 10 bits 0-2 | auto=0 / high=1 / med=2 / low=3 / quiet=4 | ✅ |
+| swing | byte 10 bits 4-5 | off=0 / vertical=1 / horizontal=2 / both=3 | ✅ |
+| Fahrenheit | byte 8 bit 1 | °C / °F unit | 🟡 |
+| clean / 10 °C heat | byte 9 bit 3 | on=1 | 🟡 |
+| on/off timer | bytes 11-13 | 11-bit minutes + enable bits | 🟡 |
+| filter / outside-quiet | byte 14 bits 3, 7 | on=1 | 🟡 |
+| checksum (long) | byte 15 | `−(sum of bytes 7…14)` mod 256 | ✅ |
+| checksum (short) | byte 6 | `~`byte 5 (inverted command) | ✅ |
+
+Power is the long-vs-short frame selector rather than a state bit (the byte-8 Power bit stays 0 in long frames): `setPower(true)` renders the full 16-byte state, `setPower(false)` renders the short OFF command, whose mode/temp/fan are vendor don't-cares (a decoded OFF frame reports `power=off` and keeps the template defaults for the rest). `temperatureC()`/`setTemperatureC()` clamp to 16–30 °C; the 6-bit Temp field stores `(°C − 16) × 4`, so whole degrees land in the byte-8 high nibble. The Fahrenheit unit, clean/10 °C-heat, timers, and filter/outside-quiet bits are documented but have no setter yet — replay a captured frame via RAW to reproduce them. ARRAH2E is the only implemented model; the other AR-series models are reserved (see the support matrix).
+
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
 ### 11.3 Carrier For Long Frames
@@ -792,5 +814,6 @@ That wobble matters for tightly-timed vendors:
 - **Panasonic** tolerates either carrier — both delivered every frame on the test rig — so the hardware carrier is fine and cheaper.
 - **Gree** requires the phase-aligned carrier. Its zero-space (540 µs) is shorter than its bit mark (620 µs), so the hardware carrier's mark wobble pushes spaces out of tolerance and the receiver rejects about half the frames (measured: phase-aligned 50/50 vs hardware ~55%).
 - **Mitsubishi** is the same tight-timing case (zero-space 420 µs < bit mark 450 µs) and likewise uses the phase-aligned carrier.
+- **Fujitsu** is the same tight-timing case (zero-space 390 µs < bit mark 448 µs), so it uses the phase-aligned carrier by default; the `fujitsu_*` compat studies are intended to confirm the delivery rate on hardware.
 
 Recommendation: the phase-aligned carrier is the safe default for AC, and is what you get if you never call `setPhaseAlignedCarrier`. Use the hardware carrier (`setPhaseAlignedCarrier(false)`) only as a memory optimization for loosely-timed vendors such as Panasonic. The carrier affects delivery rate, not byte integrity — a received frame is always byte-correct because it is checksum-validated, and the phase-aligned carrier is not size-limited (durations beyond the 15-bit field are split across symbols).
