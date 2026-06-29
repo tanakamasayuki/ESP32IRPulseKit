@@ -702,11 +702,9 @@ struct Frame {
 | | Mitsubishi 136 | 17バイト | — | 未対応 |
 | | Mitsubishi 112 | 14バイト | — | 未対応 |
 | | Mitsubishi Heavy | 88 / 152bit | — | 未対応 |
-| Fujitsu | Fujitsu AC | 長16バイト / 短7バイト | ARRAH2E | **実装済**¹ |
+| Fujitsu | Fujitsu AC | 長16バイト / 短7バイト | ARRAH2E | **対応** |
 | | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | 未対応 |
 | Daikin | Daikin（＋サイズ別） | 35バイト＋他 | — | 予定（モデル未定） |
-
-¹ Fujitsu ARRAH2E: フィールドマップは host `codec_smoke` に加え、IRremoteESP8266 に対して実機で双方向に検証済み（`fujitsu_irremoteesp8266_tx` / `_rx` compat studies が pass — 当方のRAW捕捉が正準バイトを再現し、独立デコーダが当方のバーストをバイト単位で受理）。HeatpumpIR の2系統目参照（`fujitsu_heatpumpir_tx`）が **対応** へ昇格する前の残ステップ。
 
 対応フォーマットのベンダ別構造:
 

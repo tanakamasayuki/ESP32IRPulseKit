@@ -709,11 +709,9 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | Mitsubishi 136 | 17-byte | — | Not yet |
 | | Mitsubishi 112 | 14-byte | — | Not yet |
 | | Mitsubishi Heavy | 88 / 152-bit | — | Not yet |
-| Fujitsu | Fujitsu AC | 16-byte long / 7-byte short | ARRAH2E | **Implemented**¹ |
+| Fujitsu | Fujitsu AC | 16-byte long / 7-byte short | ARRAH2E | **Supported** |
 | | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | Not yet |
 | Daikin | Daikin (+ size variants) | 35-byte + others | — | Planned (model TBD) |
-
-¹ Fujitsu ARRAH2E: field map verified in host `codec_smoke` and bidirectionally on hardware against IRremoteESP8266 (the `fujitsu_irremoteesp8266_tx` / `_rx` compat studies pass — our RAW capture reproduces the canonical bytes and an independent decoder accepts our burst byte-for-byte). A HeatpumpIR second reference (`fujitsu_heatpumpir_tx`) is the remaining step before promotion to **Supported**.
 
 Per-vendor framing of the supported formats:
 

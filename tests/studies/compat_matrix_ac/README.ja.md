@@ -147,17 +147,18 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   フレームは1回送信で、`rx` primary は50msタイムアウトを使う。Gree/Mitsubishi同様、
   zeroスペース（390us）がbitマーク（448us）より短いので位相整合キャリアで送る。当方
   `esp32irpk::ac::Fujitsu` のenum値は IRremoteESP8266 のワイヤコードと一致するので、
-  フィールド比較は直接の数値一致になる。HeatpumpIR の2系統目参照
-  （`fujitsu_heatpumpir_tx`）が、SPEC §11.2 で Fujitsu を **実装済** から **対応** へ
-  昇格させる前の残ステップ。
+  フィールド比較は直接の数値一致になる。
 
-- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` — それぞれの2系統目の独立参照
+- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` — それぞれの2系統目の独立参照
   （`heatpumpir_tx` と同型）。HeatpumpIR（`GreeGenericHeatpumpIR` /
-  `MitsubishiFEHeatpumpIR`、別コードベース、LEDCキャリア）が既知状態を送信し当方RXが
-  デコード。hard判定は意味一致（checksum妥当＋論理フィールドが送信状態と一致）で、
-  バイト一致ではない（HeatpumpIRはIRremoteESP8266と異なる補助バイトを埋めるため）。
-  HeatpumpIR の Mitsubishi fan は QUIET/HIGH に届き、fan-auto を専用FanAutoビット
-  無しで符号化するので、それらのデコード経路も検証できる。
+  `MitsubishiFEHeatpumpIR` / `FujitsuHeatpumpIR`、別コードベース、LEDCキャリア）が
+  既知状態を送信し当方RXがデコード。hard判定は意味一致（checksum妥当＋論理フィールドが
+  送信状態と一致）で、バイト一致ではない（HeatpumpIRはIRremoteESP8266と異なる補助バイトを
+  埋めるため）。HeatpumpIR の Mitsubishi fan は QUIET/HIGH に届き、fan-auto を専用
+  FanAutoビット無しで符号化するので、それらのデコード経路も検証できる。HeatpumpIR の
+  Fujitsu は同じ ARRAH2E 長フレーム（byte5=0xFE）を、当方と同値に還元されるチェックサムで
+  出力し、fan定数がワイヤコードと逆順（FAN_1=quiet .. FAN_4=high）なので、peer は各速度
+  トークンを目的のワイヤコードを生む FAN_x にマップする。
 
 所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` /
 `src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` に反映します。

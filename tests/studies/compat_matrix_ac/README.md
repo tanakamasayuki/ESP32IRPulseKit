@@ -159,18 +159,20 @@ harness are added one variant at a time. In place:
   the `rx` primary uses a 50 ms timeout. Like Gree/Mitsubishi, Fujitsu's zero-space
   (390 µs) is shorter than its bit mark (448 µs), so it is sent on the
   phase-aligned carrier. Our `esp32irpk::ac::Fujitsu` enum values equal the
-  IRremoteESP8266 wire codes, so the field comparison is a direct numeric match. A
-  HeatpumpIR second reference (`fujitsu_heatpumpir_tx`) is the remaining step
-  before Fujitsu is promoted from **Implemented** to **Supported** in SPEC §11.2.
+  IRremoteESP8266 wire codes, so the field comparison is a direct numeric match.
 
-- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` -- a second independent
+- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`
-  / `MitsubishiFEHeatpumpIR`, a separate codebase over an LEDC carrier) transmits
-  a known state and our RX decodes it. The hard check is semantic (checksum valid
-  + logical fields match the sent state), not byte identity, since HeatpumpIR
-  fills different auxiliary bytes than IRremoteESP8266. HeatpumpIR's Mitsubishi
-  fan steps reach QUIET and HIGH, and it encodes fan-auto without the dedicated
-  FanAuto bit, so this variant also exercises those decode paths.
+  / `MitsubishiFEHeatpumpIR` / `FujitsuHeatpumpIR`, a separate codebase over an LEDC
+  carrier) transmits a known state and our RX decodes it. The hard check is semantic
+  (checksum valid + logical fields match the sent state), not byte identity, since
+  HeatpumpIR fills different auxiliary bytes than IRremoteESP8266. HeatpumpIR's
+  Mitsubishi fan steps reach QUIET and HIGH, and it encodes fan-auto without the
+  dedicated FanAuto bit, so that variant also exercises those decode paths.
+  HeatpumpIR's Fujitsu emits the same ARRAH2E long frame (byte 5 = 0xFE) with a
+  checksum that reduces to the same value as ours, and its fan constants are
+  inverted vs the wire codes (FAN_1 = quiet .. FAN_4 = high), so its peer maps each
+  speed token to the FAN_x that yields the intended wire code.
 
 Findings and the confirmed field maps are recorded back here and into
 `src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h`.
