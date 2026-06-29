@@ -711,7 +711,8 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | Mitsubishi Heavy | 88 / 152-bit | — | Not yet |
 | Fujitsu | Fujitsu AC | 16-byte long / 7-byte short | ARRAH2E | **Supported** |
 | | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | Not yet |
-| Daikin | Daikin (+ size variants) | 35-byte + others | — | Planned (model TBD) |
+| Daikin | Daikin classic (ARC433) | 35-byte, 3 sections | single | Planned (next) |
+| | Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312 | various sizes | — | Not yet |
 
 Per-vendor framing of the supported formats:
 

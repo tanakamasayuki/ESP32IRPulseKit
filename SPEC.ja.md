@@ -704,7 +704,8 @@ struct Frame {
 | | Mitsubishi Heavy | 88 / 152bit | — | 未対応 |
 | Fujitsu | Fujitsu AC | 長16バイト / 短7バイト | ARRAH2E | **対応** |
 | | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | 未対応 |
-| Daikin | Daikin（＋サイズ別） | 35バイト＋他 | — | 予定（モデル未定） |
+| Daikin | Daikin classic（ARC433） | 35バイト・3セクション | 単一 | 予定（次に着手） |
+| | Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312 | サイズ各種 | — | 未対応 |
 
 対応フォーマットのベンダ別構造:
 
