@@ -710,6 +710,10 @@ struct Frame {
 | | 短（7バイトswing）/ 長（10バイト） | — | 未対応 |
 | Samsung | Samsung AC | 14バイト、2セクション | 標準 | **対応**² |
 | | 拡張（21バイトタイマ） | — | 未対応 |
+| Sharp | Sharp AC | 13バイト | A907 | **実装済**¹ |
+| | | A705 / A903 | 未対応 |
+
+¹ Sharp（13バイト、A907モデル）: フィールドマップ、Auto/Dry のフィールド強制ルール、PowerSpecial 電源モデル、ニブル畳み込みXORチェックサムは host `codec_smoke` で IRSharpAc の記載レイアウトに対して検証済み。双方向の実機/compat-matrix 検証（`sharp_irremoteesp8266_tx` / `_rx`）は追加済みだが未実行のため、まだ **対応** には昇格していません。Samsung 同様 HeatpumpIR の第2リファレンスは無い（HeatpumpIR に Sharp は無い）ので、検証は IRremoteESP8266 双方向ペアに依拠する。
 
 ² Samsung は通常の IRremoteESP8266 ＋ HeatpumpIR ではなく、IRremoteESP8266 の双方向ペア（`samsung_irremoteesp8266_tx` / `_rx` — エンコード・デコードを各々独立スタックで実機確認）で検証する: HeatpumpIR の Samsung クラスは旧 AQV（21バイト）と FJM（section2チェックサムが別）変種の実装で、いずれも現行の14バイト SAMSUNG_AC と一致しないため。
 
@@ -717,7 +721,6 @@ struct Frame {
 
 | ベンダ | フォーマット / サイズ | リファレンス | 備考 |
 |---|---|---|---|
-| Sharp | Sharp AC、13バイト | IRremoteESP8266 のみ | 最も単純な byte-state（単一フレーム、反転コピーを付けて2回送信）。日本市場で一般的。HeatpumpIR の第2リファレンスは無く、キャプチャフレームの fixture で代替。 |
 | Kelvinator | Kelvinator、16バイト、2ブロック | IRremoteESP8266 のみ | 2ブロック構成＋ブロックチェックサムが Gree（解決済み）とほぼ同一 — コード再利用度が高く低コスト。 |
 | Midea | Midea、48ビット（6バイト） | IRremoteESP8266 + HeatpumpIR | OEM多数で広いカバレッジ。注意: コード＋反転コピー構造（総和/XORのバイトチェックサムが無い）で byte-state モデルから外れ気味、反転検証経路が必要。 |
 | Carrier | Carrier AC、32 / 64ビット ＋ 128ビット（16バイト） | IRremoteESP8266 + HeatpumpIR | 二重リファレンスだが複数の異なる波形フォーマットがあり、各々が別 `Frame` 型。着手前に対象フォーマットを選ぶ。 |
@@ -734,6 +737,7 @@ struct Frame {
 - `Daikin` — クラシックな「Daikin」/ ARC433 protocol（ARC433** / ARC466 リモコン、M Series / FTXM-M 機種）。35バイト状態を、先頭5bitの `00000` プリアンブルに続けて**3セクション**（8 + 8 + 19バイト）のpulse-distanceで送る。各セクションは独自のヘッダを持ち、セクション毎の総和チェックサム（byte7 / 15 / 34）を持つ。各セクションは固定署名 `11 DA 27` で始まる。単一のクラシックフォーマット（`Model` パラメータ無し）。他の Daikin サイズ（Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312）は別 `Frame` 型。`Mode` は `AUTO`/`DRY`/`COOL`/`HEAT`/`FAN`。`Fan` は `AUTO`/`QUIET`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。`setSwingVertical`/`setSwingHorizontal` で上下・左右の気流軸を切り替える。`temperatureC()`/`setTemperatureC()` は `float` ペア（byte22 に °C × 2 を格納）。位相整合キャリア必須——zeroスペースがbitマークと等しい（共に428us、§11.3）。
 - `Toshiba` — 標準「Toshiba AC」protocol（WH-/RAS- リモコン、Carrier OEM機）。9バイトの pulse-distance フレームをフレームギャップを挟んで**2回**送る、**MSB-first**（唯一のMSB-first ACベンダ）、固定署名 `F2 0D` で始まる（byte1 = `~`byte0・byte3 = `~`byte2）。byte8 に XOR チェックサム（byte0–7）。電源は状態ビットでなく Mode フィールドが表す（`Mode == 7` = off）ので、`setPower(false)` は mode 7 を書き、`setPower(true)` は直前のモードを復元する。`Mode` は `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`。`Fan` は `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`（温度は整数のみ、17–30℃）。スイングは別の短メッセージ系（予約）で、標準フレームは保持しない。7バイト短・10バイト長メッセージは別 `Frame` 型。
 - `Samsung` — 標準「Samsung AC」protocol（AR-/ARH- 系リモコン）。14バイト状態、**LSBファースト**。先頭一回限りのヘッダ（690us mark + 17844us space）の後、7バイトの2セクションを送る。各セクションは独自のセクションヘッダ（3086/8864us）と 2886us のセクションギャップを持つ。各セクションは popcount（ハミング重み）チェックサムをビット反転し、バイト1〜2の2ニブルに分割して格納する。固定ベンダ署名は無いため `fromRaw` は両セクションのチェックサム一致をゲートにする。電源は2bitフィールド2つ（byte6・byte13）: 両方 `0b11` = on、両方 `0b00` = off。`Mode` は `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`（温度は整数のみ、16–30℃）。スイングと特殊ファン（Powerful/WindFree/Econo）はここでは設定不可。21バイト拡張（タイマ）メッセージは別 `Frame` 型。
+- `Sharp` — 標準「Sharp AC」protocol。13バイトの単一 pulse-distance フレーム、**LSBファースト**、固定ヘッダ `AA 5A CF 10` で始まる。byte12 の上位ニブルにニブル畳み込みXORチェックサム。電源は4bitの `PowerSpecial` フィールド（byte5）: on=3 / off=2（単純なビットではない）。`Special` バイト（byte10）は実機がどのボタンを押したかを表すが、`toRaw` は常に「電源」値（0x00）を出すので完全な状態コマンドになる。`Mode` は `AUTO`/`HEAT`/`COOL`/`DRY`（Auto と Fan はワイヤコード `0b00` を共有するので Fan 単独は無し）。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`（非連続のワイヤコード 2/4/3/5/7、温度は整数 15–30℃）。Auto と Dry は温度を持たない（Temp=0）ので、温度はその場では don't-care。実装は既定の A907 モデル。A705 / A903（Heat を Fan に置換し別のファンコード、Model/Model2 ビットで区別）は予約。swing / ion / clean / timer は記載のみで setter 未作成。
 
 **Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
 
@@ -861,6 +865,22 @@ MSB-first。`toRaw` は固定フレーミング前置（署名＋反転ペア＋
 | checksum（section 2） | byte8 上位ニブル ＋ byte9 下位ニブル | section バイト7–13 の popcount を反転 | ✅ |
 
 LSB-first。`toRaw` は2つのセクションチェックサムを再計算し、一回限りの先頭ヘッダに続けて2セクション（各々独自ヘッダ付き）を実機同様に描画する。電源は2bitフィールド2つをまとめて書く。swing と特殊ファンは setter 未作成。実装済みは唯一このフォーマットで、21バイト拡張（タイマ）は予約。
+
+**Sharp AC フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが13バイト状態のどこに入るか。ステータス凡例は上と同じ。byte0–3 は固定ヘッダ `AA 5A CF 10`。
+
+| フィールド | 位置（byte/bit） | コード / 範囲 | 状態 |
+|---|---|---|---|
+| power | byte5 bit4-7（PowerSpecial） | on=3 / off=2 | ✅ |
+| mode | byte6 bit0-1 | auto=0 / heat=1 / cool=2 / dry=3 | ✅ |
+| temperature | byte4 bit0-3 | `°C − 15`、15–30℃（Cool/Heatのみ、Auto/Dry=0） | ✅ |
+| fan(風量) | byte6 bit4-6 | auto=2 / med=3 / min=4 / high=5 / max=7 | ✅ |
+| model | byte4 bit4 ＋ byte11 bit4 | A907（実装）/ A705 / A903 | 🟡 |
+| swing | byte8 bit0-2 | — | 🟡 |
+| ion / clean / timer | byte6/7/11 | — | 🟡 |
+| special（ボタン） | byte10 | power=0x00（出力） | ✅ |
+| checksum | byte12 bit4-7 | byte0–11 ＋ byte12下位ニブルのニブル畳み込みXOR | ✅ |
+
+LSB-first。`toRaw` は固定ヘッダを書き直し、Auto/Dry では温度を0にし（温度を持たない）、Special バイトを「電源」値にして、ニブルチェックサムを再計算する。電源は PowerSpecial フィールド（on=3 / off=2）。A705 / A903 モデル・swing・ion・clean・timer は setter 未作成。実装済みは A907 のみで、A705 / A903 は予約。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 

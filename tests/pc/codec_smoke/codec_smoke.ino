@@ -2362,6 +2362,126 @@ void testSamsungAcStateMatrix()
   EXPECT_TRUE("samsung/state-matrix", all_ok);
 }
 
+// Sharp AC (standard 13-byte SHARP_AC): build a frame, render the burst (LSB-first,
+// single frame, fixed AA 5A CF 10 header), decode it back, and confirm the logical
+// fields and the nibble-folded XOR checksum survive the roundtrip. Canonical bytes
+// are derived from IRSharpAc's documented layout + checksum; the hardware study
+// verifies them against IRSharpAc.
+void testSharpAcRoundtrip()
+{
+  using esp32irpk::ac::Sharp::Fan;
+  using esp32irpk::ac::Sharp::Frame;
+  using esp32irpk::ac::Sharp::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(24);
+  f.setFan(Fan::AUTO);
+
+  EXPECT_TRUE("sharp/power-get", f.power());
+  EXPECT_TRUE("sharp/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("sharp/temp-get", 24u, f.temperatureC());
+  EXPECT_TRUE("sharp/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("sharp/encode", f.toRaw(buf));
+  EXPECT_TRUE("sharp/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("sharp/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("sharp/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("sharp/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("sharp/decode-power", g.power());
+  EXPECT_TRUE("sharp/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("sharp/decode-temp", 24u, g.temperatureC());
+  EXPECT_TRUE("sharp/decode-fan", g.fan() == Fan::AUTO);
+
+  // On / cool / 24C / fan auto (A907), from IRSharpAc's struct + nibble checksum.
+  static const uint8_t kCanonicalCool24[Frame::kBytes] = {
+      0xAA, 0x5A, 0xCF, 0x10, 0x09, 0x31, 0x22,
+      0x00, 0x08, 0x80, 0x00, 0xE0, 0x91};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool24[i])
+      canonical_match = false;
+  EXPECT_TRUE("sharp/canonical-bytes", canonical_match);
+
+  // Power off (PowerSpecial = 2).
+  Frame p{};
+  p.setMode(Mode::HEAT);
+  p.setPower(false);
+  EXPECT_TRUE("sharp/poweroff", !p.power());
+  uint16_t t2[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer b2{t2, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("sharp/poweroff-encode", p.toRaw(b2));
+  Frame pg{};
+  EXPECT_TRUE("sharp/poweroff-decode", Frame::fromRaw(esp32irpk::IRRawTickView{b2.ticks, b2.len}, pg));
+  EXPECT_TRUE("sharp/poweroff-decode-off", !pg.power());
+
+  // Temperature clamps to the supported range.
+  Frame t{};
+  t.setMode(Mode::COOL);
+  t.setTemperatureC(40);
+  EXPECT_EQ("sharp/temp-clamp-high", 30u, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("sharp/temp-clamp-low", 15u, t.temperatureC());
+
+  // A non-Sharp waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("sharp/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power combination must encode (setters -> toRaw ->
+// fromRaw) back to itself with a valid checksum. Auto/Dry force Fan=Auto and Temp=0
+// (no temp setting), so those fields are only asserted in Cool/Heat.
+void testSharpAcStateMatrix()
+{
+  using esp32irpk::ac::Sharp::Fan;
+  using esp32irpk::ac::Sharp::Frame;
+  using esp32irpk::ac::Sharp::Mode;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::HEAT, Mode::COOL, Mode::DRY};
+  static const Fan fans[] = {Fan::AUTO, Fan::MIN_SPEED, Fan::MED_SPEED,
+                             Fan::HIGH_SPEED, Fan::MAX_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 15; temp <= 30; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          Frame f{};
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+          f.setPower(power != 0);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan)
+            all_ok = false;
+          // Temperature is only meaningful in Cool/Heat (Auto/Dry carry no temp).
+          const bool cool_or_heat = (m == Mode::COOL || m == Mode::HEAT);
+          if (cool_or_heat && g.temperatureC() != temp)
+            all_ok = false;
+        }
+  EXPECT_TRUE("sharp/state-matrix", all_ok);
+}
+
 // Each vendor's toString() maps an enum value to its identifier name (used by
 // printTo). Out-of-range values fall back to "?".
 void testAcEnumToString()
@@ -2373,6 +2493,7 @@ void testAcEnumToString()
   namespace D = esp32irpk::ac::Daikin;
   namespace TO = esp32irpk::ac::Toshiba;
   namespace SA = esp32irpk::ac::Samsung;
+  namespace SH = esp32irpk::ac::Sharp;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -2395,6 +2516,9 @@ void testAcEnumToString()
   EXPECT_TRUE("samsung/tostring-mode", strcmp(SA::toString(SA::Mode::HEAT), "HEAT") == 0);
   EXPECT_TRUE("samsung/tostring-fan-low", strcmp(SA::toString(SA::Fan::LOW_SPEED), "LOW_SPEED") == 0);
   EXPECT_TRUE("samsung/tostring-fan-max", strcmp(SA::toString(SA::Fan::MAX_SPEED), "MAX_SPEED") == 0);
+  EXPECT_TRUE("sharp/tostring-mode", strcmp(SH::toString(SH::Mode::COOL), "COOL") == 0);
+  EXPECT_TRUE("sharp/tostring-fan-min", strcmp(SH::toString(SH::Fan::MIN_SPEED), "MIN_SPEED") == 0);
+  EXPECT_TRUE("sharp/tostring-fan-max", strcmp(SH::toString(SH::Fan::MAX_SPEED), "MAX_SPEED") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -2609,6 +2733,32 @@ void testAcFromBytes()
     EXPECT_TRUE("samsung/frombytes-eq", eq);
     EXPECT_TRUE("samsung/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+  // Sharp: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Sharp::Fan;
+    using esp32irpk::ac::Sharp::Frame;
+    using esp32irpk::ac::Sharp::Mode;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::MAX_SPEED);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("sharp/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("sharp/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("sharp/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("sharp/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("sharp/frombytes-eq", eq);
+    EXPECT_TRUE("sharp/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -2675,6 +2825,8 @@ void setup()
   testToshibaAcStateMatrix();
   testSamsungAcRoundtrip();
   testSamsungAcStateMatrix();
+  testSharpAcRoundtrip();
+  testSharpAcStateMatrix();
   testAcEnumToString();
   testAcFromBytes();
 

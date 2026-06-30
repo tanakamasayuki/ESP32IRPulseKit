@@ -55,6 +55,10 @@ toshiba_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Samsung（esp32irpk::ac::Samsung に合わせて IRSamsungAc の標準14バイト SAMSUNG_AC を使用）
 samsung_irremoteesp8266_tx/  # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
 samsung_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
+
+# Sharp（esp32irpk::ac::Sharp に合わせて IRSharpAc の標準13バイト SHARP_AC、A907モデルを使用）
+sharp_irremoteesp8266_tx/    # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+sharp_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
 ```
 
 各ベンダは同じ `<extlib>_<role>` バリアントを使う。バリアントのフォルダ名は
@@ -186,6 +190,14 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   旧 AQV（21バイト）/ FJM（section2チェックサムが別）変種で現行14バイト形式と一致しないため、
   Samsung は IRremoteESP8266 双方向ペアのみで相互検証する。
 
+- `sharp_irremoteesp8266_tx/` + `sharp_irremoteesp8266_rx/` — 標準13バイト SHARP_AC（既定
+  A907モデル）用の較正＋encoder検証の対。IRremoteESP8266 の `IRSharpAc` を使う。LSBファースト、
+  単一フレーム、固定ヘッダ `AA 5A CF 10`、byte12上位ニブルにニブル畳み込みXORチェックサム。電源は
+  4bitの `PowerSpecial`（on=3/off=2）。`Special` バイトは押されたボタンを表すため、TX peer は
+  `setPower` を**最後**に呼ぶ（Special=power=0x00 となり当方encoderの出力と一致）。Auto/Dry は
+  温度を持たないので temp はその場では don't-care。Samsung 同様 `sharp_heatpumpir_tx` は**無い**
+  （HeatpumpIR に Sharp は無い）ので、IRremoteESP8266 双方向ペアのみで相互検証する。
+
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` — それぞれの2系統目の独立参照
   （`panasonic_heatpumpir_tx` と同型）。HeatpumpIR（`GreeGenericHeatpumpIR` /
   `MitsubishiFEHeatpumpIR` / `FujitsuHeatpumpIR`、別コードベース、LEDCキャリア）が
@@ -204,7 +216,7 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   variant は power / mode（auto/cool/dry/heat）/ temp / fan を較正する。
 
 所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` /
-`src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` / `src/ac/Toshiba.h` / `src/ac/Samsung.h` に反映します。
+`src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` / `src/ac/Toshiba.h` / `src/ac/Samsung.h` / `src/ac/Sharp.h` に反映します。
 
 `panasonic_irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
 IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを確認: 当方のRAW

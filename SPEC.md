@@ -717,6 +717,10 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | short (7-byte swing) / long (10-byte) | — | Not yet |
 | Samsung | Samsung AC | 14-byte, 2 sections | standard | **Supported**² |
 | | extended (21-byte timer) | — | Not yet |
+| Sharp | Sharp AC | 13-byte | A907 | **Implemented**¹ |
+| | | A705 / A903 | Not yet |
+
+¹ Sharp (13-byte, A907 model): field map, the Auto/Dry field-forcing rules, the PowerSpecial power model, and the nibble-folded XOR checksum are verified in host `codec_smoke` against IRSharpAc's documented layout; the bidirectional hardware/compat-matrix verification (`sharp_irremoteesp8266_tx` / `_rx`) is added but not yet run, so it is not yet promoted to **Supported**. Like Samsung, there is no HeatpumpIR second reference (HeatpumpIR has no Sharp), so verification rests on the IRremoteESP8266 bidirectional pair.
 
 ² Samsung is verified by the IRremoteESP8266 bidirectional pair (`samsung_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination: HeatpumpIR's Samsung classes implement the older AQV (21-byte) and FJM (different section-2 checksum) variants, neither matching the modern 14-byte SAMSUNG_AC.
 
@@ -724,7 +728,6 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 | Vendor | Format / size | References | Notes |
 |---|---|---|---|
-| Sharp | Sharp AC, 13-byte | IRremoteESP8266 only | Simplest byte-state framing (single frame, sent twice with the copy inverted); common in the JP market. No HeatpumpIR second reference — use captured-frame fixtures instead. |
 | Kelvinator | Kelvinator, 16-byte, two blocks | IRremoteESP8266 only | Two-block layout + block checksum nearly identical to Gree (already solved) — high code reuse, low effort. |
 | Midea | Midea, 48-bit (6-byte) | IRremoteESP8266 + HeatpumpIR | Large rebadge coverage (many OEM brands). Caveat: code + inverted-copy structure (no sum/XOR byte checksum) stretches the byte-state model; needs an inversion-check path. |
 | Carrier | Carrier AC, 32 / 64-bit + 128-bit (16-byte) | IRremoteESP8266 + HeatpumpIR | Dual reference, but several distinct wire formats — each a separate `Frame` type. Pick a target format before starting. |
@@ -741,6 +744,7 @@ Per-vendor framing of the supported formats:
 - `Daikin` — the classic "Daikin" / ARC433 protocol (ARC433** / ARC466 remotes, M-Series / FTXM-M units). A 35-byte state is sent as a 5-bit `00000` leading preamble followed by **three** pulse-distance sections (8 + 8 + 19 bytes), each with its own header and a per-section sum checksum (bytes 7 / 15 / 34); every section begins with the fixed signature `11 DA 27`. Single classic wire format (no `Model` parameter); the other Daikin sizes (Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312) are separate `Frame` types. `Mode` is `AUTO`/`DRY`/`COOL`/`HEAT`/`FAN`; `Fan` is `AUTO`/`QUIET`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`; `setSwingVertical`/`setSwingHorizontal` toggle the two airflow axes; `temperatureC()`/`setTemperatureC()` are a `float` pair (byte 22 stores °C × 2). It must use the phase-aligned carrier — its zero-space equals its bit mark (both 428 µs), §11.3.
 - `Toshiba` — the standard "Toshiba AC" protocol (WH-/RAS- remotes, rebadged Carrier units). A 9-byte pulse-distance frame transmitted twice (separated by the frame gap), **MSB-first** (the only MSB-first AC vendor), beginning with the fixed signature `F2 0D` (byte 1 = `~`byte 0; byte 3 = `~`byte 2), with an XOR checksum (of bytes 0–7) in byte 8. Power is carried by the Mode field (`Mode == 7` = off), not a separate bit, so `setPower(false)` writes mode 7 and `setPower(true)` restores the last set mode. `Mode` is `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`; `Fan` is `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (whole-degree temps, 17–30 °C). Swing is a separate short-message variant (reserved); the standard frame does not carry it. The 7-byte short and 10-byte long messages are separate `Frame` types.
 - `Samsung` — the standard "Samsung AC" protocol (AR-/ARH- series remotes). A 14-byte state, **LSB-first**, sent as a one-time leading header (690 µs mark + 17844 µs space) followed by two 7-byte sections, each with its own section header (3086/8864 µs) and a 2886 µs section gap. Each section carries a popcount (Hamming-weight) checksum, bitwise-inverted, split across two nibbles of its bytes 1–2. There is no fixed vendor signature, so `fromRaw` gates on both section checksums validating. Power is two 2-bit fields (byte 6 and byte 13): both `0b11` = on, both `0b00` = off. `Mode` is `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`; `Fan` is `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (whole-degree temps, 16–30 °C). Swing and the special fan flags (Powerful/WindFree/Econo) are not settable here. The 21-byte extended (timer) message is a separate `Frame` type.
+- `Sharp` — the standard "Sharp AC" protocol. A 13-byte single pulse-distance frame, **LSB-first**, beginning with the fixed header `AA 5A CF 10`, with a nibble-folded XOR checksum in the high nibble of byte 12. Power lives in the 4-bit `PowerSpecial` field (byte 5): on = 3, off = 2 (not a single bit). The `Special` byte (byte 10) records which button a real remote pressed; `toRaw` always emits the "power" value (0x00) so it is a complete state command. `Mode` is `AUTO`/`HEAT`/`COOL`/`DRY` (Auto and Fan share wire code `0b00`, so no standalone Fan); `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (non-contiguous wire codes 2/4/3/5/7; whole-degree temps 15–30 °C). Auto and Dry modes carry no temperature (Temp = 0), so temperature is a don't-care there. This is the default A907 model; A705 / A903 (which remap Heat to Fan and use different fan codes, flagged by the Model/Model2 bits) are reserved. Swing, ion, clean and timer are documented but not settable.
 
 **Panasonic field map (decoded logical fields).** Where each control field lives in the 27-byte state. Status legend: ✅ implemented (decode + encode) · 🔜 planned · 🟡 documented, no setter (re-send via RAW replay) · ⛔ out of scope (separate frame type).
 
@@ -868,6 +872,22 @@ It is MSB-first; `toRaw` rewrites the fixed framing prefix (signature + inverted
 | checksum (section 2) | byte 8 high nibble + byte 9 low nibble | popcount of section bytes 7–13, inverted | ✅ |
 
 It is LSB-first; `toRaw` recomputes the two section checksums, then renders the one-time leading header followed by the two sections (each with its own header), as a real remote does. Power is two 2-bit fields written together. Swing and the special fan flags have no setters. This is the only Samsung format implemented; the 21-byte extended (timer) message is reserved.
+
+**Sharp AC field map (decoded logical fields).** Where each control field lives in the 13-byte state. Same status legend. Bytes 0–3 are the fixed header `AA 5A CF 10`.
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| power | byte 5 bits 4-7 (PowerSpecial) | on = 3 / off = 2 | ✅ |
+| mode | byte 6 bits 0-1 | auto=0 / heat=1 / cool=2 / dry=3 | ✅ |
+| temperature | byte 4 bits 0-3 | `°C − 15`, 15–30 °C (Cool/Heat only; Auto/Dry = 0) | ✅ |
+| fan (airflow) | byte 6 bits 4-6 | auto=2 / med=3 / min=4 / high=5 / max=7 | ✅ |
+| model | byte 4 bit 4 + byte 11 bit 4 | A907 (implemented) / A705 / A903 | 🟡 |
+| swing | byte 8 bits 0-2 | — | 🟡 |
+| ion / clean / timer | bytes 6/7/11 | — | 🟡 |
+| special (button) | byte 10 | power = 0x00 (emitted) | ✅ |
+| checksum | byte 12 bits 4-7 | nibble-folded XOR of bytes 0–11 + byte 12 low nibble | ✅ |
+
+It is LSB-first; `toRaw` rewrites the fixed header, zeroes the temperature in Auto/Dry (which carry none), sets the Special byte to the "power" value, and recomputes the nibble checksum. Power uses the PowerSpecial field (on = 3 / off = 2). The A705 / A903 models, swing, ion, clean and timer have no setters. This is the only Sharp model implemented; A705 / A903 are reserved.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
