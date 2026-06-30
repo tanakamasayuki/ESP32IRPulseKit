@@ -1,0 +1,123 @@
+// Compat-AC second reference (Daikin) -- RX side (ESP32IRPulseKit).
+//
+// The peer TX (peer_tx/) is HeatpumpIR's DaikinHeatpumpIR over an LEDC carrier --
+// a transmit path independent of both ESP32IRPulseKit and IRremoteESP8266. This
+// primary captures the burst with our RAW path and decodes it with
+// esp32irpk::ac::Daikin. The harness checks our decoded fields against the known
+// sent state (semantic agreement; byte identity is not expected -- HeatpumpIR
+// fills some auxiliary bytes differently from IRremoteESP8266).
+//
+// HeatpumpIR's Daikin emits the same classic 35-byte, 3-section ARC433 frame
+// (signature 11 DA 27); sections 1-2 keep the template's valid checksums and only
+// byte 34 is recomputed, so our three-checksum validation passes.
+#include <ESP32IRPulseKit.h>
+
+#ifndef IR_RX_GPIO
+#define IR_RX_GPIO "32"
+#endif
+
+#ifndef IR_RX_INVERTED
+#define IR_RX_INVERTED "1"
+#endif
+
+const int kIrRxGpio = atoi(IR_RX_GPIO);
+const bool kIrRxInverted = atoi(IR_RX_INVERTED) != 0;
+
+esp32irpk::IRReceiver<> rx(kIrRxGpio, kIrRxInverted);
+
+namespace
+{
+void printStateHex(const uint8_t *bytes, uint16_t nbytes)
+{
+  for (uint16_t i = 0; i < nbytes; ++i)
+  {
+    if (bytes[i] < 0x10)
+      Serial.print('0');
+    Serial.print(bytes[i], HEX);
+  }
+}
+
+void sendReady()
+{
+  Serial.print("RX_READY impl=ESP32IRPulseKit gpio=");
+  Serial.print(kIrRxGpio);
+  Serial.print(" inverted=");
+  Serial.println(kIrRxInverted ? 1 : 0);
+}
+
+bool readLine(String &line)
+{
+  if (!Serial.available())
+    return false;
+  line = Serial.readStringUntil('\n');
+  line.trim();
+  return line.length() > 0;
+}
+
+void printAcDecode(const esp32irpk::IRRawTickView &raw)
+{
+  esp32irpk::ac::Daikin::Frame f;
+  if (!esp32irpk::ac::Daikin::Frame::fromRaw(raw, f))
+  {
+    Serial.print("AC_RAW vendor=NONE raw_len=");
+    Serial.println(raw.len);
+    return;
+  }
+
+  Serial.print("AC_DECODE vendor=DAIKIN checksum=");
+  Serial.print(f.checksum_ok ? "ok" : "bad");
+  Serial.print(" power=");
+  Serial.print(f.power() ? 1 : 0);
+  Serial.print(" mode=");
+  Serial.print((unsigned)f.mode());
+  Serial.print(" temp=");
+  Serial.print((unsigned)f.temperatureC());
+  Serial.print(" fan=");
+  Serial.print((unsigned)f.fan());
+  Serial.print(" swingv=");
+  Serial.print(f.swingVertical() ? 1 : 0);
+  Serial.print(" swingh=");
+  Serial.print(f.swingHorizontal() ? 1 : 0);
+  Serial.print(" bytes=");
+  printStateHex(f.bytes, f.byte_length);
+  Serial.println();
+}
+} // namespace
+
+void setup()
+{
+  Serial.begin(115200);
+  delay(5000);
+
+  rx.setDecodeCandidates(0);     // RAW-only: no generic decode
+  rx.setMaxRxSymbols(1024);      // hold the preamble + three sections
+  rx.setIdleThresholdUs(100000); // 100ms > 29ms inter-section gap, < ~300ms ceiling
+  if (!rx.begin())
+  {
+    Serial.println("RX_ERROR begin_failed");
+    return;
+  }
+  sendReady();
+}
+
+void loop()
+{
+  String line;
+  if (readLine(line))
+  {
+    if (line == "PING")
+      Serial.println("PONG");
+    else if (line == "READY")
+      sendReady();
+  }
+
+  esp32irpk::IRReceiveResult<> r;
+  if (rx.read(r))
+  {
+    if (r.raw.len > 0)
+      printAcDecode(r.raw);
+    delay(1);
+  }
+
+  delay(1);
+}

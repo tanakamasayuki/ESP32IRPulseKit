@@ -704,8 +704,10 @@ struct Frame {
 | | Mitsubishi Heavy | 88 / 152bit | — | 未対応 |
 | Fujitsu | Fujitsu AC | 長16バイト / 短7バイト | ARRAH2E | **対応** |
 | | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | 未対応 |
-| Daikin | Daikin classic（ARC433） | 35バイト・3セクション | 単一 | 予定（次に着手） |
+| Daikin | Daikin classic（ARC433） | 35バイト・3セクション | 単一 | **実装済**¹ |
 | | Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312 | サイズ各種 | — | 未対応 |
+
+¹ Daikin classic（ARC433）: フィールドマップは host `codec_smoke` で IRDaikinESP 由来の canonical state に対して検証済み。双方向の実機/compat-matrix 検証（`daikin_*` studies）は追加済みだが未実行のため、まだ **対応** には昇格していません。
 
 対応フォーマットのベンダ別構造:
 
@@ -713,6 +715,7 @@ struct Frame {
 - `Gree` — 8バイトの状態を2ブロックのpulse-distanceで送信。1ブロック目はバイト0〜3に固定3bitフッタを付け、2ブロック目はバイト4〜7をヘッダ無しで送る。Kelvinator系のブロックチェックサムがバイト7の上位ニブルに入る。実装モデルは YBOFB（`Model::YBOFB`、モデルビットは0）。`Model::YAW1F`/`YX1FSF` は将来用に予約。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`MAX_SPEED`。`SwingV`/`SwingH` で上下・左右スイングを設定。
 - `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。このフォーマットは単一モデル（`Model` パラメータ無し）。他のMitsubishi波形フォーマット（136 / 112 / Heavy）は別の `Frame` 型になる。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。`Vane`（上下、`P1`..`P5`）と `WideVane`（左右）で気流方向を設定し、`temperatureC()`/`setTemperatureC()` は 0.5℃刻みを含む対称な `float` ペア。
 - `Fujitsu` — 「Fujitsu AC」protocol（ARシリーズリモコン）、対象モデルは ARRAH2E。全設定は16バイトのpulse-distance「長」フレームで、固定バイト `14 63 00 10 10` で始まり、byte5 = `0xFE`（長フレームマーカー）、byte15 に補数チェックサム。電源OFFは7バイトの「短」フレーム `14 63 00 10 10 02 FD`（byte6 = `~`byte5）。各フレームは1回送信。電源は状態ビットでなくフレーム種別が表す（長=ON、短OFF=OFF）ので、`setPower(false)` は短フレームを送り、デコードしたOFFフレームの mode/temp/fan はベンダ的にdon't-careでテンプレート既定値を保持する。単一モデル（`Model` パラメータはまだ無し）。ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E は長さ・マーカー・チェックサム補数・（ARREW4E は）温度エンコードが異なり、後でモデル分岐または `Frame` 型として追加する。`Fan` は `AUTO`/`HIGH_SPEED`/`MED_SPEED`/`LOW_SPEED`/`QUIET`。`Swing` は `OFF`/`VERTICAL`/`HORIZONTAL`/`BOTH`。
+- `Daikin` — クラシックな「Daikin」/ ARC433 protocol（ARC433** / ARC466 リモコン、M Series / FTXM-M 機種）。35バイト状態を、先頭5bitの `00000` プリアンブルに続けて**3セクション**（8 + 8 + 19バイト）のpulse-distanceで送る。各セクションは独自のヘッダを持ち、セクション毎の総和チェックサム（byte7 / 15 / 34）を持つ。各セクションは固定署名 `11 DA 27` で始まる。単一のクラシックフォーマット（`Model` パラメータ無し）。他の Daikin サイズ（Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312）は別 `Frame` 型。`Mode` は `AUTO`/`DRY`/`COOL`/`HEAT`/`FAN`。`Fan` は `AUTO`/`QUIET`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。`setSwingVertical`/`setSwingHorizontal` で上下・左右の気流軸を切り替える。`temperatureC()`/`setTemperatureC()` は `float` ペア（byte22 に °C × 2 を格納）。位相整合キャリア必須——zeroスペースがbitマークと等しい（共に428us、§11.3）。
 
 **Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
 
@@ -793,6 +796,25 @@ byte3 の上位ニブル（`0b0101`）と byte5 bit3-5（`0b100`）はリモコ�
 
 電源は状態ビットでなく長/短フレームのセレクタ（長フレームでは byte8 の Power ビットは0のまま）: `setPower(true)` は全16バイト状態を、`setPower(false)` は短OFFコマンドを描画し、その mode/temp/fan はベンダ的にdon't-care（デコードしたOFFフレームは `power=off` を報告し残りはテンプレート既定値を保持）。`temperatureC()`/`setTemperatureC()` は 16–30℃ にクランプ。6bitのTempフィールドは `(℃ − 16) × 4` を格納するので整数度は byte8 の上位ニブルに乗る。華氏単位・クリーン/10℃暖房・タイマー・フィルタ/外部静音は記載のみで setter は未作成 — キャプチャしたフレームを RAW replay で再送すれば再現できる。実装モデルは ARRAH2E のみ。他のARシリーズは予約（対応一覧を参照）。
 
+**Daikin classic（ARC433）フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが35バイト状態（3セクション: byte0–7 / 8–15 / 16–34、各セクションは `11 DA 27` 署名で始まる）のどこに入るか。ステータス凡例は上と同じ。
+
+| フィールド | 位置 (byte/bit) | コード/値域 | ステータス |
+|---|---|---|---|
+| power | byte21 bit0 | on=1 / off=0 | ✅ |
+| mode | byte21 bit4-6 | auto=0 / dry=2 / cool=3 / heat=4 / fan=6 | ✅ |
+| 温度 | byte22 | `°C × 2`、10–32℃（0.5℃刻み） | ✅ |
+| fan(風量) | byte24 bit4-7 | auto=A / quiet=B / 3–7（弱→最強） | ✅ |
+| 上下スイング | byte24 bit0-3 | on=F / off=0 | ✅ |
+| 左右スイング | byte25 bit0-3 | on=F / off=0 | ✅ |
+| comfort | byte6 bit4 | on=1 | 🟡 |
+| 入切タイマー | byte21 bit1-2 + byte26-28 | 有効＋12bit・分単位 | 🟡 |
+| パワフル / しずか | byte29 bit0 / bit5 | on=1 | 🟡 |
+| センサ / econo | byte32 bit1 / bit2 | on=1 | 🟡 |
+| カビ防止(mold) | byte33 bit1 | on=1 | 🟡 |
+| checksum（×3） | byte7 / 15 / 34 | セクション毎の総和 mod256 | ✅ |
+
+状態は5bitの `00000` プリアンブル＋3セクションとして描画され、各セクションは独自の `3650/1623µs` ヘッダを持ち `~29ms` ギャップで終わる。`toRaw` はセクション署名と3つのチェックサムを書き直す。`temperatureC()`/`setTemperatureC()` は 10–32℃ にクランプし `°C × 2` を格納（0.5℃刻みが往復する）。comfort / タイマー / パワフル / しずか / センサ / econo / mold は記載のみで setter は未作成 — キャプチャしたフレームを RAW replay で再送すれば再現できる。実装済みは唯一このフォーマットで、他サイズは予約（対応一覧を参照）。
+
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 
 ### 11.3 長尺フレームのキャリア
@@ -807,5 +829,6 @@ ACフレームは長く、確実に届くキャリアはベンダのタイミン
 - **Gree** は位相整合キャリアが必須です。zeroスペース（540us）がbitマーク（620us）より短いため、ハードウェアキャリアのマーク揺れでスペースが許容範囲を外れ、受信側がフレームの約半数を棄却します（実測: 位相整合 50/50 vs ハードウェア 約55%）。
 - **Mitsubishi** も同じタイミング余裕の狭い例（zeroスペース420us < bitマーク450us）で、同様に位相整合キャリアを使います。
 - **Fujitsu** も同じタイミング余裕の狭い例（zeroスペース390us < bitマーク448us）で、既定で位相整合キャリアを使います。`fujitsu_*` compat studies は実機での到達率を確認するためのものです。
+- **Daikin** は最も極端な例で、zeroスペースがbitマークと等しい（共に428us）ため揺れの余裕がゼロで、位相整合キャリアが必須です。3セクションのバーストも長く、位相整合のシンボル数は全ベンダ中最大になります。
 
 推奨: ACでは位相整合キャリアが安全な既定で、`setPhaseAlignedCarrier` を呼ばなければこれになります。ハードウェアキャリア（`setPhaseAlignedCarrier(false)`）は、Panasonic のようなタイミング余裕の広いベンダでの省メモリ最適化としてのみ使ってください。キャリアはバイト整合性ではなく到達率に影響します——受信できたフレームは常にバイト正確（チェックサム検証済み）で、位相整合キャリアにサイズ上限はありません（15bitフィールドを超える時間は複数シンボルに分割）。

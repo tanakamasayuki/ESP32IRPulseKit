@@ -2006,6 +2006,122 @@ void testFujitsuAcStateMatrix()
   EXPECT_TRUE("fujitsu/state-matrix", all_ok);
 }
 
+// Daikin AC (classic / ARC433): build a frame, render the burst (a 5-bit preamble
+// + three pulse-distance sections), decode it back, and confirm the logical fields
+// and the three per-section checksums survive the roundtrip. The canonical bytes
+// are derived from the documented field layout; the hardware study verifies them
+// against IRDaikinESP.
+void testDaikinAcRoundtrip()
+{
+  using esp32irpk::ac::Daikin::Fan;
+  using esp32irpk::ac::Daikin::Frame;
+  using esp32irpk::ac::Daikin::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(25);
+  f.setFan(Fan::AUTO);
+  f.setSwingVertical(false);
+  f.setSwingHorizontal(false);
+
+  EXPECT_TRUE("daikin/power-get", f.power());
+  EXPECT_TRUE("daikin/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("daikin/temp-get", 25.0f, f.temperatureC());
+  EXPECT_TRUE("daikin/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("daikin/encode", f.toRaw(buf));
+  EXPECT_TRUE("daikin/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("daikin/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("daikin/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("daikin/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("daikin/decode-power", g.power());
+  EXPECT_TRUE("daikin/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("daikin/decode-temp", 25.0f, g.temperatureC());
+  EXPECT_TRUE("daikin/decode-fan", g.fan() == Fan::AUTO);
+  EXPECT_TRUE("daikin/decode-swingv", !g.swingVertical());
+  EXPECT_TRUE("daikin/decode-swingh", !g.swingHorizontal());
+
+  // Power on / cool / 25C / fan auto / swing off, derived from the documented
+  // layout and the three per-section sum checksums (bytes 7 / 15 / 34).
+  static const uint8_t kCanonicalCool25[Frame::kBytes] = {
+      0x11, 0xDA, 0x27, 0x00, 0xC5, 0x00, 0x00, 0xD7,
+      0x11, 0xDA, 0x27, 0x00, 0x42, 0x00, 0x00, 0x54,
+      0x11, 0xDA, 0x27, 0x00, 0x00, 0x39, 0x32, 0x00, 0xA0, 0x00,
+      0x00, 0x06, 0x60, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x43};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool25[i])
+      canonical_match = false;
+  EXPECT_TRUE("daikin/canonical-bytes", canonical_match);
+
+  // Temperature clamps to the supported range.
+  Frame t{};
+  t.setTemperatureC(40);
+  EXPECT_EQ("daikin/temp-clamp-high", 32.0f, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("daikin/temp-clamp-low", 10.0f, t.temperatureC());
+
+  // A non-Daikin waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("daikin/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power/swing combination must encode (setters ->
+// toRaw -> fromRaw) back to itself with valid section checksums, exercising the
+// full field map and the multi-section codec path.
+void testDaikinAcStateMatrix()
+{
+  using esp32irpk::ac::Daikin::Fan;
+  using esp32irpk::ac::Daikin::Frame;
+  using esp32irpk::ac::Daikin::Mode;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::DRY, Mode::COOL, Mode::HEAT, Mode::FAN};
+  static const Fan fans[] = {Fan::AUTO, Fan::QUIET, Fan::MIN_SPEED, Fan::LOW_SPEED,
+                             Fan::MED_SPEED, Fan::HIGH_SPEED, Fan::MAX_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 10; temp <= 32; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          bool sv = (temp % 2) == 0;
+          bool sh = (temp % 3) == 0;
+          Frame f{};
+          f.setPower(power != 0);
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+          f.setSwingVertical(sv);
+          f.setSwingHorizontal(sh);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan ||
+              g.temperatureC() != static_cast<float>(temp) ||
+              g.swingVertical() != sv || g.swingHorizontal() != sh)
+            all_ok = false;
+        }
+  EXPECT_TRUE("daikin/state-matrix", all_ok);
+}
+
 // Each vendor's toString() maps an enum value to its identifier name (used by
 // printTo). Out-of-range values fall back to "?".
 void testAcEnumToString()
@@ -2014,6 +2130,7 @@ void testAcEnumToString()
   namespace G = esp32irpk::ac::Gree;
   namespace M = esp32irpk::ac::Mitsubishi;
   namespace F = esp32irpk::ac::Fujitsu;
+  namespace D = esp32irpk::ac::Daikin;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -2027,6 +2144,9 @@ void testAcEnumToString()
   EXPECT_TRUE("fujitsu/tostring-mode", strcmp(F::toString(F::Mode::HEAT), "HEAT") == 0);
   EXPECT_TRUE("fujitsu/tostring-fan-quiet", strcmp(F::toString(F::Fan::QUIET), "QUIET") == 0);
   EXPECT_TRUE("fujitsu/tostring-swing", strcmp(F::toString(F::Swing::BOTH), "BOTH") == 0);
+  EXPECT_TRUE("daikin/tostring-mode", strcmp(D::toString(D::Mode::COOL), "COOL") == 0);
+  EXPECT_TRUE("daikin/tostring-fan-quiet", strcmp(D::toString(D::Fan::QUIET), "QUIET") == 0);
+  EXPECT_TRUE("daikin/tostring-fan-max", strcmp(D::toString(D::Fan::MAX_SPEED), "MAX_SPEED") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -2161,6 +2281,34 @@ void testAcFromBytes()
     EXPECT_TRUE("fujitsu/frombytes-eq", eq);
     EXPECT_TRUE("fujitsu/frombytes-badlen", !Frame::fromBytes(dec.bytes, 99, fb));
   }
+  // Daikin (classic): bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Daikin::Fan;
+    using esp32irpk::ac::Daikin::Frame;
+    using esp32irpk::ac::Daikin::Mode;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::MAX_SPEED);
+    a.setSwingVertical(true);
+    a.setSwingHorizontal(false);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("daikin/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("daikin/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("daikin/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("daikin/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("daikin/frombytes-eq", eq);
+    EXPECT_TRUE("daikin/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -2221,6 +2369,8 @@ void setup()
   testFujitsuAcRoundtrip();
   testFujitsuAcPowerOff();
   testFujitsuAcStateMatrix();
+  testDaikinAcRoundtrip();
+  testDaikinAcStateMatrix();
   testAcEnumToString();
   testAcFromBytes();
 

@@ -43,6 +43,10 @@ gree_irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266         
 # Fujitsu（esp32irpk::ac::Fujitsu に合わせて IRFujitsuAC の ARRAH2E モデルを使用）
 fujitsu_irremoteesp8266_tx/  # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
 fujitsu_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
+
+# Daikin（esp32irpk::ac::Daikin に合わせて IRDaikinESP のクラシック ARC433 を使用）
+daikin_irremoteesp8266_tx/   # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+daikin_irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
 ```
 
 各ベンダは同じ `<extlib>_<role>` バリアントを使う。バリアントのフォルダ名は
@@ -149,7 +153,18 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   `esp32irpk::ac::Fujitsu` のenum値は IRremoteESP8266 のワイヤコードと一致するので、
   フィールド比較は直接の数値一致になる。
 
-- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` — それぞれの2系統目の独立参照
+- `daikin_irremoteesp8266_tx/` + `daikin_irremoteesp8266_rx/` — クラシックな「Daikin」/
+  ARC433 protocol 用の較正＋encoder検証の対。IRremoteESP8266 の `IRDaikinESP` を使う。
+  35バイト状態を5bitの `00000` プリアンブル＋3セクション（8 / 8 / 19バイト）として送り、
+  各セクションは独自の `3650/1623µs` ヘッダとセクション毎の総和チェックサム（byte7 / 15 /
+  34）を持ち、各セクションは `11 DA 27` 署名で始まる。`tx` primary はプリアンブルを読み飛ばし
+  3セクションを復号、`rx` peer は `toRaw` でプリアンブル＋セクションを描画する。`rx` primary は
+  ~29msのセクション間ギャップを1キャプチャに収めるため65msタイムアウトを使う。Daikin は最も
+  タイミング余裕が狭い（zeroスペース428us == bitマーク428us）ので位相整合キャリアで送る。当方
+  `esp32irpk::ac::Daikin` のenum値は IRremoteESP8266 のワイヤコードと一致するので、フィールド比較は
+  直接の数値一致になる。
+
+- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` — それぞれの2系統目の独立参照
   （`heatpumpir_tx` と同型）。HeatpumpIR（`GreeGenericHeatpumpIR` /
   `MitsubishiFEHeatpumpIR` / `FujitsuHeatpumpIR`、別コードベース、LEDCキャリア）が
   既知状態を送信し当方RXがデコード。hard判定は意味一致（checksum妥当＋論理フィールドが
@@ -158,10 +173,13 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   FanAutoビット無しで符号化するので、それらのデコード経路も検証できる。HeatpumpIR の
   Fujitsu は同じ ARRAH2E 長フレーム（byte5=0xFE）を、当方と同値に還元されるチェックサムで
   出力し、fan定数がワイヤコードと逆順（FAN_1=quiet .. FAN_4=high）なので、peer は各速度
-  トークンを目的のワイヤコードを生む FAN_x にマップする。
+  トークンを目的のワイヤコードを生む FAN_x にマップする。HeatpumpIR の Daikin は同じクラシック
+  35バイト・3セクションの ARC433 フレームを出力し、テンプレートのセクション1/2チェックサムを保ち
+  byte34 のみ再計算するので当方の3チェックサム検証が通る。Daikin encoder はスイングを駆動せず
+  （固定off）quiet段も無いので、この variant は power / mode / temp / fan を較正する。
 
 所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` /
-`src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` に反映します。
+`src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` に反映します。
 
 `irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
 IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを確認: 当方のRAW
