@@ -708,17 +708,20 @@ struct Frame {
 | | Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312 | サイズ各種 | — | 未対応 |
 | Toshiba | Toshiba AC | 9バイト | 標準 | **対応** |
 | | 短（7バイトswing）/ 長（10バイト） | — | 未対応 |
+| Samsung | Samsung AC | 14バイト、2セクション | 標準 | **対応**² |
+| | 拡張（21バイトタイマ） | — | 未対応 |
+
+² Samsung は通常の IRremoteESP8266 ＋ HeatpumpIR ではなく、IRremoteESP8266 の双方向ペア（`samsung_irremoteesp8266_tx` / `_rx` — エンコード・デコードを各々独立スタックで実機確認）で検証する: HeatpumpIR の Samsung クラスは旧 AQV（21バイト）と FJM（section2チェックサムが別）変種の実装で、いずれも現行の14バイト SAMSUNG_AC と一致しないため。
 
 **未着手の候補ベンダ（推奨着手順）。** 優先順位の基準: ①第2の独立リファレンス（IRremoteESP8266 *と* HeatpumpIR の両方＝対応済みベンダと同じ検証体制）②`ac::`層に合う byte-state 構造 ③フレーミングの単純さ ④機種カバレッジ。対象モデルは承認時に決定し、ここで固定はしない。ビットペア方式（Coolix 24-bit、LG 28-bit など）は多バイトの byte-state ではなく別コード経路が必要なため、本レイヤの対象外とする。
 
-| # | ベンダ | フォーマット / サイズ | リファレンス | 備考 |
-|---|---|---|---|---|
-| 1 | Samsung | Samsung AC、14バイト（拡張21バイト） | IRremoteESP8266 + HeatpumpIR | 実績ある手順への最適合: 二重リファレンス・単一 byte-state フォーマット・主要ブランド。最も低リスクな次候補。 |
-| 2 | Sharp | Sharp AC、13バイト | IRremoteESP8266 のみ | 最も単純な byte-state（単一フレーム、反転コピーを付けて2回送信）。日本市場で一般的。HeatpumpIR の第2リファレンスは無く、キャプチャフレームの fixture で代替。 |
-| 3 | Kelvinator | Kelvinator、16バイト、2ブロック | IRremoteESP8266 のみ | 2ブロック構成＋ブロックチェックサムが Gree（解決済み）とほぼ同一 — コード再利用度が高く低コスト。 |
-| 4 | Midea | Midea、48ビット（6バイト） | IRremoteESP8266 + HeatpumpIR | OEM多数で広いカバレッジ。注意: コード＋反転コピー構造（総和/XORのバイトチェックサムが無い）で byte-state モデルから外れ気味、反転検証経路が必要。 |
-| 5 | Carrier | Carrier AC、32 / 64ビット ＋ 128ビット（16バイト） | IRremoteESP8266 + HeatpumpIR | 二重リファレンスだが複数の異なる波形フォーマットがあり、各々が別 `Frame` 型。着手前に対象フォーマットを選ぶ。 |
-| 6 | Hitachi | Hitachi AC、28バイト（＋13〜53バイトの各種） | IRremoteESP8266 + HeatpumpIR | 最難: サイズ変種が多くリーダ/セクション構造。単純なベンダを片付けてから着手。 |
+| ベンダ | フォーマット / サイズ | リファレンス | 備考 |
+|---|---|---|---|
+| Sharp | Sharp AC、13バイト | IRremoteESP8266 のみ | 最も単純な byte-state（単一フレーム、反転コピーを付けて2回送信）。日本市場で一般的。HeatpumpIR の第2リファレンスは無く、キャプチャフレームの fixture で代替。 |
+| Kelvinator | Kelvinator、16バイト、2ブロック | IRremoteESP8266 のみ | 2ブロック構成＋ブロックチェックサムが Gree（解決済み）とほぼ同一 — コード再利用度が高く低コスト。 |
+| Midea | Midea、48ビット（6バイト） | IRremoteESP8266 + HeatpumpIR | OEM多数で広いカバレッジ。注意: コード＋反転コピー構造（総和/XORのバイトチェックサムが無い）で byte-state モデルから外れ気味、反転検証経路が必要。 |
+| Carrier | Carrier AC、32 / 64ビット ＋ 128ビット（16バイト） | IRremoteESP8266 + HeatpumpIR | 二重リファレンスだが複数の異なる波形フォーマットがあり、各々が別 `Frame` 型。着手前に対象フォーマットを選ぶ。 |
+| Hitachi | Hitachi AC、28バイト（＋13〜53バイトの各種） | IRremoteESP8266 + HeatpumpIR | 最難: サイズ変種が多くリーダ/セクション構造。単純なベンダを片付けてから着手。 |
 
 さらにカバレッジを広げたい場合の単一リファレンス（IRremoteESP8266のみ）byte-state 候補: Haier（9バイト / 22バイト）、TCL112（14バイト）、Electra（13バイト）。
 
@@ -730,6 +733,7 @@ struct Frame {
 - `Fujitsu` — 「Fujitsu AC」protocol（ARシリーズリモコン）、対象モデルは ARRAH2E。全設定は16バイトのpulse-distance「長」フレームで、固定バイト `14 63 00 10 10` で始まり、byte5 = `0xFE`（長フレームマーカー）、byte15 に補数チェックサム。電源OFFは7バイトの「短」フレーム `14 63 00 10 10 02 FD`（byte6 = `~`byte5）。各フレームは1回送信。電源は状態ビットでなくフレーム種別が表す（長=ON、短OFF=OFF）ので、`setPower(false)` は短フレームを送り、デコードしたOFFフレームの mode/temp/fan はベンダ的にdon't-careでテンプレート既定値を保持する。単一モデル（`Model` パラメータはまだ無し）。ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E は長さ・マーカー・チェックサム補数・（ARREW4E は）温度エンコードが異なり、後でモデル分岐または `Frame` 型として追加する。`Fan` は `AUTO`/`HIGH_SPEED`/`MED_SPEED`/`LOW_SPEED`/`QUIET`。`Swing` は `OFF`/`VERTICAL`/`HORIZONTAL`/`BOTH`。
 - `Daikin` — クラシックな「Daikin」/ ARC433 protocol（ARC433** / ARC466 リモコン、M Series / FTXM-M 機種）。35バイト状態を、先頭5bitの `00000` プリアンブルに続けて**3セクション**（8 + 8 + 19バイト）のpulse-distanceで送る。各セクションは独自のヘッダを持ち、セクション毎の総和チェックサム（byte7 / 15 / 34）を持つ。各セクションは固定署名 `11 DA 27` で始まる。単一のクラシックフォーマット（`Model` パラメータ無し）。他の Daikin サイズ（Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312）は別 `Frame` 型。`Mode` は `AUTO`/`DRY`/`COOL`/`HEAT`/`FAN`。`Fan` は `AUTO`/`QUIET`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。`setSwingVertical`/`setSwingHorizontal` で上下・左右の気流軸を切り替える。`temperatureC()`/`setTemperatureC()` は `float` ペア（byte22 に °C × 2 を格納）。位相整合キャリア必須——zeroスペースがbitマークと等しい（共に428us、§11.3）。
 - `Toshiba` — 標準「Toshiba AC」protocol（WH-/RAS- リモコン、Carrier OEM機）。9バイトの pulse-distance フレームをフレームギャップを挟んで**2回**送る、**MSB-first**（唯一のMSB-first ACベンダ）、固定署名 `F2 0D` で始まる（byte1 = `~`byte0・byte3 = `~`byte2）。byte8 に XOR チェックサム（byte0–7）。電源は状態ビットでなく Mode フィールドが表す（`Mode == 7` = off）ので、`setPower(false)` は mode 7 を書き、`setPower(true)` は直前のモードを復元する。`Mode` は `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`。`Fan` は `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`（温度は整数のみ、17–30℃）。スイングは別の短メッセージ系（予約）で、標準フレームは保持しない。7バイト短・10バイト長メッセージは別 `Frame` 型。
+- `Samsung` — 標準「Samsung AC」protocol（AR-/ARH- 系リモコン）。14バイト状態、**LSBファースト**。先頭一回限りのヘッダ（690us mark + 17844us space）の後、7バイトの2セクションを送る。各セクションは独自のセクションヘッダ（3086/8864us）と 2886us のセクションギャップを持つ。各セクションは popcount（ハミング重み）チェックサムをビット反転し、バイト1〜2の2ニブルに分割して格納する。固定ベンダ署名は無いため `fromRaw` は両セクションのチェックサム一致をゲートにする。電源は2bitフィールド2つ（byte6・byte13）: 両方 `0b11` = on、両方 `0b00` = off。`Mode` は `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`（温度は整数のみ、16–30℃）。スイングと特殊ファン（Powerful/WindFree/Econo）はここでは設定不可。21バイト拡張（タイマ）メッセージは別 `Frame` 型。
 
 **Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
 
@@ -843,6 +847,21 @@ byte3 の上位ニブル（`0b0101`）と byte5 bit3-5（`0b100`）はリモコ�
 
 MSB-first。`toRaw` は固定フレーミング前置（署名＋反転ペア＋length/flags）を書き直し XOR チェックサムを再計算し、9バイトメッセージをフレームギャップを挟んで**2回**描画する（標準プロトコル準拠 — サードパーティのデコーダはフレーム間ギャップを終端スペースとして利用するため）。zeroスペースは公称490usではなく440usで送出する: 実機の受信機は mark/space 境界をずらして受信スペースを伸ばすため、490usだと復元後のzeroスペースが IRremoteESP8266 の厳しい既定上限（`490 − kMarkExcess(50) = 440`、×1.25 ≈ 551us）を超える。短めに出すことで余裕を確保しつつ、我々のデコーダ（許容30%）や通常バイアスの受信機でも復元できる。電源は Mode フィールドの off コード（7）なので `setPower(false)` は mode 7 を書く。filter ビットは setter 未作成、swing は別の短メッセージ（予約）。実装済みは唯一このフォーマットで、7バイト短・10バイト長は予約。
 
+**Samsung AC フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが14バイト状態（7バイト×2セクション）のどこに入るか。ステータス凡例は上と同じ。
+
+| フィールド | 位置（byte/bit） | コード / 範囲 | 状態 |
+|---|---|---|---|
+| power | byte6 bit4-5 ＋ byte13 bit4-5 | 両方 `0b11` = on / 両方 `0b00` = off | ✅ |
+| mode | byte12 bit4-6 | auto=0 / cool=1 / dry=2 / fan=3 / heat=4 | ✅ |
+| temperature | byte11 bit4-7 | `°C − 16`、16–30℃（整数） | ✅ |
+| fan(風量) | byte12 bit1-3 | auto=0 / low=2 / med=4 / high=5 / max(turbo)=7 | ✅ |
+| swing | byte9 bit4-6 | — | 🟡 |
+| 特殊ファン（Powerful/WindFree/Econo） | byte10 bit1-3 | — | 🟡 |
+| checksum（section 1） | byte1 上位ニブル ＋ byte2 下位ニブル | section バイト0–6 の popcount を反転 | ✅ |
+| checksum（section 2） | byte8 上位ニブル ＋ byte9 下位ニブル | section バイト7–13 の popcount を反転 | ✅ |
+
+LSB-first。`toRaw` は2つのセクションチェックサムを再計算し、一回限りの先頭ヘッダに続けて2セクション（各々独自ヘッダ付き）を実機同様に描画する。電源は2bitフィールド2つをまとめて書く。swing と特殊ファンは setter 未作成。実装済みは唯一このフォーマットで、21バイト拡張（タイマ）は予約。
+
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 
 ### 11.3 長尺フレームのキャリア
@@ -859,5 +878,6 @@ ACフレームは長く、確実に届くキャリアはベンダのタイミン
 - **Fujitsu** も同じタイミング余裕の狭い例（zeroスペース390us < bitマーク448us）で、既定で位相整合キャリアを使います。`fujitsu_*` compat studies は実機での到達率を確認するためのものです。
 - **Daikin** は最も極端な例で、zeroスペースがbitマークと等しい（共に428us）ため揺れの余裕がゼロで、位相整合キャリアが必須です。3セクションのバーストも長く、位相整合のシンボル数は全ベンダ中最大になります。
 - **Toshiba** は zeroスペース（送出値440us — フレーミング注記参照）が bitマーク（580us）より短い、Fujitsu と同じ余裕の狭い例なので、既定で位相整合キャリアを使います。
+- **Samsung** は zeroスペース（436us）が bitマーク（586us）より短いので、既定で位相整合キャリアを使います。セクションデコーダが mark-excess を使わないため、標準の436us zeroスペースは Toshiba で必要だった短縮送出なしでサードパーティの窓に収まります。
 
 推奨: ACでは位相整合キャリアが安全な既定で、`setPhaseAlignedCarrier` を呼ばなければこれになります。ハードウェアキャリア（`setPhaseAlignedCarrier(false)`）は、Panasonic のようなタイミング余裕の広いベンダでの省メモリ最適化としてのみ使ってください。キャリアはバイト整合性ではなく到達率に影響します——受信できたフレームは常にバイト正確（チェックサム検証済み）で、位相整合キャリアにサイズ上限はありません（15bitフィールドを超える時間は複数シンボルに分割）。

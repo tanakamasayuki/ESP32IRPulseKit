@@ -2242,6 +2242,126 @@ void testToshibaAcStateMatrix()
   EXPECT_TRUE("toshiba/state-matrix", all_ok);
 }
 
+// Samsung AC (standard 14-byte SAMSUNG_AC): build a frame, render the burst
+// (LSB-first, leading header + two 7-byte sections), decode it back, and confirm
+// the logical fields and the two popcount section checksums survive the roundtrip.
+// Canonical bytes are derived from IRSamsungAc's documented field layout +
+// checksum; the hardware study verifies them against IRSamsungAc.
+void testSamsungAcRoundtrip()
+{
+  using esp32irpk::ac::Samsung::Fan;
+  using esp32irpk::ac::Samsung::Frame;
+  using esp32irpk::ac::Samsung::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(24);
+  f.setFan(Fan::AUTO);
+
+  EXPECT_TRUE("samsung/power-get", f.power());
+  EXPECT_TRUE("samsung/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("samsung/temp-get", 24u, f.temperatureC());
+  EXPECT_TRUE("samsung/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("samsung/encode", f.toRaw(buf));
+  EXPECT_TRUE("samsung/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("samsung/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("samsung/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("samsung/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("samsung/decode-power", g.power());
+  EXPECT_TRUE("samsung/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("samsung/decode-temp", 24u, g.temperatureC());
+  EXPECT_TRUE("samsung/decode-fan", g.fan() == Fan::AUTO);
+
+  // Power on / cool / 24C / fan auto, derived from IRSamsungAc's struct layout +
+  // the popcount section checksums (section 1 -> bytes 1,2; section 2 -> bytes 8,9).
+  static const uint8_t kCanonicalCool24[Frame::kBytes] = {
+      0x02, 0x92, 0x0F, 0x00, 0x00, 0x00, 0xF0,
+      0x01, 0x02, 0xAF, 0x71, 0x80, 0x11, 0xF0};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool24[i])
+      canonical_match = false;
+  EXPECT_TRUE("samsung/canonical-bytes", canonical_match);
+
+  // Power is two 2-bit fields; off is independent of mode.
+  Frame p{};
+  p.setMode(Mode::HEAT);
+  p.setPower(false);
+  EXPECT_TRUE("samsung/poweroff", !p.power());
+  EXPECT_TRUE("samsung/poweroff-mode-kept", p.mode() == Mode::HEAT);
+  uint16_t t2[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer b2{t2, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("samsung/poweroff-encode", p.toRaw(b2));
+  Frame pg{};
+  EXPECT_TRUE("samsung/poweroff-decode", Frame::fromRaw(esp32irpk::IRRawTickView{b2.ticks, b2.len}, pg));
+  EXPECT_TRUE("samsung/poweroff-decode-off", !pg.power());
+  EXPECT_TRUE("samsung/poweroff-decode-mode", pg.mode() == Mode::HEAT);
+
+  // Temperature clamps to the supported range.
+  Frame t{};
+  t.setTemperatureC(40);
+  EXPECT_EQ("samsung/temp-clamp-high", 30u, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("samsung/temp-clamp-low", 16u, t.temperatureC());
+
+  // A non-Samsung waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("samsung/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power combination must encode (setters -> toRaw ->
+// fromRaw) back to itself with valid section checksums, exercising the full field
+// map, the two-section framing, and the LSB-first codec path.
+void testSamsungAcStateMatrix()
+{
+  using esp32irpk::ac::Samsung::Fan;
+  using esp32irpk::ac::Samsung::Frame;
+  using esp32irpk::ac::Samsung::Mode;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::COOL, Mode::DRY, Mode::FAN, Mode::HEAT};
+  static const Fan fans[] = {Fan::AUTO, Fan::LOW_SPEED, Fan::MED_SPEED,
+                             Fan::HIGH_SPEED, Fan::MAX_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 16; temp <= 30; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          Frame f{};
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+          f.setPower(power != 0);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          // Power is independent of mode, so mode is always asserted.
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan ||
+              g.temperatureC() != temp)
+            all_ok = false;
+        }
+  EXPECT_TRUE("samsung/state-matrix", all_ok);
+}
+
 // Each vendor's toString() maps an enum value to its identifier name (used by
 // printTo). Out-of-range values fall back to "?".
 void testAcEnumToString()
@@ -2252,6 +2372,7 @@ void testAcEnumToString()
   namespace F = esp32irpk::ac::Fujitsu;
   namespace D = esp32irpk::ac::Daikin;
   namespace TO = esp32irpk::ac::Toshiba;
+  namespace SA = esp32irpk::ac::Samsung;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -2271,6 +2392,9 @@ void testAcEnumToString()
   EXPECT_TRUE("toshiba/tostring-mode", strcmp(TO::toString(TO::Mode::HEAT), "HEAT") == 0);
   EXPECT_TRUE("toshiba/tostring-fan-min", strcmp(TO::toString(TO::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("toshiba/tostring-fan-max", strcmp(TO::toString(TO::Fan::MAX_SPEED), "MAX_SPEED") == 0);
+  EXPECT_TRUE("samsung/tostring-mode", strcmp(SA::toString(SA::Mode::HEAT), "HEAT") == 0);
+  EXPECT_TRUE("samsung/tostring-fan-low", strcmp(SA::toString(SA::Fan::LOW_SPEED), "LOW_SPEED") == 0);
+  EXPECT_TRUE("samsung/tostring-fan-max", strcmp(SA::toString(SA::Fan::MAX_SPEED), "MAX_SPEED") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -2459,6 +2583,32 @@ void testAcFromBytes()
     EXPECT_TRUE("toshiba/frombytes-eq", eq);
     EXPECT_TRUE("toshiba/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+  // Samsung: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Samsung::Fan;
+    using esp32irpk::ac::Samsung::Frame;
+    using esp32irpk::ac::Samsung::Mode;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::MAX_SPEED);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("samsung/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("samsung/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("samsung/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("samsung/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("samsung/frombytes-eq", eq);
+    EXPECT_TRUE("samsung/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -2523,6 +2673,8 @@ void setup()
   testDaikinAcStateMatrix();
   testToshibaAcRoundtrip();
   testToshibaAcStateMatrix();
+  testSamsungAcRoundtrip();
+  testSamsungAcStateMatrix();
   testAcEnumToString();
   testAcFromBytes();
 

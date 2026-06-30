@@ -52,6 +52,10 @@ daikin_irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Toshiba (IRToshibaAC, standard 9-byte TOSHIBA_AC, matching esp32irpk::ac::Toshiba)
 toshiba_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
 toshiba_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+
+# Samsung (IRSamsungAc, standard 14-byte SAMSUNG_AC, matching esp32irpk::ac::Samsung)
+samsung_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+samsung_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
 Each vendor uses the same `<extlib>_<role>` variants. The variant folders are
@@ -188,6 +192,18 @@ harness are added one variant at a time. In place:
   AC vendor) with the `F2 0D` signature and an XOR checksum in byte 8; power is the
   Mode field's off code (7). Exercises the codec's MSB-first path on hardware.
 
+- `samsung_irremoteesp8266_tx/` + `samsung_irremoteesp8266_rx/` -- the same calibration
+  and encoder-verification pair for the standard 14-byte SAMSUNG_AC protocol, using
+  IRremoteESP8266's `IRSamsungAc`. LSB-first, a one-time leading header (690/17844 µs)
+  then two 7-byte sections, each with a popcount section checksum split across its
+  bytes 1-2; power is two 2-bit fields. The TX peer drives `IRsend::sendSamsungAC`
+  directly (not `IRSamsungAc::send`, which emits a 21-byte extended frame on power
+  changes), and the RX uses a 30 ms timeout to span the 17.8 ms leading gap. There is
+  **no** `samsung_heatpumpir_tx`: HeatpumpIR's Samsung classes implement the older AQV
+  (21-byte) and FJM (different section-2 checksum) variants, neither matching the
+  modern 14-byte format, so Samsung is cross-checked by the IRremoteESP8266
+  bidirectional pair alone.
+
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`
   / `MitsubishiFEHeatpumpIR` / `FujitsuHeatpumpIR` / `DaikinHeatpumpIR`, a separate
@@ -210,7 +226,7 @@ harness are added one variant at a time. In place:
   power / mode (auto/cool/dry/heat) / temp / fan.
 
 Findings and the confirmed field maps are recorded back here and into
-`src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` / `src/ac/Toshiba.h`.
+`src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` / `src/ac/Toshiba.h` / `src/ac/Samsung.h`.
 
 The `irremoteesp8266_tx/` run confirms the Panasonic field map in
 `src/ac/Panasonic.h` matches IRremoteESP8266's `IRPanasonicAc` byte-for-byte:

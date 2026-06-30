@@ -715,17 +715,20 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312 | various sizes | — | Not yet |
 | Toshiba | Toshiba AC | 9-byte | standard | **Supported** |
 | | short (7-byte swing) / long (10-byte) | — | Not yet |
+| Samsung | Samsung AC | 14-byte, 2 sections | standard | **Supported**² |
+| | extended (21-byte timer) | — | Not yet |
+
+² Samsung is verified by the IRremoteESP8266 bidirectional pair (`samsung_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination: HeatpumpIR's Samsung classes implement the older AQV (21-byte) and FJM (different section-2 checksum) variants, neither matching the modern 14-byte SAMSUNG_AC.
 
 **Candidate vendors (not yet started), in suggested implementation order.** Ordering weighs, in priority: a second independent reference (IRremoteESP8266 *and* HeatpumpIR, matching the verification used for the supported vendors), a clean byte-state fit for the `ac::` layer, framing simplicity, and device coverage. Target models are chosen at approval time, not pre-locked here. Bit-paired code formats (Coolix 24-bit, LG 28-bit, …) are deliberately out of scope — they are not multi-byte byte-state and would need a different code path outside this layer.
 
-| # | Vendor | Format / size | References | Notes |
-|---|---|---|---|---|
-| 1 | Samsung | Samsung AC, 14-byte (21-byte extended) | IRremoteESP8266 + HeatpumpIR | Cleanest match to the proven playbook: dual reference, single byte-state format, mainstream brand. Lowest-risk next vendor. |
-| 2 | Sharp | Sharp AC, 13-byte | IRremoteESP8266 only | Simplest byte-state framing (single frame, sent twice with the copy inverted); common in the JP market. No HeatpumpIR second reference — use captured-frame fixtures instead. |
-| 3 | Kelvinator | Kelvinator, 16-byte, two blocks | IRremoteESP8266 only | Two-block layout + block checksum nearly identical to Gree (already solved) — high code reuse, low effort. |
-| 4 | Midea | Midea, 48-bit (6-byte) | IRremoteESP8266 + HeatpumpIR | Large rebadge coverage (many OEM brands). Caveat: code + inverted-copy structure (no sum/XOR byte checksum) stretches the byte-state model; needs an inversion-check path. |
-| 5 | Carrier | Carrier AC, 32 / 64-bit + 128-bit (16-byte) | IRremoteESP8266 + HeatpumpIR | Dual reference, but several distinct wire formats — each a separate `Frame` type. Pick a target format before starting. |
-| 6 | Hitachi | Hitachi AC, 28-byte (+ 13–53-byte variants) | IRremoteESP8266 + HeatpumpIR | Hardest: many size variants with leader/section framing. Defer until the simpler vendors are done. |
+| Vendor | Format / size | References | Notes |
+|---|---|---|---|
+| Sharp | Sharp AC, 13-byte | IRremoteESP8266 only | Simplest byte-state framing (single frame, sent twice with the copy inverted); common in the JP market. No HeatpumpIR second reference — use captured-frame fixtures instead. |
+| Kelvinator | Kelvinator, 16-byte, two blocks | IRremoteESP8266 only | Two-block layout + block checksum nearly identical to Gree (already solved) — high code reuse, low effort. |
+| Midea | Midea, 48-bit (6-byte) | IRremoteESP8266 + HeatpumpIR | Large rebadge coverage (many OEM brands). Caveat: code + inverted-copy structure (no sum/XOR byte checksum) stretches the byte-state model; needs an inversion-check path. |
+| Carrier | Carrier AC, 32 / 64-bit + 128-bit (16-byte) | IRremoteESP8266 + HeatpumpIR | Dual reference, but several distinct wire formats — each a separate `Frame` type. Pick a target format before starting. |
+| Hitachi | Hitachi AC, 28-byte (+ 13–53-byte variants) | IRremoteESP8266 + HeatpumpIR | Hardest: many size variants with leader/section framing. Defer until the simpler vendors are done. |
 
 Further single-reference (IRremoteESP8266-only) byte-state options if more coverage is wanted: Haier (9-byte / 22-byte), TCL112 (14-byte), Electra (13-byte).
 
@@ -737,6 +740,7 @@ Per-vendor framing of the supported formats:
 - `Fujitsu` — the "Fujitsu AC" protocol (AR-series remotes), targeting model ARRAH2E. A full setting is a 16-byte pulse-distance "long" frame beginning with the fixed bytes `14 63 00 10 10`, byte 5 = `0xFE` (the long-frame marker), and a complement checksum in byte 15; a power-off is the 7-byte "short" frame `14 63 00 10 10 02 FD` (byte 6 = `~`byte 5). Each frame is sent once. Power is carried by the frame type (long = on, short OFF = off), not a state bit, so `setPower(false)` emits the short frame and the don't-care mode/temp/fan fields of a decoded OFF frame keep the template defaults. Single model (no `Model` parameter yet); ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E differ in length, marker, checksum complement, and (ARREW4E) temperature encoding and would be added as model branches or `Frame` types later. `Fan` is `AUTO`/`HIGH_SPEED`/`MED_SPEED`/`LOW_SPEED`/`QUIET`; `Swing` is `OFF`/`VERTICAL`/`HORIZONTAL`/`BOTH`.
 - `Daikin` — the classic "Daikin" / ARC433 protocol (ARC433** / ARC466 remotes, M-Series / FTXM-M units). A 35-byte state is sent as a 5-bit `00000` leading preamble followed by **three** pulse-distance sections (8 + 8 + 19 bytes), each with its own header and a per-section sum checksum (bytes 7 / 15 / 34); every section begins with the fixed signature `11 DA 27`. Single classic wire format (no `Model` parameter); the other Daikin sizes (Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312) are separate `Frame` types. `Mode` is `AUTO`/`DRY`/`COOL`/`HEAT`/`FAN`; `Fan` is `AUTO`/`QUIET`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`; `setSwingVertical`/`setSwingHorizontal` toggle the two airflow axes; `temperatureC()`/`setTemperatureC()` are a `float` pair (byte 22 stores °C × 2). It must use the phase-aligned carrier — its zero-space equals its bit mark (both 428 µs), §11.3.
 - `Toshiba` — the standard "Toshiba AC" protocol (WH-/RAS- remotes, rebadged Carrier units). A 9-byte pulse-distance frame transmitted twice (separated by the frame gap), **MSB-first** (the only MSB-first AC vendor), beginning with the fixed signature `F2 0D` (byte 1 = `~`byte 0; byte 3 = `~`byte 2), with an XOR checksum (of bytes 0–7) in byte 8. Power is carried by the Mode field (`Mode == 7` = off), not a separate bit, so `setPower(false)` writes mode 7 and `setPower(true)` restores the last set mode. `Mode` is `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`; `Fan` is `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (whole-degree temps, 17–30 °C). Swing is a separate short-message variant (reserved); the standard frame does not carry it. The 7-byte short and 10-byte long messages are separate `Frame` types.
+- `Samsung` — the standard "Samsung AC" protocol (AR-/ARH- series remotes). A 14-byte state, **LSB-first**, sent as a one-time leading header (690 µs mark + 17844 µs space) followed by two 7-byte sections, each with its own section header (3086/8864 µs) and a 2886 µs section gap. Each section carries a popcount (Hamming-weight) checksum, bitwise-inverted, split across two nibbles of its bytes 1–2. There is no fixed vendor signature, so `fromRaw` gates on both section checksums validating. Power is two 2-bit fields (byte 6 and byte 13): both `0b11` = on, both `0b00` = off. `Mode` is `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`; `Fan` is `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (whole-degree temps, 16–30 °C). Swing and the special fan flags (Powerful/WindFree/Econo) are not settable here. The 21-byte extended (timer) message is a separate `Frame` type.
 
 **Panasonic field map (decoded logical fields).** Where each control field lives in the 27-byte state. Status legend: ✅ implemented (decode + encode) · 🔜 planned · 🟡 documented, no setter (re-send via RAW replay) · ⛔ out of scope (separate frame type).
 
@@ -850,6 +854,21 @@ The state is rendered as a 5-bit `00000` preamble then the three sections, each 
 
 It is MSB-first; `toRaw` rewrites the fixed framing prefix (signature + inverted pairs + length/flags), recomputes the XOR checksum, and renders the 9-byte message **twice** (separated by the frame gap), matching the standard protocol — third-party decoders rely on the inter-message gap as a bounded footer space. The zero-space is emitted at 440 µs rather than the documented 490 µs: real receivers shift the mark/space boundary and lengthen the received space, and 490 µs would push the recovered zero-space past IRremoteESP8266's tight default ceiling (`490 − kMarkExcess(50) = 440`, ×1.25 ≈ 551 µs); the shorter emit keeps it clear, while our own decoder (30 % tolerance) and normal-bias receivers still recover it. Power is the Mode field's off code (7), so `setPower(false)` writes mode 7. The filter bit has no setter; swing is a separate short message (reserved). This is the only Toshiba format implemented; the 7-byte short and 10-byte long messages are reserved.
 
+**Samsung AC field map (decoded logical fields).** Where each control field lives in the 14-byte state (two 7-byte sections). Same status legend.
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| power | byte 6 bits 4-5 + byte 13 bits 4-5 | both `0b11` = on / both `0b00` = off | ✅ |
+| mode | byte 12 bits 4-6 | auto=0 / cool=1 / dry=2 / fan=3 / heat=4 | ✅ |
+| temperature | byte 11 bits 4-7 | `°C − 16`, 16–30 °C (whole degrees) | ✅ |
+| fan (airflow) | byte 12 bits 1-3 | auto=0 / low=2 / med=4 / high=5 / max(turbo)=7 | ✅ |
+| swing | byte 9 bits 4-6 | — | 🟡 |
+| special fan (Powerful/WindFree/Econo) | byte 10 bits 1-3 | — | 🟡 |
+| checksum (section 1) | byte 1 high nibble + byte 2 low nibble | popcount of section bytes 0–6, inverted | ✅ |
+| checksum (section 2) | byte 8 high nibble + byte 9 low nibble | popcount of section bytes 7–13, inverted | ✅ |
+
+It is LSB-first; `toRaw` recomputes the two section checksums, then renders the one-time leading header followed by the two sections (each with its own header), as a real remote does. Power is two 2-bit fields written together. Swing and the special fan flags have no setters. This is the only Samsung format implemented; the 21-byte extended (timer) message is reserved.
+
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
 ### 11.3 Carrier For Long Frames
@@ -866,5 +885,6 @@ That wobble matters for tightly-timed vendors:
 - **Fujitsu** is the same tight-timing case (zero-space 390 µs < bit mark 448 µs), so it uses the phase-aligned carrier by default; the `fujitsu_*` compat studies are intended to confirm the delivery rate on hardware.
 - **Daikin** is the most extreme case: its zero-space *equals* its bit mark (both 428 µs), leaving no margin for carrier wobble, so it requires the phase-aligned carrier. Its three-section burst is also long, so the phase-aligned symbol count is the largest of any vendor.
 - **Toshiba** has a zero-space (emitted 440 µs — see the framing note) shorter than its bit mark (580 µs), the same tight-margin case as Fujitsu, so it uses the phase-aligned carrier by default.
+- **Samsung** has a zero-space (436 µs) shorter than its bit mark (586 µs), so it uses the phase-aligned carrier by default. Its section decoder applies no mark-excess, so the standard 436 µs zero-space clears the third-party window without the shortened emit Toshiba needed.
 
 Recommendation: the phase-aligned carrier is the safe default for AC, and is what you get if you never call `setPhaseAlignedCarrier`. Use the hardware carrier (`setPhaseAlignedCarrier(false)`) only as a memory optimization for loosely-timed vendors such as Panasonic. The carrier affects delivery rate, not byte integrity — a received frame is always byte-correct because it is checksum-validated, and the phase-aligned carrier is not size-limited (durations beyond the 15-bit field are split across symbols).
