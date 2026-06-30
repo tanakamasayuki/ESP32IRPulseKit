@@ -87,7 +87,7 @@ def send_once(tx, case: Case):
 
 def decode_once(rx):
     try:
-        match = rx.expect(AC_DECODE, timeout=12)
+        match = rx.expect(AC_DECODE, timeout=3)
     except (EOF, TIMEOUT):
         return None
     return {

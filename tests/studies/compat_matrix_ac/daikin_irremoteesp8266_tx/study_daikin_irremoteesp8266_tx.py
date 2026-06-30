@@ -92,7 +92,7 @@ def send_once(tx, case: Case):
 # pytest-embedded's expect() returns the re.Match (there is no dut.match attribute).
 def decode_once(rx):
     try:
-        m = rx.expect(AC_DECODE, timeout=12)
+        m = rx.expect(AC_DECODE, timeout=3)
     except (EOF, TIMEOUT):
         return None
     return {
