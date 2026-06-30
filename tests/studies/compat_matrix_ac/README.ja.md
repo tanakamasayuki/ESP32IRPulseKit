@@ -31,10 +31,10 @@
 
 ```text
 # Panasonic
-irremoteesp8266_tx/        # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
-irremoteesp8266_rx/        # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
-irremoteesp8266_self/      # TX + RX: IRremoteESP8266                               （参照ベースライン）
-heatpumpir_tx/             # TX: HeatpumpIR（既知状態） -> RX: ESP32IRPulseKit       （2系統目の参照）
+panasonic_irremoteesp8266_tx/        # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+panasonic_irremoteesp8266_rx/        # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
+panasonic_irremoteesp8266_self/      # TX + RX: IRremoteESP8266                               （参照ベースライン）
+panasonic_heatpumpir_tx/             # TX: HeatpumpIR（既知状態） -> RX: ESP32IRPulseKit       （2系統目の参照）
 
 # Gree（esp32irpk::ac::Gree に合わせて IRGreeAC の YBOFB モデルを使用）
 gree_irremoteesp8266_tx/   # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
@@ -58,9 +58,9 @@ samsung_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 ```
 
 各ベンダは同じ `<extlib>_<role>` バリアントを使う。バリアントのフォルダ名は
-ベンダ名で前置する（`gree_…`）。前置のないものは歴史的経緯で Panasonic。
+すべてベンダ名で前置する（`panasonic_…`、`gree_…`）。
 
-`irremoteesp8266_self`（IRremoteESP8266 が既知状態をエンコードし、自分の送信を
+`panasonic_irremoteesp8266_self`（IRremoteESP8266 が既知状態をエンコードし、自分の送信を
 デコード）はベースライン。クロス方向を信頼する前に、参照が物理治具/配置で往復
 できることを確認します。
 
@@ -72,7 +72,7 @@ Arduino-IRremote はここでは**使いません**。エアコン状態のデ�
   送信。当方RXがRAWをキャプチャ（RAWのみ＋`setMaxRxSymbols`＋大きめidle）し
   `ac::Panasonic::Frame::fromRaw` でデコードしてフィールドを出力。study は
   `送信状態 → 当方デコード結果` を記録＝これがフィールドマップ確定の材料。
-- `irremoteesp8266_rx`（当方が送信、外部RX）: 当方 `ac::Panasonic` で状態を
+- `panasonic_irremoteesp8266_rx`（当方が送信、外部RX）: 当方 `ac::Panasonic` で状態を
   エンコードし、IRremoteESP8266 が復号。当方エンコーダの検証。
 
 ## シリアル形式
@@ -99,7 +99,7 @@ Serialポート/GPIOが必要です。
 
 ```sh
 uv run --env-file .env pytest -s -o python_files="study_*.py" \
-  studies/compat_matrix_ac/irremoteesp8266_tx/
+  studies/compat_matrix_ac/panasonic_irremoteesp8266_tx/
 ```
 
 ## 状態
@@ -107,22 +107,22 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
 設計とシリアル契約はここで確定。バリアント別のsketchとハーネスは1つずつ追加。
 実装済み:
 
-- `irremoteesp8266_self/` — ベースライン: 物理治具がPanasonic ACフレームを往復
+- `panasonic_irremoteesp8266_self/` — ベースライン: 物理治具がPanasonic ACフレームを往復
   できること（IRremoteESP8266 がエンコード→送信→受信→同じ27バイトへデコード）を、
   クロス方向を信頼する前に確認。
-- `irremoteesp8266_tx/` — フィールドマップ較正: IRremoteESP8266 が既知状態を送信、
+- `panasonic_irremoteesp8266_tx/` — フィールドマップ較正: IRremoteESP8266 が既知状態を送信、
   当方RXがRAWキャプチャして `esp32irpk::ac::Panasonic` でデコード。正準フレームとの
   バイト一致が合否判定（hard）、既知状態とのフィールド単位比較は報告のみ（assertし
   ない）でフィールドマップ確定の材料にする。`test_irremoteesp8266_tx_models` は加えて、
   peer に各Panasonicモデル（`setModel` DKE/NKE/LKE/RKR）を送らせ、当方RXが正準バイトを
   復元し**かつ同じモデルを自己判定**（`Frame::model`）することを確認 — モデル別マーカー
   バイトと判定を IRremoteESP8266 に対して検証する。
-- `irremoteesp8266_rx/` — encoder検証（`_tx`の対）: 当方TXが `esp32irpk::ac::Panasonic`
+- `panasonic_irremoteesp8266_rx/` — encoder検証（`_tx`の対）: 当方TXが `esp32irpk::ac::Panasonic`
   で既知状態をエンコードして送信、IRremoteESP8266 がデコード。外部ライブラリが復元
   したバイトが当方encoderの生成バイトと一致（checksum ok）すること＝当方 `toRaw()` が
   独立スタックも受理する正しいバーストを出すことの証明。
 
-- `heatpumpir_tx/` — 2系統目の独立参照: HeatpumpIR（`PanasonicJKEHeatpumpIR`、
+- `panasonic_heatpumpir_tx/` — 2系統目の独立参照: HeatpumpIR（`PanasonicJKEHeatpumpIR`、
   別コードベース、LEDCキャリア）が既知状態を送信、当方RXがデコード。hard判定は
   当方デコードが checksum 妥当かつ論理フィールドが送信状態と一致すること（バイト
   一致ではない — 独立した2つのencoderがフィールド意味で一致することに価値がある）。
@@ -187,7 +187,7 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   Samsung は IRremoteESP8266 双方向ペアのみで相互検証する。
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` — それぞれの2系統目の独立参照
-  （`heatpumpir_tx` と同型）。HeatpumpIR（`GreeGenericHeatpumpIR` /
+  （`panasonic_heatpumpir_tx` と同型）。HeatpumpIR（`GreeGenericHeatpumpIR` /
   `MitsubishiFEHeatpumpIR` / `FujitsuHeatpumpIR`、別コードベース、LEDCキャリア）が
   既知状態を送信し当方RXがデコード。hard判定は意味一致（checksum妥当＋論理フィールドが
   送信状態と一致）で、バイト一致ではない（HeatpumpIRはIRremoteESP8266と異なる補助バイトを
@@ -206,13 +206,13 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
 所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` /
 `src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` / `src/ac/Toshiba.h` / `src/ac/Samsung.h` に反映します。
 
-`irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
+`panasonic_irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
 IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを確認: 当方のRAW
 キャプチャが正準27バイトを再現し、power / mode（auto/cool/heat/dry）/ temperature
 / fan がすべて期待値にデコードされる。fan nibble は Panasonic の速度＋3
 （min/low/med/high/max = 0x3〜0x7、auto = 0xA）。
 
-`irremoteesp8266_rx/` の結果、当方encoderも確認: setterで構築し `toRaw()` で描画した
+`panasonic_irremoteesp8266_rx/` の結果、当方encoderも確認: setterで構築し `toRaw()` で描画した
 フレームが、実機リモコンが常に持つ固定feature byte（[15]=0x80, [19]=0x0E, [20]=0xE0,
 [23]=0x81）を含む完全な正準状態になる。そのため `Frame` は既知良テンプレートを既定値
 とし、mode/temp/fan/power だけ設定してもこれらのバイトが揃う。
@@ -225,7 +225,7 @@ ACのサンプルは `setPhaseAlignedCarrier(false)` で自走ハードウェア
 リフィルのアンダーランリスクが増す（SPEC §11.3）。そのためサンプルは長尺フレームで
 ハードウェアキャリアを推奨する。
 
-`study_irremoteesp8266_carrier_ab.py` はその選択が到達率を損なうかを計測する。`irremoteesp8266_rx`
+`study_panasonic_irremoteesp8266_carrier_ab.py` はその選択が到達率を損なうかを計測する。`panasonic_irremoteesp8266_rx`
 の peer（当方TX）はランタイム `CARRIER pa` / `CARRIER hw` コマンドを受け
 （ビルド既定は `PULSEKIT_CARRIER`、0=ハードウェア）、各状態を両モードで送信して
 モード別の正準到達率を記録する。実機治具では両キャリアとも全フレーム到達
@@ -237,12 +237,12 @@ ACのサンプルは `setPhaseAlignedCarrier(false)` で自走ハードウェア
 
 ```sh
 uv run --env-file .env pytest -s -o python_files="study_*.py" \
-  studies/compat_matrix_ac/irremoteesp8266_rx/study_irremoteesp8266_carrier_ab.py
+  studies/compat_matrix_ac/panasonic_irremoteesp8266_rx/study_panasonic_irremoteesp8266_carrier_ab.py
 ```
 
 ### デコーダ許容（タイミングスキュー）
 
-`heatpumpir_tx` はデコーダの厳しすぎる点も炙り出した。HeatpumpIR のESP32送信は
+`panasonic_heatpumpir_tx` はデコーダの厳しすぎる点も炙り出した。HeatpumpIR のESP32送信は
 マーク毎にLEDCキャリアを付け直すbusy-loopビットバンガーで、空白が約+150us伸びる
 （zero空白が公称432usに対し捕捉で約620us）。元の0/1判定は各長の狭い窓を使い、
 その間のデッドゾーンでこれらのフレームを丸ごと棄却していた — HeatpumpIRが問題なく

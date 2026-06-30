@@ -32,10 +32,10 @@ reuse `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`.
 
 ```text
 # Panasonic
-irremoteesp8266_tx/        # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
-irremoteesp8266_rx/        # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
-irremoteesp8266_self/      # TX + RX: IRremoteESP8266                                 (reference baseline)
-heatpumpir_tx/             # TX: HeatpumpIR (known state) -> RX: ESP32IRPulseKit       (second reference)
+panasonic_irremoteesp8266_tx/        # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+panasonic_irremoteesp8266_rx/        # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+panasonic_irremoteesp8266_self/      # TX + RX: IRremoteESP8266                                 (reference baseline)
+panasonic_heatpumpir_tx/             # TX: HeatpumpIR (known state) -> RX: ESP32IRPulseKit       (second reference)
 
 # Gree (IRGreeAC with the YBOFB model, matching esp32irpk::ac::Gree)
 gree_irremoteesp8266_tx/   # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
@@ -58,11 +58,10 @@ samsung_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRP
 samsung_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
-Each vendor uses the same `<extlib>_<role>` variants. The variant folders are
-prefixed with the vendor name (`gree_…`); the un-prefixed ones are Panasonic for
-historical reasons.
+Each vendor uses the same `<extlib>_<role>` variants. Every variant folder is
+prefixed with its vendor name (`panasonic_…`, `gree_…`).
 
-`irremoteesp8266_self` (IRremoteESP8266 encodes a known AC state and decodes its
+`panasonic_irremoteesp8266_self` (IRremoteESP8266 encodes a known AC state and decodes its
 own transmission) is the baseline: it confirms the reference round-trips in the
 physical rig/placement before the cross directions are trusted.
 
@@ -75,7 +74,7 @@ state), so it cannot compare fields.
   `setMaxRxSymbols` + large idle), decodes with `ac::Panasonic::Frame::fromRaw`,
   and prints the fields. The study records `sent state -> our decoded fields`,
   which is exactly what fixes the field map.
-- `irremoteesp8266_rx` (our transmitter, external RX): our `ac::Panasonic`
+- `panasonic_irremoteesp8266_rx` (our transmitter, external RX): our `ac::Panasonic`
   encodes a state; IRremoteESP8266 decodes it. Confirms our encoder.
 
 ## Serial format
@@ -102,7 +101,7 @@ boards and the local serial ports / GPIOs in `.env`.
 
 ```sh
 uv run --env-file .env pytest -s -o python_files="study_*.py" \
-  studies/compat_matrix_ac/irremoteesp8266_tx/
+  studies/compat_matrix_ac/panasonic_irremoteesp8266_tx/
 ```
 
 ## Status
@@ -110,10 +109,10 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
 The design and serial contract are fixed here; the per-variant sketches and
 harness are added one variant at a time. In place:
 
-- `irremoteesp8266_self/` -- baseline: confirms the physical rig round-trips a
+- `panasonic_irremoteesp8266_self/` -- baseline: confirms the physical rig round-trips a
   Panasonic A/C frame (IRremoteESP8266 encodes, transmits, receives, decodes
   back to the same 27 bytes) before the cross directions are trusted.
-- `irremoteesp8266_tx/` -- field-map calibration: IRremoteESP8266 transmits a
+- `panasonic_irremoteesp8266_tx/` -- field-map calibration: IRremoteESP8266 transmits a
   known state, our RX captures it RAW and decodes with `esp32irpk::ac::Panasonic`.
   Byte equality against the canonical frame is the hard pass/fail; per-field
   comparison against the known state is reported (not asserted) to drive the
@@ -121,12 +120,12 @@ harness are added one variant at a time. In place:
   each Panasonic model (`setModel` DKE/NKE/LKE/RKR) and checks our RX recovers
   the canonical bytes AND self-identifies the same model (`Frame::model`), so the
   per-model marker bytes and detection are confirmed against IRremoteESP8266.
-- `irremoteesp8266_rx/` -- encoder verification (complement of `_tx`): our TX
+- `panasonic_irremoteesp8266_rx/` -- encoder verification (complement of `_tx`): our TX
   encodes a known state with `esp32irpk::ac::Panasonic` and transmits it;
   IRremoteESP8266 decodes it. The bytes the external library recovers must equal
   the bytes our encoder produced, with a valid checksum -- proving our `toRaw()`
   emits a well-formed burst an independent stack accepts.
-- `heatpumpir_tx/` -- second, independent reference: HeatpumpIR
+- `panasonic_heatpumpir_tx/` -- second, independent reference: HeatpumpIR
   (`PanasonicJKEHeatpumpIR`, a separate codebase, over an LEDC carrier)
   transmits a known state; our RX decodes it. The hard check is that our decode
   is checksum-valid and its logical fields match the sent state (not byte
@@ -205,7 +204,7 @@ harness are added one variant at a time. In place:
   bidirectional pair alone.
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` -- a second independent
-  reference for each, mirroring `heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`
+  reference for each, mirroring `panasonic_heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`
   / `MitsubishiFEHeatpumpIR` / `FujitsuHeatpumpIR` / `DaikinHeatpumpIR`, a separate
   codebase over an LEDC carrier) transmits a known state and our RX decodes it. The
   hard check is semantic (checksum valid + logical fields match the sent state), not
@@ -228,13 +227,13 @@ harness are added one variant at a time. In place:
 Findings and the confirmed field maps are recorded back here and into
 `src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` / `src/ac/Toshiba.h` / `src/ac/Samsung.h`.
 
-The `irremoteesp8266_tx/` run confirms the Panasonic field map in
+The `panasonic_irremoteesp8266_tx/` run confirms the Panasonic field map in
 `src/ac/Panasonic.h` matches IRremoteESP8266's `IRPanasonicAc` byte-for-byte:
 our RAW capture reproduces the canonical 27 bytes, and power / mode (auto, cool,
 heat, dry) / temperature / fan all decode to the expected values. The fan nibble
 is the Panasonic speed plus 3 (min/low/med/high/max = 0x3..0x7, auto = 0xA).
 
-The `irremoteesp8266_rx/` run additionally confirms our encoder: a frame built
+The `panasonic_irremoteesp8266_rx/` run additionally confirms our encoder: a frame built
 from setters and rendered by `toRaw()` is the full canonical state, including
 the fixed feature bytes a real remote always carries ([15]=0x80, [19]=0x0E,
 [20]=0xE0, [23]=0x81). A `Frame` therefore defaults to a known-good template so
@@ -248,8 +247,8 @@ give higher mark precision but expands a long AC burst to ~17 KB of symbols per
 send and raises the refill-underrun risk under heavy interrupt load (SPEC 11.3),
 which is why the examples recommend the hardware carrier for long frames.
 
-`study_irremoteesp8266_carrier_ab.py` measures whether that choice costs delivery. The
-`irremoteesp8266_rx` peer (our TX) takes a runtime `CARRIER pa` / `CARRIER hw`
+`study_panasonic_irremoteesp8266_carrier_ab.py` measures whether that choice costs delivery. The
+`panasonic_irremoteesp8266_rx` peer (our TX) takes a runtime `CARRIER pa` / `CARRIER hw`
 command (build-time default `PULSEKIT_CARRIER`, 0 = hardware), and the study sends
 each state under both modes and records the canonical-delivery rate per mode. On
 the test rig both carriers delivered every frame (phase-aligned and hardware each
@@ -262,12 +261,12 @@ rate would be reported, not failed. Run it with:
 
 ```sh
 uv run --env-file .env pytest -s -o python_files="study_*.py" \
-  studies/compat_matrix_ac/irremoteesp8266_rx/study_irremoteesp8266_carrier_ab.py
+  studies/compat_matrix_ac/panasonic_irremoteesp8266_rx/study_panasonic_irremoteesp8266_carrier_ab.py
 ```
 
 ### Decoder tolerance (timing skew)
 
-`heatpumpir_tx` also surfaced a decoder-strictness issue. HeatpumpIR's ESP32
+`panasonic_heatpumpir_tx` also surfaced a decoder-strictness issue. HeatpumpIR's ESP32
 sender is a busy-loop bit-banger that re-attaches the LEDC carrier per mark, so
 every space comes out ~150us long (a zero space is ~620us captured vs the 432us
 nominal). The original per-bit decode used narrow windows around each 0/1 length,
