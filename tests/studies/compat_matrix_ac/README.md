@@ -48,6 +48,10 @@ fujitsu_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Daikin (IRDaikinESP, classic ARC433, matching esp32irpk::ac::Daikin)
 daikin_irremoteesp8266_tx/   # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
 daikin_irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+
+# Toshiba (IRToshibaAC, standard 9-byte TOSHIBA_AC, matching esp32irpk::ac::Toshiba)
+toshiba_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+toshiba_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
 Each vendor uses the same `<extlib>_<role>` variants. The variant folders are
@@ -178,7 +182,13 @@ harness are added one variant at a time. In place:
   `esp32irpk::ac::Daikin` enum values equal the IRremoteESP8266 wire codes, so the
   field comparison is a direct numeric match.
 
-- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` -- a second independent
+- `toshiba_irremoteesp8266_tx/` + `toshiba_irremoteesp8266_rx/` -- the same calibration
+  and encoder-verification pair for the standard 9-byte TOSHIBA_AC protocol, using
+  IRremoteESP8266's `IRToshibaAC`. A single **MSB-first** frame (the only MSB-first
+  AC vendor) with the `F2 0D` signature and an XOR checksum in byte 8; power is the
+  Mode field's off code (7). Exercises the codec's MSB-first path on hardware.
+
+- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`
   / `MitsubishiFEHeatpumpIR` / `FujitsuHeatpumpIR` / `DaikinHeatpumpIR`, a separate
   codebase over an LEDC carrier) transmits a known state and our RX decodes it. The
@@ -194,9 +204,13 @@ harness are added one variant at a time. In place:
   keeps the template's section-1/2 checksums and recomputes only byte 34, so our
   three-checksum validation passes. Its Daikin encoder does not drive swing (fixed
   off) and has no quiet step, so that variant calibrates power / mode / temp / fan.
+  HeatpumpIR's Toshiba stores the state bit-reversed and sends it, so on the wire it
+  is the same standard MSB-first TOSHIBA_AC frame our decoder reads directly; it has
+  no FAN operating mode and does not drive swing, so that variant calibrates
+  power / mode (auto/cool/dry/heat) / temp / fan.
 
 Findings and the confirmed field maps are recorded back here and into
-`src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h`.
+`src/ac/Panasonic.h` / `src/ac/Gree.h` / `src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` / `src/ac/Toshiba.h`.
 
 The `irremoteesp8266_tx/` run confirms the Panasonic field map in
 `src/ac/Panasonic.h` matches IRremoteESP8266's `IRPanasonicAc` byte-for-byte:

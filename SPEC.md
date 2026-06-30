@@ -713,6 +713,8 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | Not yet |
 | Daikin | Daikin classic (ARC433) | 35-byte, 3 sections | single | **Supported** |
 | | Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312 | various sizes | — | Not yet |
+| Toshiba | Toshiba AC | 9-byte | standard | **Supported** |
+| | short (7-byte swing) / long (10-byte) | — | Not yet |
 
 Per-vendor framing of the supported formats:
 
@@ -721,6 +723,7 @@ Per-vendor framing of the supported formats:
 - `Mitsubishi` — the 18-byte "Mitsubishi AC" protocol (MSZ/Kirigamine remotes): one pulse-distance frame with a fixed 5-byte signature, sent twice with a long gap; the last byte is a sum checksum over the rest. This format has a single model (no `Model` parameter); the other Mitsubishi wire formats (136 / 112 / Heavy) would be separate `Frame` types. `Fan` is `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`; `Vane` (vertical, `P1`..`P5`) and `WideVane` (horizontal) set the airflow direction, and `temperatureC()`/`setTemperatureC()` are a symmetric `float` pair carrying 0.5 °C steps.
 - `Fujitsu` — the "Fujitsu AC" protocol (AR-series remotes), targeting model ARRAH2E. A full setting is a 16-byte pulse-distance "long" frame beginning with the fixed bytes `14 63 00 10 10`, byte 5 = `0xFE` (the long-frame marker), and a complement checksum in byte 15; a power-off is the 7-byte "short" frame `14 63 00 10 10 02 FD` (byte 6 = `~`byte 5). Each frame is sent once. Power is carried by the frame type (long = on, short OFF = off), not a state bit, so `setPower(false)` emits the short frame and the don't-care mode/temp/fan fields of a decoded OFF frame keep the template defaults. Single model (no `Model` parameter yet); ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E differ in length, marker, checksum complement, and (ARREW4E) temperature encoding and would be added as model branches or `Frame` types later. `Fan` is `AUTO`/`HIGH_SPEED`/`MED_SPEED`/`LOW_SPEED`/`QUIET`; `Swing` is `OFF`/`VERTICAL`/`HORIZONTAL`/`BOTH`.
 - `Daikin` — the classic "Daikin" / ARC433 protocol (ARC433** / ARC466 remotes, M-Series / FTXM-M units). A 35-byte state is sent as a 5-bit `00000` leading preamble followed by **three** pulse-distance sections (8 + 8 + 19 bytes), each with its own header and a per-section sum checksum (bytes 7 / 15 / 34); every section begins with the fixed signature `11 DA 27`. Single classic wire format (no `Model` parameter); the other Daikin sizes (Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312) are separate `Frame` types. `Mode` is `AUTO`/`DRY`/`COOL`/`HEAT`/`FAN`; `Fan` is `AUTO`/`QUIET`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`; `setSwingVertical`/`setSwingHorizontal` toggle the two airflow axes; `temperatureC()`/`setTemperatureC()` are a `float` pair (byte 22 stores °C × 2). It must use the phase-aligned carrier — its zero-space equals its bit mark (both 428 µs), §11.3.
+- `Toshiba` — the standard "Toshiba AC" protocol (WH-/RAS- remotes, rebadged Carrier units). A 9-byte pulse-distance frame transmitted twice (separated by the frame gap), **MSB-first** (the only MSB-first AC vendor), beginning with the fixed signature `F2 0D` (byte 1 = `~`byte 0; byte 3 = `~`byte 2), with an XOR checksum (of bytes 0–7) in byte 8. Power is carried by the Mode field (`Mode == 7` = off), not a separate bit, so `setPower(false)` writes mode 7 and `setPower(true)` restores the last set mode. `Mode` is `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`; `Fan` is `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (whole-degree temps, 17–30 °C). Swing is a separate short-message variant (reserved); the standard frame does not carry it. The 7-byte short and 10-byte long messages are separate `Frame` types.
 
 **Panasonic field map (decoded logical fields).** Where each control field lives in the 27-byte state. Status legend: ✅ implemented (decode + encode) · 🔜 planned · 🟡 documented, no setter (re-send via RAW replay) · ⛔ out of scope (separate frame type).
 
@@ -820,6 +823,20 @@ Power is the long-vs-short frame selector rather than a state bit (the byte-8 Po
 
 The state is rendered as a 5-bit `00000` preamble then the three sections, each with its own `3650/1623 µs` header and ending in a `~29 ms` gap; `toRaw` rewrites the section signatures and all three checksums. `temperatureC()`/`setTemperatureC()` clamp to 10–32 °C and store `°C × 2` (so 0.5 °C steps round-trip). The comfort / timer / powerful / quiet / sensor / econo / mold bits are documented but have no setter yet — replay a captured frame via RAW to reproduce them. This is the only Daikin format implemented; the other sizes are reserved (see the support matrix).
 
+**Toshiba AC field map (decoded logical fields).** Where each control field lives in the 9-byte state. Same status legend. Bytes 0–4 are fixed framing: `F2 0D` (signature + inverted pair), `03 FC` (length/model + inverted pair), `01` (flags).
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| power | byte 6 bits 0-2 (Mode) | on = mode ≠ 7 / off = 7 | ✅ |
+| mode | byte 6 bits 0-2 | auto=0 / cool=1 / dry=2 / heat=3 / fan=4 | ✅ |
+| temperature | byte 5 bits 4-7 | `°C − 17`, 17–30 °C (whole degrees) | ✅ |
+| fan (airflow) | byte 6 bits 5-7 | auto=0 / 2–6 (min→max) | ✅ |
+| filter | byte 7 bit 4 | on=1 | 🟡 |
+| swing | short-message variant | — | ⛔ separate frame |
+| checksum | byte 8 | XOR of bytes 0–7 | ✅ |
+
+It is MSB-first; `toRaw` rewrites the fixed framing prefix (signature + inverted pairs + length/flags), recomputes the XOR checksum, and renders the 9-byte message **twice** (separated by the frame gap), matching the standard protocol — third-party decoders rely on the inter-message gap as a bounded footer space. The zero-space is emitted at 440 µs rather than the documented 490 µs: real receivers shift the mark/space boundary and lengthen the received space, and 490 µs would push the recovered zero-space past IRremoteESP8266's tight default ceiling (`490 − kMarkExcess(50) = 440`, ×1.25 ≈ 551 µs); the shorter emit keeps it clear, while our own decoder (30 % tolerance) and normal-bias receivers still recover it. Power is the Mode field's off code (7), so `setPower(false)` writes mode 7. The filter bit has no setter; swing is a separate short message (reserved). This is the only Toshiba format implemented; the 7-byte short and 10-byte long messages are reserved.
+
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
 ### 11.3 Carrier For Long Frames
@@ -835,5 +852,6 @@ That wobble matters for tightly-timed vendors:
 - **Mitsubishi** is the same tight-timing case (zero-space 420 µs < bit mark 450 µs) and likewise uses the phase-aligned carrier.
 - **Fujitsu** is the same tight-timing case (zero-space 390 µs < bit mark 448 µs), so it uses the phase-aligned carrier by default; the `fujitsu_*` compat studies are intended to confirm the delivery rate on hardware.
 - **Daikin** is the most extreme case: its zero-space *equals* its bit mark (both 428 µs), leaving no margin for carrier wobble, so it requires the phase-aligned carrier. Its three-section burst is also long, so the phase-aligned symbol count is the largest of any vendor.
+- **Toshiba** has a zero-space (emitted 440 µs — see the framing note) shorter than its bit mark (580 µs), the same tight-margin case as Fujitsu, so it uses the phase-aligned carrier by default.
 
 Recommendation: the phase-aligned carrier is the safe default for AC, and is what you get if you never call `setPhaseAlignedCarrier`. Use the hardware carrier (`setPhaseAlignedCarrier(false)`) only as a memory optimization for loosely-timed vendors such as Panasonic. The carrier affects delivery rate, not byte integrity — a received frame is always byte-correct because it is checksum-validated, and the phase-aligned carrier is not size-limited (durations beyond the 15-bit field are split across symbols).

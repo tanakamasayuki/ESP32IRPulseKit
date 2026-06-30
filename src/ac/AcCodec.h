@@ -96,7 +96,12 @@ namespace esp32irpk::ac
       if (bit_count >= max_bits)
         return 0; // payload exceeds caller buffer
       if (space_us >= one_threshold_us)
-        out[bit_count / 8] |= static_cast<uint8_t>(1u << (bit_count % 8));
+      {
+        // Bit order within the byte follows t.lsb_first (MSB-first vendors, e.g.
+        // Toshiba, send bit 7 first).
+        const size_t bit_in_byte = t.lsb_first ? (bit_count % 8) : (7 - (bit_count % 8));
+        out[bit_count / 8] |= static_cast<uint8_t>(1u << bit_in_byte);
+      }
       // else bit 0: leave the cleared bit as-is
       ++bit_count;
       pos += 2;
@@ -109,7 +114,8 @@ namespace esp32irpk::ac
   }
 
   // Encode `bit_len` bits from `bytes` as one pulse-distance frame appended to
-  // `out` (LSB-first within each byte). Returns false on capacity overflow.
+  // `out`; bit order within each byte follows `t.lsb_first`. Returns false on
+  // capacity overflow.
   // `with_header` selects whether a leading header pair is emitted: some vendors
   // (e.g. Gree) concatenate a second block with no header of its own.
   inline bool bytesFrameToRaw(const uint8_t *bytes, size_t bit_len,
@@ -132,7 +138,8 @@ namespace esp32irpk::ac
         return false;
     for (size_t i = 0; i < bit_len; ++i)
     {
-      const bool one = (bytes[i / 8] >> (i % 8)) & 0x1u;
+      const size_t bit_in_byte = t.lsb_first ? (i % 8) : (7 - (i % 8));
+      const bool one = (bytes[i / 8] >> bit_in_byte) & 0x1u;
       if (!push(usToTicks(t.bit_mark_us)))
         return false;
       if (!push(usToTicks(one ? t.one_space_us : t.zero_space_us)))

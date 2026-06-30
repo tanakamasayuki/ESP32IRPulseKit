@@ -2122,6 +2122,126 @@ void testDaikinAcStateMatrix()
   EXPECT_TRUE("daikin/state-matrix", all_ok);
 }
 
+// Toshiba AC (standard 9-byte TOSHIBA_AC): build a frame, render the burst
+// (MSB-first, single frame), decode it back, and confirm the logical fields and
+// the XOR checksum survive the roundtrip. Also exercises the codec's MSB-first
+// path (Toshiba is the only MSB-first AC vendor). Canonical bytes are derived from
+// the documented field layout; the hardware study verifies them against
+// IRToshibaAC.
+void testToshibaAcRoundtrip()
+{
+  using esp32irpk::ac::Toshiba::Fan;
+  using esp32irpk::ac::Toshiba::Frame;
+  using esp32irpk::ac::Toshiba::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(24);
+  f.setFan(Fan::AUTO);
+
+  EXPECT_TRUE("toshiba/power-get", f.power());
+  EXPECT_TRUE("toshiba/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("toshiba/temp-get", 24u, f.temperatureC());
+  EXPECT_TRUE("toshiba/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("toshiba/encode", f.toRaw(buf));
+  EXPECT_TRUE("toshiba/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("toshiba/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("toshiba/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("toshiba/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("toshiba/decode-power", g.power());
+  EXPECT_TRUE("toshiba/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("toshiba/decode-temp", 24u, g.temperatureC());
+  EXPECT_TRUE("toshiba/decode-fan", g.fan() == Fan::AUTO);
+
+  // Power on / cool / 24C / fan auto, derived from the documented layout + XOR
+  // checksum (byte 8). Signature F2 0D, inverted pair 03 FC, flags 01.
+  static const uint8_t kCanonicalCool24[Frame::kBytes] = {
+      0xF2, 0x0D, 0x03, 0xFC, 0x01, 0x70, 0x01, 0x00, 0x70};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool24[i])
+      canonical_match = false;
+  EXPECT_TRUE("toshiba/canonical-bytes", canonical_match);
+
+  // Power off is encoded in the Mode field (== 7).
+  Frame p{};
+  p.setMode(Mode::HEAT);
+  p.setPower(false);
+  EXPECT_TRUE("toshiba/poweroff", !p.power());
+  uint16_t t2[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer b2{t2, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("toshiba/poweroff-encode", p.toRaw(b2));
+  Frame pg{};
+  EXPECT_TRUE("toshiba/poweroff-decode", Frame::fromRaw(esp32irpk::IRRawTickView{b2.ticks, b2.len}, pg));
+  EXPECT_TRUE("toshiba/poweroff-decode-off", !pg.power());
+
+  // Temperature clamps to the supported range.
+  Frame t{};
+  t.setTemperatureC(40);
+  EXPECT_EQ("toshiba/temp-clamp-high", 30u, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("toshiba/temp-clamp-low", 17u, t.temperatureC());
+
+  // A non-Toshiba waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("toshiba/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power combination must encode (setters -> toRaw ->
+// fromRaw) back to itself with a valid XOR checksum, exercising the full field map
+// and the MSB-first codec path.
+void testToshibaAcStateMatrix()
+{
+  using esp32irpk::ac::Toshiba::Fan;
+  using esp32irpk::ac::Toshiba::Frame;
+  using esp32irpk::ac::Toshiba::Mode;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::COOL, Mode::DRY, Mode::HEAT, Mode::FAN};
+  static const Fan fans[] = {Fan::AUTO, Fan::MIN_SPEED, Fan::LOW_SPEED,
+                             Fan::MED_SPEED, Fan::HIGH_SPEED, Fan::MAX_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 17; temp <= 30; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          Frame f{};
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+          f.setPower(power != 0);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.fan() != fan ||
+              g.temperatureC() != temp)
+            all_ok = false;
+          // Mode is only meaningful when powered on (off masks it as field 7).
+          if (power && g.mode() != m)
+            all_ok = false;
+        }
+  EXPECT_TRUE("toshiba/state-matrix", all_ok);
+}
+
 // Each vendor's toString() maps an enum value to its identifier name (used by
 // printTo). Out-of-range values fall back to "?".
 void testAcEnumToString()
@@ -2131,6 +2251,7 @@ void testAcEnumToString()
   namespace M = esp32irpk::ac::Mitsubishi;
   namespace F = esp32irpk::ac::Fujitsu;
   namespace D = esp32irpk::ac::Daikin;
+  namespace TO = esp32irpk::ac::Toshiba;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -2147,6 +2268,9 @@ void testAcEnumToString()
   EXPECT_TRUE("daikin/tostring-mode", strcmp(D::toString(D::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("daikin/tostring-fan-quiet", strcmp(D::toString(D::Fan::QUIET), "QUIET") == 0);
   EXPECT_TRUE("daikin/tostring-fan-max", strcmp(D::toString(D::Fan::MAX_SPEED), "MAX_SPEED") == 0);
+  EXPECT_TRUE("toshiba/tostring-mode", strcmp(TO::toString(TO::Mode::HEAT), "HEAT") == 0);
+  EXPECT_TRUE("toshiba/tostring-fan-min", strcmp(TO::toString(TO::Fan::MIN_SPEED), "MIN_SPEED") == 0);
+  EXPECT_TRUE("toshiba/tostring-fan-max", strcmp(TO::toString(TO::Fan::MAX_SPEED), "MAX_SPEED") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -2309,6 +2433,32 @@ void testAcFromBytes()
     EXPECT_TRUE("daikin/frombytes-eq", eq);
     EXPECT_TRUE("daikin/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+  // Toshiba: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Toshiba::Fan;
+    using esp32irpk::ac::Toshiba::Frame;
+    using esp32irpk::ac::Toshiba::Mode;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::MAX_SPEED);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("toshiba/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("toshiba/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("toshiba/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("toshiba/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("toshiba/frombytes-eq", eq);
+    EXPECT_TRUE("toshiba/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -2371,6 +2521,8 @@ void setup()
   testFujitsuAcStateMatrix();
   testDaikinAcRoundtrip();
   testDaikinAcStateMatrix();
+  testToshibaAcRoundtrip();
+  testToshibaAcStateMatrix();
   testAcEnumToString();
   testAcFromBytes();
 

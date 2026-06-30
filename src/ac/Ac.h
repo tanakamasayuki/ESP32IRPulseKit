@@ -7,6 +7,7 @@
 #include "Mitsubishi.h"
 #include "Fujitsu.h"
 #include "Daikin.h"
+#include "Toshiba.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -23,6 +24,7 @@ namespace esp32irpk::ac
     MITSUBISHI = 3,
     FUJITSU = 4,
     DAIKIN = 5,
+    TOSHIBA = 6,
     // further vendors added incrementally
   };
 
@@ -85,6 +87,13 @@ namespace esp32irpk::ac
         df.printTo(*out);
       return AcVendor::DAIKIN;
     }
+    Toshiba::Frame tf;
+    if (Toshiba::Frame::fromRaw(raw, tf))
+    {
+      if (out)
+        tf.printTo(*out);
+      return AcVendor::TOSHIBA;
+    }
     if (out)
       out->println("// decoded: no AC vendor matched (raw replay still works)");
     return AcVendor::UNKNOWN;
@@ -133,6 +142,13 @@ namespace esp32irpk::ac
                           df.bytes, Daikin::Frame::kBytes);
       return AcVendor::DAIKIN;
     }
+    Toshiba::Frame tf;
+    if (Toshiba::Frame::fromRaw(raw, tf))
+    {
+      printAcStateSnippet(out, "Toshiba", "esp32irpk::ac::Toshiba::Frame",
+                          tf.bytes, Toshiba::Frame::kBytes);
+      return AcVendor::TOSHIBA;
+    }
     return AcVendor::UNKNOWN;
   }
 
@@ -171,6 +187,12 @@ namespace esp32irpk::ac
     {
       df.printSetterSnippet(out);
       return AcVendor::DAIKIN;
+    }
+    Toshiba::Frame tf;
+    if (Toshiba::Frame::fromRaw(raw, tf))
+    {
+      tf.printSetterSnippet(out);
+      return AcVendor::TOSHIBA;
     }
     return AcVendor::UNKNOWN;
   }

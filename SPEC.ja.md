@@ -706,6 +706,8 @@ struct Frame {
 | | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | 未対応 |
 | Daikin | Daikin classic（ARC433） | 35バイト・3セクション | 単一 | **対応** |
 | | Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312 | サイズ各種 | — | 未対応 |
+| Toshiba | Toshiba AC | 9バイト | 標準 | **対応** |
+| | 短（7バイトswing）/ 長（10バイト） | — | 未対応 |
 
 対応フォーマットのベンダ別構造:
 
@@ -714,6 +716,7 @@ struct Frame {
 - `Mitsubishi` — 18バイトの「Mitsubishi AC」protocol（MSZ/霧ヶ峰系リモコン）: 固定5バイト署名を持つpulse-distanceフレーム1個を、長いギャップを挟んで2回送信。最終バイトは残りの総和チェックサム。このフォーマットは単一モデル（`Model` パラメータ無し）。他のMitsubishi波形フォーマット（136 / 112 / Heavy）は別の `Frame` 型になる。`Fan` は `AUTO`/`QUIET`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。`Vane`（上下、`P1`..`P5`）と `WideVane`（左右）で気流方向を設定し、`temperatureC()`/`setTemperatureC()` は 0.5℃刻みを含む対称な `float` ペア。
 - `Fujitsu` — 「Fujitsu AC」protocol（ARシリーズリモコン）、対象モデルは ARRAH2E。全設定は16バイトのpulse-distance「長」フレームで、固定バイト `14 63 00 10 10` で始まり、byte5 = `0xFE`（長フレームマーカー）、byte15 に補数チェックサム。電源OFFは7バイトの「短」フレーム `14 63 00 10 10 02 FD`（byte6 = `~`byte5）。各フレームは1回送信。電源は状態ビットでなくフレーム種別が表す（長=ON、短OFF=OFF）ので、`setPower(false)` は短フレームを送り、デコードしたOFFフレームの mode/temp/fan はベンダ的にdon't-careでテンプレート既定値を保持する。単一モデル（`Model` パラメータはまだ無し）。ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E は長さ・マーカー・チェックサム補数・（ARREW4E は）温度エンコードが異なり、後でモデル分岐または `Frame` 型として追加する。`Fan` は `AUTO`/`HIGH_SPEED`/`MED_SPEED`/`LOW_SPEED`/`QUIET`。`Swing` は `OFF`/`VERTICAL`/`HORIZONTAL`/`BOTH`。
 - `Daikin` — クラシックな「Daikin」/ ARC433 protocol（ARC433** / ARC466 リモコン、M Series / FTXM-M 機種）。35バイト状態を、先頭5bitの `00000` プリアンブルに続けて**3セクション**（8 + 8 + 19バイト）のpulse-distanceで送る。各セクションは独自のヘッダを持ち、セクション毎の総和チェックサム（byte7 / 15 / 34）を持つ。各セクションは固定署名 `11 DA 27` で始まる。単一のクラシックフォーマット（`Model` パラメータ無し）。他の Daikin サイズ（Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312）は別 `Frame` 型。`Mode` は `AUTO`/`DRY`/`COOL`/`HEAT`/`FAN`。`Fan` は `AUTO`/`QUIET`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`。`setSwingVertical`/`setSwingHorizontal` で上下・左右の気流軸を切り替える。`temperatureC()`/`setTemperatureC()` は `float` ペア（byte22 に °C × 2 を格納）。位相整合キャリア必須——zeroスペースがbitマークと等しい（共に428us、§11.3）。
+- `Toshiba` — 標準「Toshiba AC」protocol（WH-/RAS- リモコン、Carrier OEM機）。9バイトの pulse-distance フレームをフレームギャップを挟んで**2回**送る、**MSB-first**（唯一のMSB-first ACベンダ）、固定署名 `F2 0D` で始まる（byte1 = `~`byte0・byte3 = `~`byte2）。byte8 に XOR チェックサム（byte0–7）。電源は状態ビットでなく Mode フィールドが表す（`Mode == 7` = off）ので、`setPower(false)` は mode 7 を書き、`setPower(true)` は直前のモードを復元する。`Mode` は `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`。`Fan` は `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`（温度は整数のみ、17–30℃）。スイングは別の短メッセージ系（予約）で、標準フレームは保持しない。7バイト短・10バイト長メッセージは別 `Frame` 型。
 
 **Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
 
@@ -813,6 +816,20 @@ byte3 の上位ニブル（`0b0101`）と byte5 bit3-5（`0b100`）はリモコ�
 
 状態は5bitの `00000` プリアンブル＋3セクションとして描画され、各セクションは独自の `3650/1623µs` ヘッダを持ち `~29ms` ギャップで終わる。`toRaw` はセクション署名と3つのチェックサムを書き直す。`temperatureC()`/`setTemperatureC()` は 10–32℃ にクランプし `°C × 2` を格納（0.5℃刻みが往復する）。comfort / タイマー / パワフル / しずか / センサ / econo / mold は記載のみで setter は未作成 — キャプチャしたフレームを RAW replay で再送すれば再現できる。実装済みは唯一このフォーマットで、他サイズは予約（対応一覧を参照）。
 
+**Toshiba AC フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが9バイト状態のどこに入るか。ステータス凡例は上と同じ。byte0–4 は固定フレーミング: `F2 0D`（署名＋反転ペア）・`03 FC`（length/model＋反転ペア）・`01`（フラグ）。
+
+| フィールド | 位置 (byte/bit) | コード/値域 | ステータス |
+|---|---|---|---|
+| power | byte6 bit0-2 (Mode) | on = mode≠7 / off = 7 | ✅ |
+| mode | byte6 bit0-2 | auto=0 / cool=1 / dry=2 / heat=3 / fan=4 | ✅ |
+| 温度 | byte5 bit4-7 | `°C − 17`、17–30℃（整数） | ✅ |
+| fan(風量) | byte6 bit5-7 | auto=0 / 2–6（弱→最強） | ✅ |
+| filter | byte7 bit4 | on=1 | 🟡 |
+| swing | 短メッセージ系 | — | ⛔ 別フレーム |
+| checksum | byte8 | byte0–7 の XOR | ✅ |
+
+MSB-first。`toRaw` は固定フレーミング前置（署名＋反転ペア＋length/flags）を書き直し XOR チェックサムを再計算し、9バイトメッセージをフレームギャップを挟んで**2回**描画する（標準プロトコル準拠 — サードパーティのデコーダはフレーム間ギャップを終端スペースとして利用するため）。zeroスペースは公称490usではなく440usで送出する: 実機の受信機は mark/space 境界をずらして受信スペースを伸ばすため、490usだと復元後のzeroスペースが IRremoteESP8266 の厳しい既定上限（`490 − kMarkExcess(50) = 440`、×1.25 ≈ 551us）を超える。短めに出すことで余裕を確保しつつ、我々のデコーダ（許容30%）や通常バイアスの受信機でも復元できる。電源は Mode フィールドの off コード（7）なので `setPower(false)` は mode 7 を書く。filter ビットは setter 未作成、swing は別の短メッセージ（予約）。実装済みは唯一このフォーマットで、7バイト短・10バイト長は予約。
+
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 
 ### 11.3 長尺フレームのキャリア
@@ -828,5 +845,6 @@ ACフレームは長く、確実に届くキャリアはベンダのタイミン
 - **Mitsubishi** も同じタイミング余裕の狭い例（zeroスペース420us < bitマーク450us）で、同様に位相整合キャリアを使います。
 - **Fujitsu** も同じタイミング余裕の狭い例（zeroスペース390us < bitマーク448us）で、既定で位相整合キャリアを使います。`fujitsu_*` compat studies は実機での到達率を確認するためのものです。
 - **Daikin** は最も極端な例で、zeroスペースがbitマークと等しい（共に428us）ため揺れの余裕がゼロで、位相整合キャリアが必須です。3セクションのバーストも長く、位相整合のシンボル数は全ベンダ中最大になります。
+- **Toshiba** は zeroスペース（送出値440us — フレーミング注記参照）が bitマーク（580us）より短い、Fujitsu と同じ余裕の狭い例なので、既定で位相整合キャリアを使います。
 
 推奨: ACでは位相整合キャリアが安全な既定で、`setPhaseAlignedCarrier` を呼ばなければこれになります。ハードウェアキャリア（`setPhaseAlignedCarrier(false)`）は、Panasonic のようなタイミング余裕の広いベンダでの省メモリ最適化としてのみ使ってください。キャリアはバイト整合性ではなく到達率に影響します——受信できたフレームは常にバイト正確（チェックサム検証済み）で、位相整合キャリアにサイズ上限はありません（15bitフィールドを超える時間は複数シンボルに分割）。

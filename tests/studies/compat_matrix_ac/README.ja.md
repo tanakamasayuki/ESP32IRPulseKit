@@ -47,6 +47,10 @@ fujitsu_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Daikin（esp32irpk::ac::Daikin に合わせて IRDaikinESP のクラシック ARC433 を使用）
 daikin_irremoteesp8266_tx/   # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
 daikin_irremoteesp8266_rx/   # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
+
+# Toshiba（esp32irpk::ac::Toshiba に合わせて IRToshibaAC の標準9バイト TOSHIBA_AC を使用）
+toshiba_irremoteesp8266_tx/  # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+toshiba_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
 ```
 
 各ベンダは同じ `<extlib>_<role>` バリアントを使う。バリアントのフォルダ名は
@@ -164,7 +168,12 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   `esp32irpk::ac::Daikin` のenum値は IRremoteESP8266 のワイヤコードと一致するので、フィールド比較は
   直接の数値一致になる。
 
-- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` — それぞれの2系統目の独立参照
+- `toshiba_irremoteesp8266_tx/` + `toshiba_irremoteesp8266_rx/` — 標準9バイト TOSHIBA_AC
+  用の較正＋encoder検証の対。IRremoteESP8266 の `IRToshibaAC` を使う。`F2 0D` 署名＋byte8 XOR
+  チェックサムの単一 **MSB-first** フレーム（唯一のMSB-first ACベンダ）。電源は Mode フィールドの
+  off コード（7）。codec の MSB-first 経路を実機で検証する。
+
+- `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` — それぞれの2系統目の独立参照
   （`heatpumpir_tx` と同型）。HeatpumpIR（`GreeGenericHeatpumpIR` /
   `MitsubishiFEHeatpumpIR` / `FujitsuHeatpumpIR`、別コードベース、LEDCキャリア）が
   既知状態を送信し当方RXがデコード。hard判定は意味一致（checksum妥当＋論理フィールドが
@@ -177,9 +186,12 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" \
   35バイト・3セクションの ARC433 フレームを出力し、テンプレートのセクション1/2チェックサムを保ち
   byte34 のみ再計算するので当方の3チェックサム検証が通る。Daikin encoder はスイングを駆動せず
   （固定off）quiet段も無いので、この variant は power / mode / temp / fan を較正する。
+  HeatpumpIR の Toshiba は状態をビット反転して送るので、ワイヤ上は当方が直接読める標準の
+  MSB-first TOSHIBA_AC フレームになる。FAN 運転モードは無く、スイングも駆動しないので、この
+  variant は power / mode（auto/cool/dry/heat）/ temp / fan を較正する。
 
 所見と確定したフィールドマップはここと `src/ac/Panasonic.h` / `src/ac/Gree.h` /
-`src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` に反映します。
+`src/ac/Mitsubishi.h` / `src/ac/Fujitsu.h` / `src/ac/Daikin.h` / `src/ac/Toshiba.h` に反映します。
 
 `irremoteesp8266_tx/` の結果、`src/ac/Panasonic.h` のPanasonicフィールドマップが
 IRremoteESP8266 の `IRPanasonicAc` とバイト単位で一致することを確認: 当方のRAW
