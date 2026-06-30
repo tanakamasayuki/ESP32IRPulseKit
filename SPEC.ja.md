@@ -709,6 +709,19 @@ struct Frame {
 | Toshiba | Toshiba AC | 9バイト | 標準 | **対応** |
 | | 短（7バイトswing）/ 長（10バイト） | — | 未対応 |
 
+**未着手の候補ベンダ（推奨着手順）。** 優先順位の基準: ①第2の独立リファレンス（IRremoteESP8266 *と* HeatpumpIR の両方＝対応済みベンダと同じ検証体制）②`ac::`層に合う byte-state 構造 ③フレーミングの単純さ ④機種カバレッジ。対象モデルは承認時に決定し、ここで固定はしない。ビットペア方式（Coolix 24-bit、LG 28-bit など）は多バイトの byte-state ではなく別コード経路が必要なため、本レイヤの対象外とする。
+
+| # | ベンダ | フォーマット / サイズ | リファレンス | 備考 |
+|---|---|---|---|---|
+| 1 | Samsung | Samsung AC、14バイト（拡張21バイト） | IRremoteESP8266 + HeatpumpIR | 実績ある手順への最適合: 二重リファレンス・単一 byte-state フォーマット・主要ブランド。最も低リスクな次候補。 |
+| 2 | Sharp | Sharp AC、13バイト | IRremoteESP8266 のみ | 最も単純な byte-state（単一フレーム、反転コピーを付けて2回送信）。日本市場で一般的。HeatpumpIR の第2リファレンスは無く、キャプチャフレームの fixture で代替。 |
+| 3 | Kelvinator | Kelvinator、16バイト、2ブロック | IRremoteESP8266 のみ | 2ブロック構成＋ブロックチェックサムが Gree（解決済み）とほぼ同一 — コード再利用度が高く低コスト。 |
+| 4 | Midea | Midea、48ビット（6バイト） | IRremoteESP8266 + HeatpumpIR | OEM多数で広いカバレッジ。注意: コード＋反転コピー構造（総和/XORのバイトチェックサムが無い）で byte-state モデルから外れ気味、反転検証経路が必要。 |
+| 5 | Carrier | Carrier AC、32 / 64ビット ＋ 128ビット（16バイト） | IRremoteESP8266 + HeatpumpIR | 二重リファレンスだが複数の異なる波形フォーマットがあり、各々が別 `Frame` 型。着手前に対象フォーマットを選ぶ。 |
+| 6 | Hitachi | Hitachi AC、28バイト（＋13〜53バイトの各種） | IRremoteESP8266 + HeatpumpIR | 最難: サイズ変種が多くリーダ/セクション構造。単純なベンダを片付けてから着手。 |
+
+さらにカバレッジを広げたい場合の単一リファレンス（IRremoteESP8266のみ）byte-state 候補: Haier（9バイト / 22バイト）、TCL112（14バイト）、Electra（13バイト）。
+
 対応フォーマットのベンダ別構造:
 
 - `Panasonic` — Kaseikyo/AEHA系: 2つのpulse-distanceフレーム（8バイト署名 + 19バイト状態）、LSBファースト、2フレーム目の総和チェックサム。`Model::JKE`（テンプレートは IRremoteESP8266 の既定known-good stateとバイト完全一致）、`DKE`/`NKE`/`LKE`/`RKR` に対応 — power/mode/temperature/fan のフィールドマップは共通で、固定マーカーバイトだけが異なる（`fromRaw` がモデル判定、`toRaw` が刻む）。各モデルを IRremoteESP8266 に対して実機検証済み。`CKP` は予約（トグル電源＋quiet/powerfulのビット位置が別）でエンコードは `false`。

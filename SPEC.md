@@ -716,6 +716,19 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | Toshiba | Toshiba AC | 9-byte | standard | **Supported** |
 | | short (7-byte swing) / long (10-byte) | — | Not yet |
 
+**Candidate vendors (not yet started), in suggested implementation order.** Ordering weighs, in priority: a second independent reference (IRremoteESP8266 *and* HeatpumpIR, matching the verification used for the supported vendors), a clean byte-state fit for the `ac::` layer, framing simplicity, and device coverage. Target models are chosen at approval time, not pre-locked here. Bit-paired code formats (Coolix 24-bit, LG 28-bit, …) are deliberately out of scope — they are not multi-byte byte-state and would need a different code path outside this layer.
+
+| # | Vendor | Format / size | References | Notes |
+|---|---|---|---|---|
+| 1 | Samsung | Samsung AC, 14-byte (21-byte extended) | IRremoteESP8266 + HeatpumpIR | Cleanest match to the proven playbook: dual reference, single byte-state format, mainstream brand. Lowest-risk next vendor. |
+| 2 | Sharp | Sharp AC, 13-byte | IRremoteESP8266 only | Simplest byte-state framing (single frame, sent twice with the copy inverted); common in the JP market. No HeatpumpIR second reference — use captured-frame fixtures instead. |
+| 3 | Kelvinator | Kelvinator, 16-byte, two blocks | IRremoteESP8266 only | Two-block layout + block checksum nearly identical to Gree (already solved) — high code reuse, low effort. |
+| 4 | Midea | Midea, 48-bit (6-byte) | IRremoteESP8266 + HeatpumpIR | Large rebadge coverage (many OEM brands). Caveat: code + inverted-copy structure (no sum/XOR byte checksum) stretches the byte-state model; needs an inversion-check path. |
+| 5 | Carrier | Carrier AC, 32 / 64-bit + 128-bit (16-byte) | IRremoteESP8266 + HeatpumpIR | Dual reference, but several distinct wire formats — each a separate `Frame` type. Pick a target format before starting. |
+| 6 | Hitachi | Hitachi AC, 28-byte (+ 13–53-byte variants) | IRremoteESP8266 + HeatpumpIR | Hardest: many size variants with leader/section framing. Defer until the simpler vendors are done. |
+
+Further single-reference (IRremoteESP8266-only) byte-state options if more coverage is wanted: Haier (9-byte / 22-byte), TCL112 (14-byte), Electra (13-byte).
+
 Per-vendor framing of the supported formats:
 
 - `Panasonic` — Kaseikyo/AEHA family: two pulse-distance frames (8-byte signature + 19-byte state), LSB-first, sum checksum over the second frame. `Model::JKE` (template byte-identical to IRremoteESP8266's default known-good state), `DKE`, `NKE`, `LKE` and `RKR` are supported — they share the power/mode/temperature/fan field map and differ only in fixed marker bytes (`fromRaw` classifies the model; `toRaw` stamps it), verified per-model against IRremoteESP8266. `CKP` is reserved (toggle power + relocated quiet/powerful bits); encoding it returns `false`.
