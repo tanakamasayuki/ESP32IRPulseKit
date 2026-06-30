@@ -38,13 +38,6 @@ AC_DECODE = re.compile(
     rb"bytes=(?P<bytes>[0-9A-Fa-f]{70})\r?\n"
 )
 
-# Decode-failure diagnostic from the RX sketch: the captured symbol count and the
-# durations (us). Surfaced in the failure message so a bad capture (fragmented vs
-# full ~584-symbol burst, or timing skew) can be diagnosed without a side channel.
-AC_RAW = re.compile(
-    rb"AC_RAW vendor=NONE raw_len=(?P<len>\d+) ticks_us=(?P<ticks>[\d,]+)\r?\n"
-)
-
 
 @dataclass(frozen=True)
 class Case:
@@ -96,20 +89,13 @@ def send_once(tx, case: Case):
     return match.group("bytes").decode().lower()
 
 
-# Returns ("decode", {...}) on a successful AC decode, ("raw", "<len> ...") with the
-# capture diagnostic when our decoder rejected the burst, or (None, None) on timeout.
+# pytest-embedded's expect() returns the re.Match (there is no dut.match attribute).
 def decode_once(rx):
     try:
-        idx = rx.expect([AC_DECODE, AC_RAW, TIMEOUT, EOF], timeout=12)
+        m = rx.expect(AC_DECODE, timeout=12)
     except (EOF, TIMEOUT):
-        return None, None
-    if idx == 1:
-        m = rx.match
-        return "raw", f"len={m.group('len').decode()} ticks_us={m.group('ticks').decode()}"
-    if idx >= 2:
-        return None, None
-    m = rx.match
-    return "decode", {
+        return None
+    return {
         "checksum": m.group("checksum").decode(),
         "power": int(m.group("power")),
         "mode": int(m.group("mode")),
@@ -125,22 +111,18 @@ def capture_best_of_n(tx, rx, case: Case):
     n_ok = 0
     sent_last = None
     obs_last = None
-    raw_last = None
     for _ in range(TRIALS):
         sent = send_once(tx, case)
         if sent is None:
             continue
         sent_last = sent
-        kind, payload = decode_once(rx)
-        if kind == "raw":
-            raw_last = payload
+        obs = decode_once(rx)
+        if obs is None:
             continue
-        if kind != "decode":
-            continue
-        obs_last = payload
-        if payload["checksum"] == "ok" and payload["bytes"] == sent:
+        obs_last = obs
+        if obs["checksum"] == "ok" and obs["bytes"] == sent:
             n_ok += 1
-    return sent_last, obs_last, n_ok, raw_last
+    return sent_last, obs_last, n_ok
 
 
 @pytest.mark.parametrize(
@@ -152,18 +134,15 @@ def test_daikin_irremoteesp8266_tx(dut, peers, case, record_property):
     tx, rx = wait_boards_ready(dut, peers)
     assert_serial_control(tx, rx)
 
-    sent, observed, n_ok, raw_diag = capture_best_of_n(tx, rx, case)
+    sent, observed, n_ok = capture_best_of_n(tx, rx, case)
     record_property("byte_match_ratio", f"{n_ok}/{TRIALS}")
-    if raw_diag is not None:
-        record_property("rx_capture", raw_diag)
 
     # HARD check: our RAW framing must reproduce the canonical bytes.
     if n_ok < PASS_MIN:
         pytest.fail(
             f"{DUT_IMPL} RAW-decoded {case.mode}/{case.fan}/{case.temp}C/"
             f"v{case.swingv}h{case.swingh}/power{case.power} to canonical bytes only "
-            f"{n_ok}/{TRIALS} times (need >= {PASS_MIN}). sent={sent} observed={observed} "
-            f"rx_capture[{raw_diag}]",
+            f"{n_ok}/{TRIALS} times (need >= {PASS_MIN}). sent={sent} observed={observed}",
             pytrace=False,
         )
 

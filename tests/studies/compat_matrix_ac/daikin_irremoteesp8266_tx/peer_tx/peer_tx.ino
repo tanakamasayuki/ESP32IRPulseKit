@@ -21,7 +21,9 @@
 const int kIrTxGpio = atoi(IR_TX_GPIO);
 const bool kIrTxInverted = atoi(IR_TX_INVERTED) != 0;
 
-IRDaikinESP ac(kIrTxGpio, true, kIrTxInverted);
+// IRDaikinESP(pin, inverted, use_modulation): keep the 38kHz carrier ON
+// (use_modulation=true) -- without it the TSOP receiver detects nothing.
+IRDaikinESP ac(kIrTxGpio, kIrTxInverted, true);
 
 namespace
 {

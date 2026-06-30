@@ -704,10 +704,8 @@ struct Frame {
 | | Mitsubishi Heavy | 88 / 152bit | — | 未対応 |
 | Fujitsu | Fujitsu AC | 長16バイト / 短7バイト | ARRAH2E | **対応** |
 | | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | 未対応 |
-| Daikin | Daikin classic（ARC433） | 35バイト・3セクション | 単一 | **実装済**¹ |
+| Daikin | Daikin classic（ARC433） | 35バイト・3セクション | 単一 | **対応** |
 | | Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312 | サイズ各種 | — | 未対応 |
-
-¹ Daikin classic（ARC433）: フィールドマップは host `codec_smoke` で IRDaikinESP 由来の canonical state に対して検証済み。双方向の実機/compat-matrix 検証（`daikin_*` studies）は追加済みだが未実行のため、まだ **対応** には昇格していません。
 
 対応フォーマットのベンダ別構造:
 

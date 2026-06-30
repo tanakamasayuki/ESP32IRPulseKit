@@ -711,10 +711,8 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | Mitsubishi Heavy | 88 / 152-bit | — | Not yet |
 | Fujitsu | Fujitsu AC | 16-byte long / 7-byte short | ARRAH2E | **Supported** |
 | | | | ARDB1 / ARJW2 / ARREB1E / ARRY4 / ARREW4E | Not yet |
-| Daikin | Daikin classic (ARC433) | 35-byte, 3 sections | single | **Implemented**¹ |
+| Daikin | Daikin classic (ARC433) | 35-byte, 3 sections | single | **Supported** |
 | | Daikin2 / 216 / 160 / 176 / 128 / 152 / 64 / 312 | various sizes | — | Not yet |
-
-¹ Daikin classic (ARC433): field map verified in host `codec_smoke` against IRDaikinESP-derived canonical states; the bidirectional hardware/compat-matrix verification (`daikin_*` studies) is added but not yet run, so it is not yet promoted to **Supported**.
 
 Per-vendor framing of the supported formats:
 

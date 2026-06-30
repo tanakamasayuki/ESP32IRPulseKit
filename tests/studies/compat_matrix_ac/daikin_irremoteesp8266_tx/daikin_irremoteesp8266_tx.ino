@@ -26,8 +26,6 @@ const bool kIrRxInverted = atoi(IR_RX_INVERTED) != 0;
 
 esp32irpk::IRReceiver<> rx(kIrRxGpio, kIrRxInverted);
 
-uint32_t g_frames = 0; // total frames returned by read() (diagnostic)
-
 namespace
 {
 void printStateHex(const uint8_t *bytes, uint16_t nbytes)
@@ -63,18 +61,7 @@ void printAcDecode(const esp32irpk::IRRawTickView &raw)
   if (!esp32irpk::ac::Daikin::Frame::fromRaw(raw, f))
   {
     Serial.print("AC_RAW vendor=NONE raw_len=");
-    Serial.print(raw.len);
-    // Dump the capture (us) so a decode failure can be diagnosed against the
-    // expected timing (hdr 3650/1623, bit 428, one 1280, zero 428, ~29ms gap) and
-    // to tell a full ~584-symbol burst from a fragment.
-    Serial.print(" ticks_us=");
-    for (uint16_t i = 0; i < raw.len; ++i)
-    {
-      if (i)
-        Serial.print(',');
-      Serial.print((uint32_t)raw.ticks[i] * 10);
-    }
-    Serial.println();
+    Serial.println(raw.len);
     return;
   }
 
@@ -120,19 +107,7 @@ void loop()
   if (readLine(line))
   {
     if (line == "PING")
-    {
-      // Dump receiver stats so a dropped/overflowed capture is visible even when
-      // read() never yields a frame for this long four-gap burst.
-      esp32irpk::IRRxStats s = rx.stats();
-      Serial.print("PONG frames=");
-      Serial.print(g_frames);
-      Serial.print(" qovf=");
-      Serial.print(s.queue_overflow_count);
-      Serial.print(" rmtovf=");
-      Serial.print(s.rmt_overflow_count);
-      Serial.print(" trunc=");
-      Serial.println(s.raw_truncated_count);
-    }
+      Serial.println("PONG");
     else if (line == "READY")
       sendReady();
   }
@@ -140,13 +115,6 @@ void loop()
   esp32irpk::IRReceiveResult<> r;
   if (rx.read(r))
   {
-    ++g_frames;
-    // Log every frame (len + flags) so truncation/overflow is visible regardless
-    // of whether fromRaw succeeds.
-    Serial.print("RX_FRAME len=");
-    Serial.print(r.raw.len);
-    Serial.print(" flags=0x");
-    Serial.println((unsigned)r.flags, HEX);
     if (r.raw.len > 0)
       printAcDecode(r.raw);
     delay(1);
