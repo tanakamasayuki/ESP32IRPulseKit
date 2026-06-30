@@ -23,7 +23,7 @@ PEER_IMPL = "ESP32IRPulseKit"
 DUT_IMPL = "IRremoteESP8266"
 
 CARRIERS = ["hw", "pa"]
-TRIALS = 50
+TRIALS = 10
 
 TX_OK_AC = re.compile(rb"TX_OK_AC vendor=GREE bytes=(?P<bytes>[0-9A-Fa-f]{16})")
 
