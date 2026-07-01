@@ -42,6 +42,7 @@ VENDORS = [
     "SHARP",
     "KELVINATOR",
     "MIDEA",
+    "CARRIER",
 ]
 
 

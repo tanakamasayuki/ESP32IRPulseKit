@@ -67,6 +67,10 @@ kelvinator_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266    
 # Midea（esp32irpk::ac::Midea に合わせて IRMideaAC の標準48ビット/6バイト二重送信を使用）
 midea_irremoteesp8266_tx/    # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
 midea_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
+
+# Carrier（esp32irpk::ac::Carrier に合わせて IRCarrierAc64 の CARRIER_AC64 8バイト/64ビットを使用）
+carrier_irremoteesp8266_tx/  # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+carrier_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
 ```
 
 各ベンダは同じ `<extlib>_<role>` バリアントを使う。バリアントのフォルダ名は

@@ -12,6 +12,7 @@
 #include "Sharp.h"
 #include "Kelvinator.h"
 #include "Midea.h"
+#include "Carrier.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -33,6 +34,7 @@ namespace esp32irpk::ac
     SHARP = 8,
     KELVINATOR = 9,
     MIDEA = 10,
+    CARRIER = 11,
     // further vendors added incrementally
   };
 
@@ -85,6 +87,15 @@ namespace esp32irpk::ac
       if (out)
         gf.printTo(*out);
       return AcVendor::GREE;
+    }
+    // Carrier (CARRIER_AC64) shares the ~9010/4505 Kelvinator/Gree header, so try it
+    // here with them; its fixed 0x84 0x55 signature keeps it unambiguous.
+    Carrier::Frame cf;
+    if (Carrier::Frame::fromRaw(raw, cf))
+    {
+      if (out)
+        cf.printTo(*out);
+      return AcVendor::CARRIER;
     }
     Mitsubishi::Frame mf;
     if (Mitsubishi::Frame::fromRaw(raw, mf))
@@ -172,6 +183,13 @@ namespace esp32irpk::ac
                           gf.bytes, Gree::Frame::kBytes);
       return AcVendor::GREE;
     }
+    Carrier::Frame cf;
+    if (Carrier::Frame::fromRaw(raw, cf))
+    {
+      printAcStateSnippet(out, "Carrier", "esp32irpk::ac::Carrier::Frame",
+                          cf.bytes, Carrier::Frame::kBytes);
+      return AcVendor::CARRIER;
+    }
     Mitsubishi::Frame mf;
     if (Mitsubishi::Frame::fromRaw(raw, mf))
     {
@@ -249,6 +267,12 @@ namespace esp32irpk::ac
     {
       gf.printSetterSnippet(out);
       return AcVendor::GREE;
+    }
+    Carrier::Frame cf;
+    if (Carrier::Frame::fromRaw(raw, cf))
+    {
+      cf.printSetterSnippet(out);
+      return AcVendor::CARRIER;
     }
     Mitsubishi::Frame mf;
     if (Mitsubishi::Frame::fromRaw(raw, mf))

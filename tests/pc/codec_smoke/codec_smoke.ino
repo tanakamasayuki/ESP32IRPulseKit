@@ -2744,6 +2744,141 @@ void testMideaAcStateMatrix()
   EXPECT_TRUE("midea/state-matrix", all_ok);
 }
 
+// Carrier AC (CARRIER_AC64: single 8-byte LSB-first pulse-distance frame): build a
+// frame, render the burst and decode it back. Field offsets + the 4-bit nibble-sum
+// checksum are derived from IRCarrierAc64's documented layout; the hardware study
+// verifies them against IRCarrierAc64.
+void testCarrierAcRoundtrip()
+{
+  using esp32irpk::ac::Carrier::Fan;
+  using esp32irpk::ac::Carrier::Frame;
+  using esp32irpk::ac::Carrier::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(24);
+  f.setFan(Fan::AUTO);
+  f.setSwingV(false);
+
+  EXPECT_TRUE("carrier/power-get", f.power());
+  EXPECT_TRUE("carrier/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("carrier/temp-get", 24u, f.temperatureC());
+  EXPECT_TRUE("carrier/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("carrier/encode", f.toRaw(buf));
+  EXPECT_TRUE("carrier/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("carrier/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("carrier/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("carrier/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("carrier/decode-power", g.power());
+  EXPECT_TRUE("carrier/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("carrier/decode-temp", 24u, g.temperatureC());
+  EXPECT_TRUE("carrier/decode-fan", g.fan() == Fan::AUTO);
+
+  // On / cool / 24C / fan auto / no swing, from IRCarrierAc64's layout + checksum.
+  static const uint8_t kCanonicalCool24[Frame::kBytes] = {0x84, 0x55, 0x2B, 0x08, 0x10, 0x00, 0x00, 0x00};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool24[i])
+      canonical_match = false;
+  EXPECT_TRUE("carrier/canonical-bytes", canonical_match);
+
+  // A hardware capture does not record the final trailing gap (the RX ends on idle
+  // silence), so the last tick is the trailer mark with no gap after it.
+  Frame ng{};
+  EXPECT_TRUE("carrier/decode-no-trailing-gap",
+              buf.len > 1 &&
+                  Frame::fromRaw(esp32irpk::IRRawTickView{buf.ticks, buf.len - 1}, ng) &&
+                  ng.checksum_ok && ng.mode() == Mode::COOL && ng.fan() == Fan::AUTO);
+
+  // SwingV round-trips.
+  Frame s{};
+  s.setMode(Mode::COOL);
+  s.setSwingV(true);
+  EXPECT_TRUE("carrier/swingv-set", s.swingV());
+  uint16_t st[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer sb{st, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("carrier/swingv-encode", s.toRaw(sb));
+  Frame sg{};
+  EXPECT_TRUE("carrier/swingv-decode", Frame::fromRaw(esp32irpk::IRRawTickView{sb.ticks, sb.len}, sg));
+  EXPECT_TRUE("carrier/swingv-decode-on", sg.swingV());
+
+  // Power off.
+  Frame p{};
+  p.setMode(Mode::HEAT);
+  p.setPower(false);
+  EXPECT_TRUE("carrier/poweroff", !p.power());
+  uint16_t t2[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer b2{t2, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("carrier/poweroff-encode", p.toRaw(b2));
+  Frame pg{};
+  EXPECT_TRUE("carrier/poweroff-decode", Frame::fromRaw(esp32irpk::IRRawTickView{b2.ticks, b2.len}, pg));
+  EXPECT_TRUE("carrier/poweroff-decode-off", !pg.power());
+
+  // Temperature clamps to the supported 16-30C range.
+  Frame t{};
+  t.setMode(Mode::COOL);
+  t.setTemperatureC(40);
+  EXPECT_EQ("carrier/temp-clamp-high", 30u, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("carrier/temp-clamp-low", 16u, t.temperatureC());
+
+  // A non-Carrier waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("carrier/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power/swing combination must encode -> decode back to
+// itself with a valid checksum. CARRIER_AC64 carries temperature in all modes.
+void testCarrierAcStateMatrix()
+{
+  using esp32irpk::ac::Carrier::Fan;
+  using esp32irpk::ac::Carrier::Frame;
+  using esp32irpk::ac::Carrier::Mode;
+
+  static const Mode modes[] = {Mode::HEAT, Mode::COOL, Mode::FAN};
+  static const Fan fans[] = {Fan::AUTO, Fan::LOW_SPEED, Fan::MED_SPEED, Fan::HIGH_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 16; temp <= 30; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+          for (uint8_t swing = 0; swing <= 1; ++swing)
+          {
+            Frame f{};
+            f.setMode(m);
+            f.setFan(fan);
+            f.setTemperatureC(temp);
+            f.setPower(power != 0);
+            f.setSwingV(swing != 0);
+
+            uint16_t ticks[Frame::kMaxTicks];
+            esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+            if (!f.toRaw(buf))
+            {
+              all_ok = false;
+              continue;
+            }
+            esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+            Frame g{};
+            if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+                g.power() != (power != 0) || g.mode() != m || g.fan() != fan ||
+                g.temperatureC() != temp || g.swingV() != (swing != 0))
+              all_ok = false;
+          }
+  EXPECT_TRUE("carrier/state-matrix", all_ok);
+}
+
 // decodeAny must classify each vendor's own rendered frame as that vendor. This
 // guards the cascade ordering -- notably Gree vs Kelvinator, whose frames share a
 // header + B010 footer + block checksum (a Gree frame is one Kelvinator block), so
@@ -2768,6 +2903,7 @@ void testAcDecodeAny()
   check(ac::Sharp::Frame{}, ac::AcVendor::SHARP, "decodeany/sharp");
   check(ac::Kelvinator::Frame{}, ac::AcVendor::KELVINATOR, "decodeany/kelvinator");
   check(ac::Midea::Frame{}, ac::AcVendor::MIDEA, "decodeany/midea");
+  check(ac::Carrier::Frame{}, ac::AcVendor::CARRIER, "decodeany/carrier");
 }
 
 // Each vendor's toString() maps an enum value to its identifier name (used by
@@ -2784,6 +2920,7 @@ void testAcEnumToString()
   namespace SH = esp32irpk::ac::Sharp;
   namespace K = esp32irpk::ac::Kelvinator;
   namespace MI = esp32irpk::ac::Midea;
+  namespace CA = esp32irpk::ac::Carrier;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -2815,6 +2952,9 @@ void testAcEnumToString()
   EXPECT_TRUE("midea/tostring-mode", strcmp(MI::toString(MI::Mode::HEAT), "HEAT") == 0);
   EXPECT_TRUE("midea/tostring-fan-auto", strcmp(MI::toString(MI::Fan::AUTO), "AUTO") == 0);
   EXPECT_TRUE("midea/tostring-fan-high", strcmp(MI::toString(MI::Fan::HIGH_SPEED), "HIGH_SPEED") == 0);
+  EXPECT_TRUE("carrier/tostring-mode", strcmp(CA::toString(CA::Mode::HEAT), "HEAT") == 0);
+  EXPECT_TRUE("carrier/tostring-fan-auto", strcmp(CA::toString(CA::Fan::AUTO), "AUTO") == 0);
+  EXPECT_TRUE("carrier/tostring-fan-high", strcmp(CA::toString(CA::Fan::HIGH_SPEED), "HIGH_SPEED") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -3107,6 +3247,33 @@ void testAcFromBytes()
     EXPECT_TRUE("midea/frombytes-eq", eq);
     EXPECT_TRUE("midea/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+  // Carrier: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Carrier::Fan;
+    using esp32irpk::ac::Carrier::Frame;
+    using esp32irpk::ac::Carrier::Mode;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::HIGH_SPEED);
+    a.setSwingV(true);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("carrier/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("carrier/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("carrier/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("carrier/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("carrier/frombytes-eq", eq);
+    EXPECT_TRUE("carrier/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -3179,6 +3346,8 @@ void setup()
   testKelvinatorAcStateMatrix();
   testMideaAcRoundtrip();
   testMideaAcStateMatrix();
+  testCarrierAcRoundtrip();
+  testCarrierAcStateMatrix();
   testAcDecodeAny();
   testAcEnumToString();
   testAcFromBytes();

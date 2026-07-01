@@ -10,7 +10,7 @@
 // (Gree, Daikin) require it, so this gate does not offer a hardware-carrier mode.
 // Peer name "tx" reuses TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3.
 //
-// Command: SEND_AC vendor=<PANASONIC|GREE|MITSUBISHI|FUJITSU|DAIKIN|TOSHIBA|SAMSUNG|SHARP|KELVINATOR|MIDEA>
+// Command: SEND_AC vendor=<PANASONIC|GREE|MITSUBISHI|FUJITSU|DAIKIN|TOSHIBA|SAMSUNG|SHARP|KELVINATOR|MIDEA|CARRIER>
 #include <ESP32IRPulseKit.h>
 
 #ifndef IR_TX_GPIO
@@ -115,6 +115,7 @@ void handleSendAc(const String &line)
   else if (v == "SHARP")      sendVendor<ac::Sharp::Frame>("SHARP");
   else if (v == "KELVINATOR") sendVendor<ac::Kelvinator::Frame>("KELVINATOR");
   else if (v == "MIDEA")      sendVendor<ac::Midea::Frame>("MIDEA");
+  else if (v == "CARRIER")    sendVendor<ac::Carrier::Frame>("CARRIER");
   else
     Serial.println("TX_ERROR unsupported_vendor");
 }
