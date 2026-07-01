@@ -710,10 +710,10 @@ struct Frame {
 | | 短（7バイトswing）/ 長（10バイト） | — | 未対応 |
 | Samsung | Samsung AC | 14バイト、2セクション | 標準 | **対応**² |
 | | 拡張（21バイトタイマ） | — | 未対応 |
-| Sharp | Sharp AC | 13バイト | A907 | **実装済**¹ |
+| Sharp | Sharp AC | 13バイト | A907 | **対応**¹ |
 | | | A705 / A903 | 未対応 |
 
-¹ Sharp（13バイト、A907モデル）: フィールドマップ、Auto/Dry のフィールド強制ルール、PowerSpecial 電源モデル、ニブル畳み込みXORチェックサムは host `codec_smoke` で IRSharpAc の記載レイアウトに対して検証済み。双方向の実機/compat-matrix 検証（`sharp_irremoteesp8266_tx` / `_rx`）は追加済みだが未実行のため、まだ **対応** には昇格していません。Samsung 同様 HeatpumpIR の第2リファレンスは無い（HeatpumpIR に Sharp は無い）ので、検証は IRremoteESP8266 双方向ペアに依拠する。
+¹ Sharp（13バイト、A907モデル）は Samsung 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`sharp_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR に Sharp サポートが無いため。
 
 ² Samsung は通常の IRremoteESP8266 ＋ HeatpumpIR ではなく、IRremoteESP8266 の双方向ペア（`samsung_irremoteesp8266_tx` / `_rx` — エンコード・デコードを各々独立スタックで実機確認）で検証する: HeatpumpIR の Samsung クラスは旧 AQV（21バイト）と FJM（section2チェックサムが別）変種の実装で、いずれも現行の14バイト SAMSUNG_AC と一致しないため。
 
@@ -872,7 +872,7 @@ LSB-first。`toRaw` は2つのセクションチェックサムを再計算し�
 |---|---|---|---|
 | power | byte5 bit4-7（PowerSpecial） | on=3 / off=2 | ✅ |
 | mode | byte6 bit0-1 | auto=0 / heat=1 / cool=2 / dry=3 | ✅ |
-| temperature | byte4 bit0-3 | `°C − 15`、15–30℃（Cool/Heatのみ、Auto/Dry=0） | ✅ |
+| temperature | byte4 bit0-3 | `°C − 15`、15–30℃（Cool/Heat、byte4上位ビットは固定 0xC0、Auto/Dry はバイト全体を0に） | ✅ |
 | fan(風量) | byte6 bit4-6 | auto=2 / med=3 / min=4 / high=5 / max=7 | ✅ |
 | model | byte4 bit4 ＋ byte11 bit4 | A907（実装）/ A705 / A903 | 🟡 |
 | swing | byte8 bit0-2 | — | 🟡 |
@@ -880,7 +880,7 @@ LSB-first。`toRaw` は2つのセクションチェックサムを再計算し�
 | special（ボタン） | byte10 | power=0x00（出力） | ✅ |
 | checksum | byte12 bit4-7 | byte0–11 ＋ byte12下位ニブルのニブル畳み込みXOR | ✅ |
 
-LSB-first。`toRaw` は固定ヘッダを書き直し、Auto/Dry では温度を0にし（温度を持たない）、Special バイトを「電源」値にして、ニブルチェックサムを再計算する。電源は PowerSpecial フィールド（on=3 / off=2）。A705 / A903 モデル・swing・ion・clean・timer は setter 未作成。実装済みは A907 のみで、A705 / A903 は予約。
+LSB-first。`toRaw` は固定ヘッダを書き直し、Cool/Heat では byte4 上位ビットを 0xC0 にし（Auto/Dry は温度を持たないのでバイト全体を0に）、Special バイトを「電源」値にして、ニブルチェックサムを再計算する。電源は PowerSpecial フィールド（on=3 / off=2）。A705 / A903 モデル・swing・ion・clean・timer は setter 未作成。実装済みは A907 のみで、A705 / A903 は予約。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 

@@ -74,12 +74,15 @@ namespace esp32irpk::ac::Sharp
 
   namespace detail
   {
-    // Standard SHARP_AC timing. LSB-first.
+    // Standard SHARP_AC timing. LSB-first. The zero-space is emitted at 460us
+    // rather than the nominal 500 so that, after the receiver's mark/space bias,
+    // the recovered space stays under IRremoteESP8266's zero-space ceiling
+    // (~563us); the wide tol_pct still recovers its 500us zero on the way in.
     inline constexpr AcTiming kTiming = {
         /*header_mark_us=*/3800,
         /*header_space_us=*/1900,
         /*bit_mark_us=*/470,
-        /*zero_space_us=*/580,
+        /*zero_space_us=*/460,
         /*one_space_us=*/1400,
         /*trailer_mark_us=*/470,
         /*frame_gap_us=*/29000,
@@ -95,7 +98,7 @@ namespace esp32irpk::ac::Sharp
     inline constexpr uint8_t kHdr2 = 0xCF;
     inline constexpr uint8_t kHdr3 = 0x10;
 
-    inline constexpr size_t kOffTemp = 4;     // bits 0-3 Temp, bit 4 Model
+    inline constexpr size_t kOffTemp = 4;     // bits 0-3 Temp, bit 4 Model, hi bits 0xC0 (Cool/Heat)
     inline constexpr size_t kOffPower = 5;    // bits 4-7 PowerSpecial
     inline constexpr size_t kOffModeFan = 6;  // bits 0-1 Mode, bit 3 Clean, bits 4-6 Fan
     inline constexpr size_t kOffSpecial = 10; // "which button" byte
@@ -156,9 +159,10 @@ namespace esp32irpk::ac::Sharp
     static constexpr size_t kMaxTicks = 64 + 13 * 16; // header + 104 bits + trailer
 
     // raw state: a known-good A907 frame (on / cool / 24C / fan auto), checksum
-    // precomputed. Header AA 5A CF 10; Special = power (0x00).
-    uint8_t bytes[kBytes] = {0xAA, 0x5A, 0xCF, 0x10, 0x09, 0x31, 0x22,
-                             0x00, 0x08, 0x80, 0x00, 0xE0, 0x91};
+    // precomputed. Header AA 5A CF 10; byte 4 = 0xC0 | (degC-15) in Cool/Heat
+    // (IRSharpAc fixes the temp byte's high bits to 0xC0); Special = power (0x00).
+    uint8_t bytes[kBytes] = {0xAA, 0x5A, 0xCF, 0x10, 0xC9, 0x31, 0x22,
+                             0x00, 0x08, 0x80, 0x00, 0xE0, 0x51};
     uint16_t byte_length = 0;
     bool checksum_ok = false;
 
@@ -279,9 +283,18 @@ namespace esp32irpk::ac::Sharp
       const uint8_t modeCode = buf[detail::kOffModeFan] & 0x03u;
       if (detail::isAutoOrDry(modeCode))
       {
-        // Auto/Dry carry no temperature (IRSharpAc's setTemp zeroes the temp byte).
-        // Fan is NOT forced: setFan overrides regardless of mode, so it round-trips.
-        buf[detail::kOffTemp] = static_cast<uint8_t>(buf[detail::kOffTemp] & 0xF0u);
+        // Auto/Dry carry no temperature: IRSharpAc's setTemp zeroes the whole
+        // temp byte. Fan is NOT forced: setFan overrides regardless of mode, so
+        // it round-trips.
+        buf[detail::kOffTemp] = 0x00;
+      }
+      else
+      {
+        // Cool/Heat (A907): IRSharpAc's setTemp writes 0xC0 (Model bit clear) to
+        // the temp byte's high bits, then the degC-15 nibble. Match it so our
+        // frame is byte-identical to a real A907 remote.
+        buf[detail::kOffTemp] =
+            static_cast<uint8_t>(0xC0u | (buf[detail::kOffTemp] & 0x0Fu));
       }
       buf[detail::kOffSum] = static_cast<uint8_t>(
           (buf[detail::kOffSum] & 0x0Fu) | (detail::calcChecksum(buf) << 4));

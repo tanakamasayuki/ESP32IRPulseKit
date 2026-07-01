@@ -2400,9 +2400,10 @@ void testSharpAcRoundtrip()
   EXPECT_TRUE("sharp/decode-fan", g.fan() == Fan::AUTO);
 
   // On / cool / 24C / fan auto (A907), from IRSharpAc's struct + nibble checksum.
+  // Byte 4 = 0xC0 | (24-15) = 0xC9 (IRSharpAc fixes the temp byte's high bits).
   static const uint8_t kCanonicalCool24[Frame::kBytes] = {
-      0xAA, 0x5A, 0xCF, 0x10, 0x09, 0x31, 0x22,
-      0x00, 0x08, 0x80, 0x00, 0xE0, 0x91};
+      0xAA, 0x5A, 0xCF, 0x10, 0xC9, 0x31, 0x22,
+      0x00, 0x08, 0x80, 0x00, 0xE0, 0x51};
   bool canonical_match = true;
   for (size_t i = 0; i < Frame::kBytes; ++i)
     if (g.bytes[i] != kCanonicalCool24[i])

@@ -717,10 +717,10 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | short (7-byte swing) / long (10-byte) | — | Not yet |
 | Samsung | Samsung AC | 14-byte, 2 sections | standard | **Supported**² |
 | | extended (21-byte timer) | — | Not yet |
-| Sharp | Sharp AC | 13-byte | A907 | **Implemented**¹ |
+| Sharp | Sharp AC | 13-byte | A907 | **Supported**¹ |
 | | | A705 / A903 | Not yet |
 
-¹ Sharp (13-byte, A907 model): field map, the Auto/Dry field-forcing rules, the PowerSpecial power model, and the nibble-folded XOR checksum are verified in host `codec_smoke` against IRSharpAc's documented layout; the bidirectional hardware/compat-matrix verification (`sharp_irremoteesp8266_tx` / `_rx`) is added but not yet run, so it is not yet promoted to **Supported**. Like Samsung, there is no HeatpumpIR second reference (HeatpumpIR has no Sharp), so verification rests on the IRremoteESP8266 bidirectional pair.
+¹ Sharp (13-byte, A907 model), like Samsung, is verified by the IRremoteESP8266 bidirectional pair (`sharp_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Sharp support.
 
 ² Samsung is verified by the IRremoteESP8266 bidirectional pair (`samsung_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination: HeatpumpIR's Samsung classes implement the older AQV (21-byte) and FJM (different section-2 checksum) variants, neither matching the modern 14-byte SAMSUNG_AC.
 
@@ -879,7 +879,7 @@ It is LSB-first; `toRaw` recomputes the two section checksums, then renders the 
 |---|---|---|---|
 | power | byte 5 bits 4-7 (PowerSpecial) | on = 3 / off = 2 | ✅ |
 | mode | byte 6 bits 0-1 | auto=0 / heat=1 / cool=2 / dry=3 | ✅ |
-| temperature | byte 4 bits 0-3 | `°C − 15`, 15–30 °C (Cool/Heat only; Auto/Dry = 0) | ✅ |
+| temperature | byte 4 bits 0-3 | `°C − 15`, 15–30 °C (Cool/Heat; byte 4 high bits fixed 0xC0; Auto/Dry zero the whole byte) | ✅ |
 | fan (airflow) | byte 6 bits 4-6 | auto=2 / med=3 / min=4 / high=5 / max=7 | ✅ |
 | model | byte 4 bit 4 + byte 11 bit 4 | A907 (implemented) / A705 / A903 | 🟡 |
 | swing | byte 8 bits 0-2 | — | 🟡 |
@@ -887,7 +887,7 @@ It is LSB-first; `toRaw` recomputes the two section checksums, then renders the 
 | special (button) | byte 10 | power = 0x00 (emitted) | ✅ |
 | checksum | byte 12 bits 4-7 | nibble-folded XOR of bytes 0–11 + byte 12 low nibble | ✅ |
 
-It is LSB-first; `toRaw` rewrites the fixed header, zeroes the temperature in Auto/Dry (which carry none), sets the Special byte to the "power" value, and recomputes the nibble checksum. Power uses the PowerSpecial field (on = 3 / off = 2). The A705 / A903 models, swing, ion, clean and timer have no setters. This is the only Sharp model implemented; A705 / A903 are reserved.
+It is LSB-first; `toRaw` rewrites the fixed header, sets byte 4's high bits to 0xC0 in Cool/Heat (and zeroes the whole temp byte in Auto/Dry, which carry no temperature), sets the Special byte to the "power" value, and recomputes the nibble checksum. Power uses the PowerSpecial field (on = 3 / off = 2). The A705 / A903 models, swing, ion, clean and timer have no setters. This is the only Sharp model implemented; A705 / A903 are reserved.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
