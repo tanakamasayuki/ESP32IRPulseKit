@@ -81,6 +81,10 @@ void printAcDecode(const esp32irpk::IRRawTickView &raw)
   Serial.print(" bytes=");
   printStateHex(f.bytes, f.byte_length);
   Serial.println();
+  // Drain the UART before returning: the 35-byte Daikin line is ~144 chars, so
+  // two back-to-back decodes overflow the serial ring buffer and the tail (with
+  // its newline) is dropped, merging lines and defeating the study's line regex.
+  Serial.flush();
 }
 } // namespace
 
