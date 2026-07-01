@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+
+## 1.0.4
 - (EN) A/C decode robustness: the per-vendor bit-mark matching window is now wider (tolerance 40%) so decoders accept the noticeably short marks some third-party encoders emit (e.g. HeatpumpIR's Daikin 360us / Fujitsu 410us) once the receiver skews marks shorter still. Decode-only — it does not change transmitted timing; the 0/1 space split stays a fixed midpoint threshold and frame integrity is still gated by each vendor's signature/checksum.
 - (JA) エアコン復号の堅牢化: ベンダごとの bit-mark 判定窓を拡大（許容 40%）し、サードパーティ・エンコーダが出す短めの mark（例 HeatpumpIR の Daikin 360us / Fujitsu 410us）が受信機のずれでさらに短くなっても受理できるように。復号のみで送信タイミングは不変。0/1 の判定は固定しきい値のままで、フレーム整合は各ベンダの署名/チェックサムで担保。
 - (EN) Sharp air-conditioner support (`esp32irpk::ac::Sharp`): decode/encode of the standard 13-byte "Sharp AC" state (A907 model), LSB-first with the fixed `AA 5A CF 10` header and a nibble-folded XOR checksum. Power is the 4-bit PowerSpecial field; Auto/Dry carry no temperature. `Mode`/`Fan` accessors, `toString`, `printTo`, `fromBytes`. Verified field-for-field against IRremoteESP8266's IRSharpAc (bidirectional). `06_ac_learn` recognizes it too.
