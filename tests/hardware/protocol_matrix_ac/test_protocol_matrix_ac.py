@@ -43,6 +43,7 @@ VENDORS = [
     "KELVINATOR",
     "MIDEA",
     "CARRIER",
+    "HITACHI",
 ]
 
 

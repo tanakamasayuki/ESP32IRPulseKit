@@ -13,6 +13,7 @@
 #include "Kelvinator.h"
 #include "Midea.h"
 #include "Carrier.h"
+#include "Hitachi.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -35,6 +36,7 @@ namespace esp32irpk::ac
     KELVINATOR = 9,
     MIDEA = 10,
     CARRIER = 11,
+    HITACHI = 12,
     // further vendors added incrementally
   };
 
@@ -149,6 +151,15 @@ namespace esp32irpk::ac
         mif.printTo(*out);
       return AcVendor::MIDEA;
     }
+    // Hitachi (28-byte) shares the ~3300/1700 header with several vendors above, so
+    // it is last; its fixed 9-byte framing prefix keeps it unambiguous.
+    Hitachi::Frame hf;
+    if (Hitachi::Frame::fromRaw(raw, hf))
+    {
+      if (out)
+        hf.printTo(*out);
+      return AcVendor::HITACHI;
+    }
     if (out)
       out->println("// decoded: no AC vendor matched (raw replay still works)");
     return AcVendor::UNKNOWN;
@@ -240,6 +251,13 @@ namespace esp32irpk::ac
                           mif.bytes, Midea::Frame::kBytes);
       return AcVendor::MIDEA;
     }
+    Hitachi::Frame hf;
+    if (Hitachi::Frame::fromRaw(raw, hf))
+    {
+      printAcStateSnippet(out, "Hitachi", "esp32irpk::ac::Hitachi::Frame",
+                          hf.bytes, Hitachi::Frame::kBytes);
+      return AcVendor::HITACHI;
+    }
     return AcVendor::UNKNOWN;
   }
 
@@ -315,6 +333,12 @@ namespace esp32irpk::ac
     {
       mif.printSetterSnippet(out);
       return AcVendor::MIDEA;
+    }
+    Hitachi::Frame hf;
+    if (Hitachi::Frame::fromRaw(raw, hf))
+    {
+      hf.printSetterSnippet(out);
+      return AcVendor::HITACHI;
     }
     return AcVendor::UNKNOWN;
   }

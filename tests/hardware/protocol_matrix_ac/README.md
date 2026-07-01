@@ -23,6 +23,7 @@ The primary sketch is RX and `peer_tx/` is TX. The peer name stays fixed as `tx`
 - KELVINATOR
 - MIDEA
 - CARRIER
+- HITACHI
 
 ## Run
 

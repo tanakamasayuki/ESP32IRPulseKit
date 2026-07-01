@@ -72,6 +72,10 @@ midea_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Carrier (IRCarrierAc64, CARRIER_AC64 8-byte / 64-bit, matching esp32irpk::ac::Carrier)
 carrier_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
 carrier_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+
+# Hitachi (IRHitachiAc, HITACHI_AC 28-byte, matching esp32irpk::ac::Hitachi)
+hitachi_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+hitachi_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
 Each vendor uses the same `<extlib>_<role>` variants. Every variant folder is
@@ -260,6 +264,16 @@ harness are added one variant at a time. In place:
   variants, not CARRIER_AC64, so like Samsung/Sharp/Kelvinator/Midea there is **no**
   `carrier_heatpumpir_tx` and it is cross-checked by the IRremoteESP8266 bidirectional pair
   alone.
+
+- `hitachi_irremoteesp8266_tx/` + `hitachi_irremoteesp8266_rx/` -- the same calibration and
+  encoder-verification pair for the 28-byte HITACHI_AC protocol, using IRremoteESP8266's
+  `IRHitachiAc`. A single MSB-first pulse-distance frame whose logical fields are stored
+  bit-reversed inside each byte, with a fixed 9-byte framing prefix and a sum-based
+  checksum. Fields are coupled (Fan mode uses a sentinel temperature, Dry mode limits the
+  fan range, changing the mode re-clamps the fan), so the study drives both stacks with the
+  same call order and treats temperature as a don't-care in Fan mode. HeatpumpIR has a
+  Hitachi class but it implements a different (non-28-byte) variant, so like the others it
+  is cross-checked by the IRremoteESP8266 bidirectional pair alone.
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `panasonic_heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`

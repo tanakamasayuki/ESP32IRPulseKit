@@ -2879,6 +2879,145 @@ void testCarrierAcStateMatrix()
   EXPECT_TRUE("carrier/state-matrix", all_ok);
 }
 
+// Hitachi AC (HITACHI_AC: single 28-byte MSB-first pulse-distance frame with
+// bit-reversed fields): build a frame, render the burst and decode it back. Field
+// offsets, the per-byte bit reversal and the sum checksum are derived from
+// IRHitachiAc's documented layout; the hardware study verifies them against
+// IRHitachiAc.
+void testHitachiAcRoundtrip()
+{
+  using esp32irpk::ac::Hitachi::Fan;
+  using esp32irpk::ac::Hitachi::Frame;
+  using esp32irpk::ac::Hitachi::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(23);
+  f.setFan(Fan::AUTO);
+  f.setSwingV(false);
+
+  EXPECT_TRUE("hitachi/power-get", f.power());
+  EXPECT_TRUE("hitachi/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("hitachi/temp-get", 23u, f.temperatureC());
+  EXPECT_TRUE("hitachi/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("hitachi/encode", f.toRaw(buf));
+  EXPECT_TRUE("hitachi/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("hitachi/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("hitachi/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("hitachi/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("hitachi/decode-power", g.power());
+  EXPECT_TRUE("hitachi/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("hitachi/decode-temp", 23u, g.temperatureC());
+  EXPECT_TRUE("hitachi/decode-fan", g.fan() == Fan::AUTO);
+
+  // On / cool / 23C / fan auto / no swing, from IRHitachiAc's layout + checksum.
+  static const uint8_t kCanonical[Frame::kBytes] = {
+      0x80, 0x08, 0x0C, 0x02, 0xFD, 0x80, 0x7F, 0x88, 0x48, 0x10,
+      0x20, 0x74, 0x00, 0x80, 0x60, 0x60, 0x00, 0x01, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x28};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonical[i])
+      canonical_match = false;
+  EXPECT_TRUE("hitachi/canonical-bytes", canonical_match);
+
+  // A hardware capture does not record the final trailing gap.
+  Frame ng{};
+  EXPECT_TRUE("hitachi/decode-no-trailing-gap",
+              buf.len > 1 &&
+                  Frame::fromRaw(esp32irpk::IRRawTickView{buf.ticks, buf.len - 1}, ng) &&
+                  ng.checksum_ok && ng.mode() == Mode::COOL && ng.fan() == Fan::AUTO);
+
+  // SwingV/SwingH round-trip.
+  Frame s{};
+  s.setMode(Mode::COOL);
+  s.setSwingV(true);
+  s.setSwingH(true);
+  uint16_t st[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer sb{st, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("hitachi/swing-encode", s.toRaw(sb));
+  Frame sg{};
+  EXPECT_TRUE("hitachi/swing-decode", Frame::fromRaw(esp32irpk::IRRawTickView{sb.ticks, sb.len}, sg));
+  EXPECT_TRUE("hitachi/swingv-decode-on", sg.swingV());
+  EXPECT_TRUE("hitachi/swingh-decode-on", sg.swingH());
+
+  // Power off.
+  Frame p{};
+  p.setPower(false);
+  p.setMode(Mode::HEAT);
+  EXPECT_TRUE("hitachi/poweroff", !p.power());
+  uint16_t t2[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer b2{t2, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("hitachi/poweroff-encode", p.toRaw(b2));
+  Frame pg{};
+  EXPECT_TRUE("hitachi/poweroff-decode", Frame::fromRaw(esp32irpk::IRRawTickView{b2.ticks, b2.len}, pg));
+  EXPECT_TRUE("hitachi/poweroff-decode-off", !pg.power());
+
+  // Temperature clamps to the supported 16-32C range.
+  Frame t{};
+  t.setMode(Mode::COOL);
+  t.setTemperatureC(40);
+  EXPECT_EQ("hitachi/temp-clamp-high", 32u, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("hitachi/temp-clamp-low", 16u, t.temperatureC());
+
+  // A non-Hitachi waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("hitachi/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power combination must encode -> decode back to the
+// same logical state with a valid checksum. Because Hitachi couples the fields
+// (Dry/Fan clamp the fan, Fan uses a sentinel temp), the invariant checked is that
+// the decoded frame reproduces the *encoded* frame's own fields, not the raw input.
+void testHitachiAcStateMatrix()
+{
+  using esp32irpk::ac::Hitachi::Fan;
+  using esp32irpk::ac::Hitachi::Frame;
+  using esp32irpk::ac::Hitachi::Mode;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::HEAT, Mode::COOL, Mode::DRY, Mode::FAN};
+  static const Fan fans[] = {Fan::AUTO, Fan::LOW_SPEED, Fan::MED_SPEED, Fan::HIGH_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 16; temp <= 32; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          Frame f{};
+          f.setPower(power != 0);
+          f.setMode(m);
+          f.setTemperatureC(temp);
+          f.setFan(fan);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != f.power() || g.mode() != f.mode() || g.fan() != f.fan() ||
+              g.temperatureC() != f.temperatureC())
+            all_ok = false;
+        }
+  EXPECT_TRUE("hitachi/state-matrix", all_ok);
+}
+
 // decodeAny must classify each vendor's own rendered frame as that vendor. This
 // guards the cascade ordering -- notably Gree vs Kelvinator, whose frames share a
 // header + B010 footer + block checksum (a Gree frame is one Kelvinator block), so
@@ -2904,6 +3043,7 @@ void testAcDecodeAny()
   check(ac::Kelvinator::Frame{}, ac::AcVendor::KELVINATOR, "decodeany/kelvinator");
   check(ac::Midea::Frame{}, ac::AcVendor::MIDEA, "decodeany/midea");
   check(ac::Carrier::Frame{}, ac::AcVendor::CARRIER, "decodeany/carrier");
+  check(ac::Hitachi::Frame{}, ac::AcVendor::HITACHI, "decodeany/hitachi");
 }
 
 // Each vendor's toString() maps an enum value to its identifier name (used by
@@ -2921,6 +3061,7 @@ void testAcEnumToString()
   namespace K = esp32irpk::ac::Kelvinator;
   namespace MI = esp32irpk::ac::Midea;
   namespace CA = esp32irpk::ac::Carrier;
+  namespace HI = esp32irpk::ac::Hitachi;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -2955,6 +3096,9 @@ void testAcEnumToString()
   EXPECT_TRUE("carrier/tostring-mode", strcmp(CA::toString(CA::Mode::HEAT), "HEAT") == 0);
   EXPECT_TRUE("carrier/tostring-fan-auto", strcmp(CA::toString(CA::Fan::AUTO), "AUTO") == 0);
   EXPECT_TRUE("carrier/tostring-fan-high", strcmp(CA::toString(CA::Fan::HIGH_SPEED), "HIGH_SPEED") == 0);
+  EXPECT_TRUE("hitachi/tostring-mode", strcmp(HI::toString(HI::Mode::DRY), "DRY") == 0);
+  EXPECT_TRUE("hitachi/tostring-fan-auto", strcmp(HI::toString(HI::Fan::AUTO), "AUTO") == 0);
+  EXPECT_TRUE("hitachi/tostring-fan-high", strcmp(HI::toString(HI::Fan::HIGH_SPEED), "HIGH_SPEED") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -3274,6 +3418,33 @@ void testAcFromBytes()
     EXPECT_TRUE("carrier/frombytes-eq", eq);
     EXPECT_TRUE("carrier/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+  // Hitachi: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Hitachi::Fan;
+    using esp32irpk::ac::Hitachi::Frame;
+    using esp32irpk::ac::Hitachi::Mode;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::MED_SPEED);
+    a.setSwingV(true);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("hitachi/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("hitachi/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("hitachi/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("hitachi/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("hitachi/frombytes-eq", eq);
+    EXPECT_TRUE("hitachi/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -3348,6 +3519,8 @@ void setup()
   testMideaAcStateMatrix();
   testCarrierAcRoundtrip();
   testCarrierAcStateMatrix();
+  testHitachiAcRoundtrip();
+  testHitachiAcStateMatrix();
   testAcDecodeAny();
   testAcEnumToString();
   testAcFromBytes();

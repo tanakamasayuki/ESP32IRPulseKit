@@ -722,6 +722,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | Kelvinator | Kelvinator | 16-byte, two blocks | standard | **Supported**³ |
 | Midea | Midea | 48-bit (6-byte), 2 copies | standard | **Supported**⁴ |
 | Carrier | Carrier | 64-bit (8-byte) | CARRIER_AC64 | **Supported**⁵ |
+| Hitachi | Hitachi AC | 28-byte | HITACHI_AC | **Implemented**⁶ |
 
 ¹ Sharp (13-byte, A907 model), like Samsung, is verified by the IRremoteESP8266 bidirectional pair (`sharp_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Sharp support.
 
@@ -733,13 +734,9 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 ⁵ Carrier (64-bit / 8-byte, CARRIER_AC64), like Samsung, Sharp, Kelvinator and Midea, is verified by the IRremoteESP8266 bidirectional pair (`carrier_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination: HeatpumpIR has a Carrier class, but it implements the different NQV (9-byte) / MCA (6-byte) Carrier variants rather than CARRIER_AC64. The single-frame pulse-distance framing and the 4-bit nibble-sum checksum are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`).
 
-**Candidate vendors (not yet started), in suggested implementation order.** Ordering weighs, in priority: a second independent reference (IRremoteESP8266 *and* HeatpumpIR, matching the verification used for the supported vendors), a clean byte-state fit for the `ac::` layer, framing simplicity, and device coverage. Target models are chosen at approval time, not pre-locked here. Bit-paired code formats (Coolix 24-bit, LG 28-bit, …) are deliberately out of scope — they are not multi-byte byte-state and would need a different code path outside this layer.
+⁶ Hitachi (28-byte, HITACHI_AC): the field map, the per-byte bit-reversed field encoding and the sum-based checksum are verified in host `codec_smoke` against IRHitachiAc's documented layout, and the self round-trip (`hardware/protocol_matrix_ac`) and bidirectional IRremoteESP8266 compat study (`hitachi_irremoteesp8266_tx` / `_rx`) sketches are wired up but not yet run on the 2-board rig, so it is not yet promoted to **Supported**. HeatpumpIR has a Hitachi class, but it implements a different (non-28-byte) variant, so — like Samsung/Sharp/Kelvinator/Midea/Carrier — verification rests on the IRremoteESP8266 bidirectional pair. The other Hitachi sizes (13 / 27 / 33 / 37 / 43 / 53-byte) are reserved as separate frame types.
 
-| Vendor | Format / size | References | Notes |
-|---|---|---|---|
-| Hitachi | Hitachi AC, 28-byte (+ 13–53-byte variants) | IRremoteESP8266 + HeatpumpIR | Hardest: many size variants with leader/section framing. Defer until the simpler vendors are done. |
-
-Further single-reference (IRremoteESP8266-only) byte-state options if more coverage is wanted: Haier (9-byte / 22-byte), TCL112 (14-byte), Electra (13-byte).
+**Candidate vendors (not yet started).** No dual-reference (IRremoteESP8266 *and* HeatpumpIR) byte-state candidates remain. Further single-reference (IRremoteESP8266-only) byte-state options if more coverage is wanted: Haier (9-byte / 22-byte), TCL112 (14-byte), Electra (13-byte). Bit-paired code formats (Coolix 24-bit, LG 28-bit, …) are deliberately out of scope — they are not multi-byte byte-state and would need a different code path outside this layer. Target models are chosen at approval time, not pre-locked here.
 
 Per-vendor framing of the supported formats:
 
@@ -754,6 +751,7 @@ Per-vendor framing of the supported formats:
 - `Kelvinator` — the standard "Kelvinator" protocol (also used by some Gree/Sharp-badged remotes). 16 bytes = two 8-byte blocks, **LSB-first**. Each block is a header + 32 data bits + a 3-bit command footer (`B010`) + a ~20 ms gap + 32 more data bits + a ~40 ms gap; bytes 8–10 repeat bytes 0–2, byte 3 / byte 11 are fixed markers (`0x50` / `0x70`), and each block ends with a 4-bit block checksum (high nibble of byte 7 / byte 15, Gree-style: 10 + low nibbles of the first four bytes + high nibbles of the next three, mod 16). `Mode` is `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`; `Fan` is `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (the encoder mirrors the low speeds into the byte-0 BasicFan field, capped at 3); whole-degree temps 16–30 °C (Auto/Dry force 25 °C). Single format, no model axis. Vertical/horizontal swing, turbo, quiet, light, ion filter and X-Fan are documented but not settable.
 - `Midea` — the standard "Midea" protocol (used by many OEM-rebadged brands: Pioneer, Comfee, Kaysun, Keystone, MrCool, Danby, Trotec, Lennox, …). 48 bits / 6 bytes, **MSB-first**, sent as two transmissions per message: the 48 data bits, then the same 48 bits fully **bit-inverted** (each with its own 4480/4480 header, 560/1680 bits, and a 5.6 ms gap). Byte order is transmission order (byte 0 = the fixed Header/Type byte `0xA1`, byte 5 = the checksum); this is the reverse of IRremoteESP8266's `remote_state` union. The checksum is the negated sum of the bit-reversed other five bytes, itself bit-reversed. `fromRaw` gates on the second copy being the exact bit-complement of the first plus the fixed Header field (`0b10100`). `Mode` is `COOL`/`DRY`/`AUTO`/`HEAT`/`FAN`; `Fan` is `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED` (only four speeds); whole-degree temps 17–30 °C, carried in every mode. Celsius only (the Fahrenheit flag is forced clear). Single format, no model axis. Sleep, on/off timers, the sensor/follow-me message and the special toggle messages (swing, econo, turbo, light, clean, 8 °C-heat, quiet) are documented but not settable.
 - `Carrier` — the CARRIER_AC64 protocol (Carrier/Surrey 619EGX / 53NGK inverter remotes). A single 8-byte (64-bit) pulse-distance frame, **LSB-first**, sent once, beginning with the fixed signature `0x84 0x55`, with a 4-bit checksum in the low nibble of byte 2 (the sum of every nibble above it — byte 2's high nibble plus bytes 3–7). `Mode` is `HEAT`/`COOL`/`FAN` (no Auto or Dry); `Fan` is `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`; whole-degree temps 16–30 °C, carried in every mode. `SwingV` is settable. This is the 64-bit format; the other Carrier wire formats (AC / AC40 / AC84 / AC128) are separate frames. Sleep and the on/off timers are documented but not settable.
+- `Hitachi` — the 28-byte HITACHI_AC protocol (RAS-/RAK- series remotes). A single pulse-distance frame, **MSB-first**, sent once, beginning with a fixed 9-byte framing prefix (`80 08 0C 02 FD 80 7F 88 48`), with a sum-based checksum in the last byte (62 minus the bit-reversed value of every other byte, bit-reversed). Unusually, each logical field is stored **bit-reversed** within its byte, and the fields are coupled: Fan mode carries a sentinel temperature, Dry mode limits the fan to two low speeds, and changing the mode re-clamps the fan — this mirrors IRHitachiAc exactly. `Mode` is `AUTO`/`HEAT`/`COOL`/`DRY`/`FAN`; `Fan` is `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED` (non-contiguous wire codes 1/2/3/5); whole-degree temps 16–32 °C. `SwingV` and `SwingH` are settable. This is the 28-byte format; the other Hitachi sizes (13 / 27 / 33 / 37 / 43 / 53-byte) are separate frames. Timers and the comfort flags are not settable.
 
 **Panasonic field map (decoded logical fields).** Where each control field lives in the 27-byte state. Status legend: ✅ implemented (decode + encode) · 🔜 planned · 🟡 documented, no setter (re-send via RAW replay) · ⛔ out of scope (separate frame type).
 
@@ -946,6 +944,22 @@ It is MSB-first; `toRaw` forces the Header/Type byte and Celsius, writes the che
 | sleep | byte 4 bit 7 | 0/1 | 🟡 |
 
 It is LSB-first; `toRaw` forces the signature bytes, clears the unused byte, recomputes the nibble checksum, then renders the 8-byte frame once (CARRIER_AC64 is sent once). Single format; no model axis. Sleep and the timers have no setters.
+
+**Hitachi field map (decoded logical fields).** Where each control field lives in the 28-byte state. Same status legend. Each field byte stores its value bit-reversed. Bytes 0–8 are a fixed framing prefix; byte 9 flags the minimum temperature (`0x10`, or `0x90` at 16 °C); byte 24 is fixed `0x80`.
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| prefix | bytes 0-8 | fixed `80 08 0C 02 FD 80 7F 88 48` | ✅ |
+| mode | byte 10 (bit-reversed) | auto=2 / heat=3 / cool=4 / dry=5 / fan=12 | ✅ |
+| temperature | byte 11 (bit-reversed `°C << 1`) | 16–32 °C (Fan mode = sentinel) | ✅ |
+| fan | byte 13 (bit-reversed) | auto=1 / low=2 / med=3 / high=5 | ✅ |
+| swing (vertical) | byte 14 bit 7 | 0/1 | ✅ |
+| swing (horizontal) | byte 15 bit 7 | 0/1 | ✅ |
+| power | byte 17 bit 0 | 0/1 | ✅ |
+| timers / comfort flags | various | — | 🟡 |
+| checksum | byte 27 | 62 − Σ bit-reversed bytes, bit-reversed | ✅ |
+
+It is MSB-first; `toRaw` forces the fixed prefix and byte 24, recomputes the checksum, then renders the 28-byte frame once (sent once). The setters mirror IRHitachiAc's coupling (Fan-mode sentinel temperature, Dry-mode fan clamp, mode-change fan re-clamp). Single format; no model axis. Timers and comfort flags have no setters.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 
