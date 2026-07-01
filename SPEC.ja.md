@@ -713,6 +713,7 @@ struct Frame {
 | Sharp | Sharp AC | 13バイト | A907 | **対応**¹ |
 | | | A705 / A903 | 未対応 |
 | Kelvinator | Kelvinator | 16バイト、2ブロック | 標準 | **対応**³ |
+| Midea | Midea | 48ビット（6バイト）、2コピー | 標準 | **実装済**⁴ |
 
 ¹ Sharp（13バイト、A907モデル）は Samsung 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`sharp_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR に Sharp サポートが無いため。
 
@@ -720,11 +721,12 @@ struct Frame {
 
 ³ Kelvinator（16バイト、標準）は Samsung/Sharp 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`kelvinator_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR に Kelvinator サポートが無いため。加えて2ブロックのフレーミング（ブロック毎の B010 コマンドフッタ＋ギャップ）・ブロックチェックサムを host `codec_smoke` で検証し、実機の PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通っている。
 
+⁴ Midea（48ビット / 6バイト、標準）: フィールドマップ・二重送信フレーミング（48bit のデータに続けてビット反転コピー）・チェックサムは host `codec_smoke` で IRMideaAC の記載レイアウトに対して検証済み。自己往復（`hardware/protocol_matrix_ac`）と双方向の IRremoteESP8266 compat study（`midea_irremoteesp8266_tx` / `_rx`）のスケッチは用意済みだが2ボードのリグで未実行のため、まだ **対応** には昇格していない。Samsung/Sharp/Kelvinator 同様 HeatpumpIR の第2リファレンスは無いので、検証は IRremoteESP8266 双方向ペアに依拠する。
+
 **未着手の候補ベンダ（推奨着手順）。** 優先順位の基準: ①第2の独立リファレンス（IRremoteESP8266 *と* HeatpumpIR の両方＝対応済みベンダと同じ検証体制）②`ac::`層に合う byte-state 構造 ③フレーミングの単純さ ④機種カバレッジ。対象モデルは承認時に決定し、ここで固定はしない。ビットペア方式（Coolix 24-bit、LG 28-bit など）は多バイトの byte-state ではなく別コード経路が必要なため、本レイヤの対象外とする。
 
 | ベンダ | フォーマット / サイズ | リファレンス | 備考 |
 |---|---|---|---|
-| Midea | Midea、48ビット（6バイト） | IRremoteESP8266 + HeatpumpIR | OEM多数で広いカバレッジ。注意: コード＋反転コピー構造（総和/XORのバイトチェックサムが無い）で byte-state モデルから外れ気味、反転検証経路が必要。 |
 | Carrier | Carrier AC、32 / 64ビット ＋ 128ビット（16バイト） | IRremoteESP8266 + HeatpumpIR | 二重リファレンスだが複数の異なる波形フォーマットがあり、各々が別 `Frame` 型。着手前に対象フォーマットを選ぶ。 |
 | Hitachi | Hitachi AC、28バイト（＋13〜53バイトの各種） | IRremoteESP8266 + HeatpumpIR | 最難: サイズ変種が多くリーダ/セクション構造。単純なベンダを片付けてから着手。 |
 
@@ -741,6 +743,7 @@ struct Frame {
 - `Samsung` — 標準「Samsung AC」protocol（AR-/ARH- 系リモコン）。14バイト状態、**LSBファースト**。先頭一回限りのヘッダ（690us mark + 17844us space）の後、7バイトの2セクションを送る。各セクションは独自のセクションヘッダ（3086/8864us）と 2886us のセクションギャップを持つ。各セクションは popcount（ハミング重み）チェックサムをビット反転し、バイト1〜2の2ニブルに分割して格納する。固定ベンダ署名は無いため `fromRaw` は両セクションのチェックサム一致をゲートにする。電源は2bitフィールド2つ（byte6・byte13）: 両方 `0b11` = on、両方 `0b00` = off。`Mode` は `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`（温度は整数のみ、16–30℃）。スイングと特殊ファン（Powerful/WindFree/Econo）はここでは設定不可。21バイト拡張（タイマ）メッセージは別 `Frame` 型。
 - `Sharp` — 標準「Sharp AC」protocol。13バイトの単一 pulse-distance フレーム、**LSBファースト**、固定ヘッダ `AA 5A CF 10` で始まる。byte12 の上位ニブルにニブル畳み込みXORチェックサム。電源は4bitの `PowerSpecial` フィールド（byte5）: on=3 / off=2（単純なビットではない）。`Special` バイト（byte10）は実機がどのボタンを押したかを表すが、`toRaw` は常に「電源」値（0x00）を出すので完全な状態コマンドになる。`Mode` は `AUTO`/`HEAT`/`COOL`/`DRY`（Auto と Fan はワイヤコード `0b00` を共有するので Fan 単独は無し）。`Fan` は `AUTO`/`MIN_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`（非連続のワイヤコード 2/4/3/5/7、温度は整数 15–30℃）。Auto と Dry は温度を持たない（Temp=0）ので、温度はその場では don't-care。実装は既定の A907 モデル。A705 / A903（Heat を Fan に置換し別のファンコード、Model/Model2 ビットで区別）は予約。swing / ion / clean / timer は記載のみで setter 未作成。
 - `Kelvinator` — 標準「Kelvinator」protocol（一部の Gree/Sharp ブランド機でも使用）。16バイト = 8バイト2ブロック、**LSBファースト**。各ブロックは ヘッダ＋32bit＋3bitコマンドフッタ（`B010`）＋約20msギャップ＋32bit＋約40msギャップ。byte8–10 は byte0–2 の複製、byte3 / byte11 は固定マーカー（`0x50` / `0x70`）、各ブロック末尾に4bitブロックチェックサム（byte7 / byte15 の上位ニブル、Gree方式: 10＋先頭4バイトの下位ニブル＋次3バイトの上位ニブル、mod 16）。`Mode` は `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`。`Fan` は `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED`（低速側は byte0 の BasicFan にも反映、3で頭打ち）。温度は整数 16–30℃（Auto/Dry は 25℃ 固定）。単一フォーマットでモデル軸なし。上下/左右スイング・turbo・quiet・light・ion filter・X-Fan は記載のみで setter 未作成。
+- `Midea` — 標準「Midea」protocol（OEM 多数: Pioneer・Comfee・Kaysun・Keystone・MrCool・Danby・Trotec・Lennox など）。48ビット / 6バイト、**MSBファースト**。1メッセージにつき2回送信: 48bit のデータ、続けて同じ48bit を全ビット**反転**したコピー（各コピーが 4480/4480 ヘッダ・560/1680 bit・5.6ms ギャップを持つ）。バイト順は送信順（byte0 = 固定 Header/Type バイト `0xA1`、byte5 = チェックサム）で、IRremoteESP8266 の `remote_state` union とは逆順。チェックサムは他5バイトをビット反転して総和し符号反転、さらにビット反転したもの。`fromRaw` は2コピー目が1コピー目の完全なビット反転であることと固定 Header フィールド（`0b10100`）で判定。`Mode` は `COOL`/`DRY`/`AUTO`/`HEAT`/`FAN`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`（4段のみ）。温度は整数 17–30℃で全モードで保持。摂氏のみ（華氏フラグは強制クリア）。単一フォーマットでモデル軸なし。sleep・オン/オフタイマー・センサ/follow-me・特殊トグルメッセージ（swing・econo・turbo・light・clean・8℃暖房・quiet）は記載のみで setter 未作成。
 
 **Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
 
@@ -900,6 +903,23 @@ LSB-first。`toRaw` は固定ヘッダを書き直し、Cool/Heat では byte4 �
 | checksum | byte7 bit4-7（ブロック1）/ byte15 bit4-7（ブロック2） | 4bit ブロック和 | ✅ |
 
 LSB-first。`toRaw` は固定マーカーを強制し、byte0–2 を 8–10 に複製し、両ブロックチェックサムを再計算してから、2ブロック（ヘッダ・32bit・`B010` フッタ・約20msギャップ・32bit・約40msギャップ）を描画する。単一フォーマットでモデル軸なし。swing / turbo / quiet / light / ion / X-Fan は setter 未作成。
+
+**Midea フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが6バイト状態のどこに入るか。ステータス凡例は上と同じ。バイト順は送信順（MSBファースト）: byte0 = 固定 Header/Type バイト、byte5 = チェックサム。byte3–4 は既定 `0xFF`（タイマー/センサ off）。
+
+| フィールド | 位置（byte/bit） | コード / 範囲 | 状態 |
+|---|---|---|---|
+| header / type | byte0 | `0xA1`（Header `0b10100` ＋ command type `0b001`） | ✅ |
+| power | byte1 bit7 | 0/1 | ✅ |
+| mode | byte1 bit0-2 | cool=0 / dry=1 / auto=2 / heat=3 / fan=4 | ✅ |
+| fan | byte1 bit3-4 | auto=0 / low=1 / med=2 / high=3 | ✅ |
+| temperature | byte2 bit0-4 | `℃ − 17`、17–30℃（全モード） | ✅ |
+| useFahrenheit | byte2 bit5 | 強制0（摂氏） | 🟡 |
+| sleep | byte1 bit6 | 0/1 | 🟡 |
+| オン/オフタイマー・センサ/follow-me | byte3-4 | — | 🟡 |
+| swing / econo / turbo / light / clean / 8℃暖房 / quiet | 別トグルメッセージ | — | ⛔ |
+| checksum | byte5 | ビット反転総和を符号反転しビット反転 | ✅ |
+
+MSBファースト。`toRaw` は Header/Type バイトと摂氏を強制し、チェックサムを書き、2コピー（ヘッダ・48bit・トレーラ・5.6msギャップ）を描画する（2コピー目は全ビット反転）。`fromRaw` はその反転2コピー目の一致を要求する。単一フォーマットでモデル軸なし。sleep・タイマー・センサ/follow-me・トグルメッセージは setter 未作成。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 

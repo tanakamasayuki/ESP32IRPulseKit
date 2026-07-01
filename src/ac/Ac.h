@@ -11,6 +11,7 @@
 #include "Samsung.h"
 #include "Sharp.h"
 #include "Kelvinator.h"
+#include "Midea.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -31,6 +32,7 @@ namespace esp32irpk::ac
     SAMSUNG = 7,
     SHARP = 8,
     KELVINATOR = 9,
+    MIDEA = 10,
     // further vendors added incrementally
   };
 
@@ -126,6 +128,16 @@ namespace esp32irpk::ac
         shf.printTo(*out);
       return AcVendor::SHARP;
     }
+    // Midea (48-bit double transmission, second copy bit-inverted). Its header
+    // (4480/4480) matches Toshiba's, but the inverted-copy + bit-count gates make
+    // it unambiguous, so ordering here is not load-bearing.
+    Midea::Frame mif;
+    if (Midea::Frame::fromRaw(raw, mif))
+    {
+      if (out)
+        mif.printTo(*out);
+      return AcVendor::MIDEA;
+    }
     if (out)
       out->println("// decoded: no AC vendor matched (raw replay still works)");
     return AcVendor::UNKNOWN;
@@ -203,6 +215,13 @@ namespace esp32irpk::ac
                           shf.bytes, Sharp::Frame::kBytes);
       return AcVendor::SHARP;
     }
+    Midea::Frame mif;
+    if (Midea::Frame::fromRaw(raw, mif))
+    {
+      printAcStateSnippet(out, "Midea", "esp32irpk::ac::Midea::Frame",
+                          mif.bytes, Midea::Frame::kBytes);
+      return AcVendor::MIDEA;
+    }
     return AcVendor::UNKNOWN;
   }
 
@@ -266,6 +285,12 @@ namespace esp32irpk::ac
     {
       shf.printSetterSnippet(out);
       return AcVendor::SHARP;
+    }
+    Midea::Frame mif;
+    if (Midea::Frame::fromRaw(raw, mif))
+    {
+      mif.printSetterSnippet(out);
+      return AcVendor::MIDEA;
     }
     return AcVendor::UNKNOWN;
   }

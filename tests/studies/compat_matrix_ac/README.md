@@ -64,6 +64,10 @@ sharp_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Kelvinator (IRKelvinatorAC, standard 16-byte two-block, matching esp32irpk::ac::Kelvinator)
 kelvinator_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
 kelvinator_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+
+# Midea (IRMideaAC, standard 48-bit / 6-byte double transmission, matching esp32irpk::ac::Midea)
+midea_irremoteesp8266_tx/    # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+midea_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
 Each vendor uses the same `<extlib>_<role>` variants. Every variant folder is
@@ -230,6 +234,17 @@ harness are added one variant at a time. In place:
   cross-checked by the IRremoteESP8266 bidirectional pair alone. The RX-side (IRremoteESP8266
   receiver) uses a 55 ms capture timeout so both blocks (separated by a ~40 ms gap) land in
   one message.
+
+- `midea_irremoteesp8266_tx/` + `midea_irremoteesp8266_rx/` -- the same calibration and
+  encoder-verification pair for the standard 48-bit / 6-byte Midea protocol, using
+  IRremoteESP8266's `IRMideaAC`. MSB-first; one message is the 48 data bits followed by a
+  fully bit-inverted copy, each with a 4480/4480 header and separated by a ~5.6 ms gap.
+  Both stacks share the field codes (mode cool0..fan4, fan auto0..high3); temperature is
+  carried in every mode, Celsius. Bytes are exchanged in wire order (byte 0 = 0xA1 header,
+  byte 5 = checksum). Like Samsung/Sharp/Kelvinator there is **no** `midea_heatpumpir_tx`
+  (HeatpumpIR has no Midea), so it is cross-checked by the IRremoteESP8266 bidirectional
+  pair alone. The RX-side (IRremoteESP8266 receiver) uses a 15 ms capture timeout so both
+  copies land in one message.
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `panasonic_heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`

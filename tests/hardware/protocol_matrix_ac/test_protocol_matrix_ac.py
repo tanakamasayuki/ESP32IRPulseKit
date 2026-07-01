@@ -41,6 +41,7 @@ VENDORS = [
     "SAMSUNG",
     "SHARP",
     "KELVINATOR",
+    "MIDEA",
 ]
 
 

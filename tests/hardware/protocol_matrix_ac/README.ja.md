@@ -21,6 +21,7 @@ peer は各ベンダの既定 known-good 状態を `ac::send` で送信し、RX 
 - SAMSUNG
 - SHARP
 - KELVINATOR
+- MIDEA
 
 ## 実行
 

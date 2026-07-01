@@ -2611,6 +2611,139 @@ void testKelvinatorAcStateMatrix()
   EXPECT_TRUE("kelvinator/state-matrix", all_ok);
 }
 
+// Midea AC (48-bit / 6-byte, double transmission with the 2nd copy bit-inverted):
+// build a frame, render both copies (header + 48 MSB-first bits + trailer + gap,
+// x2) and decode it back. Field offsets + checksum are derived from IRMideaAC's
+// documented layout; the hardware study verifies them against IRMideaAC.
+void testMideaAcRoundtrip()
+{
+  using esp32irpk::ac::Midea::Fan;
+  using esp32irpk::ac::Midea::Frame;
+  using esp32irpk::ac::Midea::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(24);
+  f.setFan(Fan::AUTO);
+
+  EXPECT_TRUE("midea/power-get", f.power());
+  EXPECT_TRUE("midea/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("midea/temp-get", 24u, f.temperatureC());
+  EXPECT_TRUE("midea/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("midea/encode", f.toRaw(buf));
+  EXPECT_TRUE("midea/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("midea/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("midea/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("midea/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("midea/decode-power", g.power());
+  EXPECT_TRUE("midea/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("midea/decode-temp", 24u, g.temperatureC());
+  EXPECT_TRUE("midea/decode-fan", g.fan() == Fan::AUTO);
+
+  // On / cool / 24C / fan auto / Celsius, from IRMideaAC's layout + checksum.
+  static const uint8_t kCanonicalCool24[Frame::kBytes] = {0xA1, 0x80, 0x07, 0xFF, 0xFF, 0x39};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool24[i])
+      canonical_match = false;
+  EXPECT_TRUE("midea/canonical-bytes", canonical_match);
+
+  // A hardware capture does not record the final trailing gap (the RX ends on
+  // idle silence), so the last tick is the trailer mark with no gap after it.
+  Frame ng{};
+  EXPECT_TRUE("midea/decode-no-trailing-gap",
+              buf.len > 1 &&
+                  Frame::fromRaw(esp32irpk::IRRawTickView{buf.ticks, buf.len - 1}, ng) &&
+                  ng.checksum_ok && ng.mode() == Mode::COOL && ng.fan() == Fan::AUTO);
+
+  // Corrupting one bit of the second (inverted) copy must break the decode: the
+  // inverted-copy check is the vendor's core integrity guard.
+  uint16_t bad[Frame::kMaxTicks];
+  for (size_t i = 0; i < buf.len; ++i)
+    bad[i] = buf.ticks[i];
+  // The 2nd copy starts after copy1 (header 2 + 48*2 bits + trailer 2 = 100 ticks);
+  // flip its first data-bit space between the zero and one lengths.
+  const size_t second_copy_first_space = 100 + 2 + 1;
+  bad[second_copy_first_space] = (bad[second_copy_first_space] > 100) ? 56 : 168;
+  Frame bg{};
+  EXPECT_TRUE("midea/reject-broken-inverted-copy",
+              !Frame::fromRaw(esp32irpk::IRRawTickView{bad, buf.len}, bg));
+
+  // Power off.
+  Frame p{};
+  p.setMode(Mode::HEAT);
+  p.setPower(false);
+  EXPECT_TRUE("midea/poweroff", !p.power());
+  uint16_t t2[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer b2{t2, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("midea/poweroff-encode", p.toRaw(b2));
+  Frame pg{};
+  EXPECT_TRUE("midea/poweroff-decode", Frame::fromRaw(esp32irpk::IRRawTickView{b2.ticks, b2.len}, pg));
+  EXPECT_TRUE("midea/poweroff-decode-off", !pg.power());
+
+  // Temperature clamps to the supported 17-30C range.
+  Frame t{};
+  t.setMode(Mode::COOL);
+  t.setTemperatureC(40);
+  EXPECT_EQ("midea/temp-clamp-high", 30u, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("midea/temp-clamp-low", 17u, t.temperatureC());
+
+  // A non-Midea waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("midea/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power combination must encode -> decode back to
+// itself with a valid checksum. Midea carries temperature in all modes.
+void testMideaAcStateMatrix()
+{
+  using esp32irpk::ac::Midea::Fan;
+  using esp32irpk::ac::Midea::Frame;
+  using esp32irpk::ac::Midea::Mode;
+
+  static const Mode modes[] = {Mode::COOL, Mode::DRY, Mode::AUTO, Mode::HEAT, Mode::FAN};
+  static const Fan fans[] = {Fan::AUTO, Fan::LOW_SPEED, Fan::MED_SPEED, Fan::HIGH_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 17; temp <= 30; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          Frame f{};
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+          f.setPower(power != 0);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan ||
+              g.temperatureC() != temp)
+            all_ok = false;
+        }
+  EXPECT_TRUE("midea/state-matrix", all_ok);
+}
+
 // decodeAny must classify each vendor's own rendered frame as that vendor. This
 // guards the cascade ordering -- notably Gree vs Kelvinator, whose frames share a
 // header + B010 footer + block checksum (a Gree frame is one Kelvinator block), so
@@ -2634,6 +2767,7 @@ void testAcDecodeAny()
   check(ac::Samsung::Frame{}, ac::AcVendor::SAMSUNG, "decodeany/samsung");
   check(ac::Sharp::Frame{}, ac::AcVendor::SHARP, "decodeany/sharp");
   check(ac::Kelvinator::Frame{}, ac::AcVendor::KELVINATOR, "decodeany/kelvinator");
+  check(ac::Midea::Frame{}, ac::AcVendor::MIDEA, "decodeany/midea");
 }
 
 // Each vendor's toString() maps an enum value to its identifier name (used by
@@ -2649,6 +2783,7 @@ void testAcEnumToString()
   namespace SA = esp32irpk::ac::Samsung;
   namespace SH = esp32irpk::ac::Sharp;
   namespace K = esp32irpk::ac::Kelvinator;
+  namespace MI = esp32irpk::ac::Midea;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -2677,6 +2812,9 @@ void testAcEnumToString()
   EXPECT_TRUE("kelvinator/tostring-mode", strcmp(K::toString(K::Mode::HEAT), "HEAT") == 0);
   EXPECT_TRUE("kelvinator/tostring-fan-min", strcmp(K::toString(K::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("kelvinator/tostring-fan-max", strcmp(K::toString(K::Fan::MAX_SPEED), "MAX_SPEED") == 0);
+  EXPECT_TRUE("midea/tostring-mode", strcmp(MI::toString(MI::Mode::HEAT), "HEAT") == 0);
+  EXPECT_TRUE("midea/tostring-fan-auto", strcmp(MI::toString(MI::Fan::AUTO), "AUTO") == 0);
+  EXPECT_TRUE("midea/tostring-fan-high", strcmp(MI::toString(MI::Fan::HIGH_SPEED), "HIGH_SPEED") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -2943,6 +3081,32 @@ void testAcFromBytes()
     EXPECT_TRUE("kelvinator/frombytes-eq", eq);
     EXPECT_TRUE("kelvinator/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+  // Midea: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Midea::Fan;
+    using esp32irpk::ac::Midea::Frame;
+    using esp32irpk::ac::Midea::Mode;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::HIGH_SPEED);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("midea/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("midea/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("midea/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("midea/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("midea/frombytes-eq", eq);
+    EXPECT_TRUE("midea/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -3013,6 +3177,8 @@ void setup()
   testSharpAcStateMatrix();
   testKelvinatorAcRoundtrip();
   testKelvinatorAcStateMatrix();
+  testMideaAcRoundtrip();
+  testMideaAcStateMatrix();
   testAcDecodeAny();
   testAcEnumToString();
   testAcFromBytes();
