@@ -10,6 +10,7 @@ ESP32実機を使う自動テストをここに追加します。
 | --- | --- | --- |
 | `link_smoke/` | 自前ライブラリの2台IRリンクが最低限動くことを確認する安定smoke | 必須 |
 | `protocol_matrix/` | 自前TX -> 自前RXで複数protocolを実機確認するmatrix | 必須寄り |
+| `protocol_matrix_ac/` | エアコンの自己往復matrix（`ac::` レイヤー、TX -> RX、各ベンダ1状態） | 必須寄り |
 
 これらは合否が明確で、`pytest hardware` で自動収集されます。観測ログを取るだけの実機調査（jitter、timing sweep、外部ライブラリ互換）は `tests/studies/` に置き、自動収集されません。
 

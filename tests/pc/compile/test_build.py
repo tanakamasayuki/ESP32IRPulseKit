@@ -73,3 +73,10 @@ def test_protocol_matrix_hardware_sketches_build(tmp_path):
     matrix = repo / "tests" / "hardware" / "protocol_matrix"
     compile_sketch(matrix, tmp_path, "rx_esp32s3")
     compile_sketch(matrix / "peer_tx", tmp_path, "tx_esp32s3")
+
+
+def test_protocol_matrix_ac_hardware_sketches_build(tmp_path):
+    repo = Path(__file__).resolve().parents[3]
+    matrix = repo / "tests" / "hardware" / "protocol_matrix_ac"
+    compile_sketch(matrix, tmp_path, "rx_esp32s3")
+    compile_sketch(matrix / "peer_tx", tmp_path, "tx_esp32s3")

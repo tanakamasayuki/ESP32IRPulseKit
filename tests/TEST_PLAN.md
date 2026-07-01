@@ -20,7 +20,7 @@ IR behavior is affected by the physical environment, so `pc/codec_smoke` asserts
 
 | Environment | Tests |
 | --- | --- |
-| Local development | pc, hardware/link_smoke, hardware/protocol_matrix |
+| Local development | pc, hardware/link_smoke, hardware/protocol_matrix, hardware/protocol_matrix_ac |
 | GitHub Actions | pc (fixtures, codec_smoke, compile) |
 | As needed | studies |
 
@@ -49,6 +49,7 @@ Select a top-level folder such as `pc` or `hardware/link_smoke`. Files under `st
 | RMT RX RAW receive | | ✅ sketch build | ✅ NEC smoke | RX dut sketch + two-board smoke |
 | TX->RX loop | | | ✅ NEC smoke | Two-board pytest exists |
 | Protocol matrix | | ✅ sketch build | ✅ | ESP32IRPulseKit TX -> ESP32IRPulseKit RX checks NEC/SONY12/SAMSUNG32/JVC |
+| A/C protocol matrix | ✅ codec_smoke | ✅ sketch build | ✅ | ESP32IRPulseKit TX -> ESP32IRPulseKit RX self round-trip, one state per vendor (Panasonic/Gree/Mitsubishi/Fujitsu/Daikin/Toshiba/Samsung/Sharp) |
 
 ## Hardware Setup
 
@@ -62,6 +63,8 @@ The standard hardware test setup uses two boards.
 `hardware/link_smoke/` is the stable release-gate smoke test. It checks representative paths quickly and is part of normal release verification.
 
 `hardware/protocol_matrix/` is the multi-protocol ESP32IRPulseKit TX -> ESP32IRPulseKit RX hardware check. It is broader than `link_smoke` and is part of normal release verification.
+
+`hardware/protocol_matrix_ac/` is the A/C analog: an ESP32IRPulseKit TX -> ESP32IRPulseKit RX self round-trip for the `ac::` layer, one representative state per vendor, decoded via `ac::decodeAny`. It gates the A/C layer on hardware without any external library (cross-implementation interop stays in `studies/compat_matrix_ac/`). Part of normal release verification.
 
 `studies/compat_matrix/` is optional compatibility and investigation coverage. Each test directory keeps the primary sketch as RX and `peer_tx/` as TX. Keeping the peer name fixed as `tx` lets external-library variants reuse `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`. The matrix records score, raw_len, and decode results as observations so physical setup and external-library timer variation can be evaluated.
 

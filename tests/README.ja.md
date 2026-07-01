@@ -44,12 +44,12 @@ uv run --env-file .env pytest -v                                                
 uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v  # 実装間の互換（汎用＋エアコン）
 ```
 
-- 1つ目は `pc/`（host のコーデック/フレームロジック・例＋スケッチのコンパイル・fixtures）**と** `hardware/`（`link_smoke`・`protocol_matrix`）を収集するため、**2ボードのリグが必要**です。`studies/` は収集しません（`test_*.py` ではなく `study_*.py` のため）。
-- 2つ目は compat-matrix studies を外部ライブラリ（IRremoteESP8266・HeatpumpIR・Arduino-IRremote）に対して実行します — 各エアコンベンダの「対応」を裏付ける相互運用テストです。`compat_matrix*` は `compat_matrix/`（汎用プロトコル）と `compat_matrix_ac/`（エアコン）の両方に一致します。
+- 1つ目は `pc/`（host のコーデック/フレームロジック・例＋スケッチのコンパイル・fixtures）**と** `hardware/`（`link_smoke`・`protocol_matrix`・`protocol_matrix_ac`）を収集するため、**2ボードのリグが必要**です。`studies/` は収集しません（`test_*.py` ではなく `study_*.py` のため）。`protocol_matrix` は汎用プロトコル（NEC/Sony/Samsung/JVC/AEHA/RC5/RC6）、`protocol_matrix_ac` はエアコン層の PulseKit 自己往復（TX -> RX、各ベンダ1状態）を検証します — どちらもゲートされた合否です。
+- 2つ目は compat-matrix studies を外部ライブラリ（IRremoteESP8266・HeatpumpIR・Arduino-IRremote）に対して実行します — 各エアコンベンダの「対応」を裏付ける**実装間**相互運用テストです。`compat_matrix*` は `compat_matrix/`（汎用プロトコル）と `compat_matrix_ac/`（エアコン）の両方に一致します。
 
-この2回でリリースのゲート対象を網羅します: host ロジック・全例/スケッチのコンパイル・汎用2ボードのプロトコル相互運用・実装間互換。補足:
+この2回でリリースの確認対象を網羅します: host ロジック・全例/スケッチのコンパイル・汎用プロトコルとエアコン両方のゲートされた2ボード自己往復・実装間互換（studies 経由）。補足:
 
-- 一部の compat ケースは**赤のままで正当**な場合があります — 実装間の真の非互換（例: 現行フレームを実装していない HeatpumpIR の変種）であり、回帰ではありません。self テスト（`*_self`）はデコード成否で**ゲートせず**、ボードが起動して送受信ループが回れば PASS します。
+- self テスト（`*_self`）はデコード成否で**ゲートしません** — ボードが起動して送受信ループが回れば PASS します（両側が同一ライブラリなので環境ベースラインとしてのみ機能します）。
 - リグが無い場合は host のみのサブセット — `uv run --env-file .env pytest pc -v`（codec_smoke＋例のコンパイル＋fixtures）。パス無しの `pytest -v` と studies コマンドはどちらもボードが必要です。
 
 ## ディレクトリ
@@ -58,7 +58,7 @@ uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.p
   - `pc/fixtures/`: 共有IR信号データとそのデータの検査。
   - `pc/codec_smoke/`: codec / protocol / frame のロジックをArduino hostビルドで実行。
   - `pc/compile/`: examplesと最小sketchのESP32向けコンパイル確認（ビルドのみ）。
-- `hardware/`: ESP32実機2台で合否が出る自動テスト。`hardware/link_smoke` はリリース判定用の安定smoke。
+- `hardware/`: ESP32実機2台で合否が出る自動テスト。`hardware/link_smoke` はリリース判定用の安定smoke。`hardware/protocol_matrix`（汎用プロトコル）と `hardware/protocol_matrix_ac`（`ac::` レイヤー）は PulseKit 自己往復の matrix。
 - `studies/`: 実機で観測ログを取るオンデマンド調査（jitter、timing sweep、外部ライブラリ互換）。自動収集されず、判断には人手が要る。
 
 ## 環境設定

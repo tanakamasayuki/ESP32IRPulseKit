@@ -10,6 +10,7 @@ ESP32 hardware tests live here.
 | --- | --- | --- |
 | `link_smoke/` | Stable smoke test that proves the library's two-board IR link works | Required |
 | `protocol_matrix/` | Multi-protocol hardware matrix for ESP32IRPulseKit TX -> ESP32IRPulseKit RX | Release-gate candidate |
+| `protocol_matrix_ac/` | Air-conditioner self round-trip matrix (`ac::` layer, TX -> RX, one state per vendor) | Release-gate candidate |
 
 These produce a clear pass/fail and are auto-collected by `pytest hardware`. Board investigations that only record observation logs (jitter, timing sweeps, external-library compatibility) live under `tests/studies/` and are not auto-collected.
 

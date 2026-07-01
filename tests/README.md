@@ -38,12 +38,12 @@ uv run --env-file .env pytest -v                                                
 uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v  # cross-implementation compat (generic + A/C)
 ```
 
-- The first command collects `pc/` (host codec/frame logic, example + sketch compile, fixtures) **and** `hardware/` (`link_smoke`, `protocol_matrix`), so it needs the two-board rig. It does **not** collect `studies/` (those are `study_*.py`, not `test_*.py`).
-- The second command runs the compat-matrix studies against the external libraries (IRremoteESP8266, HeatpumpIR, Arduino-IRremote) — the interop that backs each A/C vendor's "Supported" status. `compat_matrix*` matches both `compat_matrix/` (generic protocols) and `compat_matrix_ac/` (A/C vendors).
+- The first command collects `pc/` (host codec/frame logic, example + sketch compile, fixtures) **and** `hardware/` (`link_smoke`, `protocol_matrix`, `protocol_matrix_ac`), so it needs the two-board rig. It does **not** collect `studies/` (those are `study_*.py`, not `test_*.py`). `protocol_matrix` covers the generic protocols (NEC/Sony/Samsung/JVC/AEHA/RC5/RC6); `protocol_matrix_ac` covers the A/C layer as a PulseKit self round-trip (TX -> RX, one state per vendor) — both are gated pass/fail.
+- The second command runs the compat-matrix studies against the external libraries (IRremoteESP8266, HeatpumpIR, Arduino-IRremote) — the cross-implementation interop that backs each A/C vendor's "Supported" status. `compat_matrix*` matches both `compat_matrix/` (generic protocols) and `compat_matrix_ac/` (A/C vendors).
 
-Those two runs cover everything gated for a release: host logic, that every example/sketch compiles, generic two-board protocol interop, and cross-implementation compatibility. Notes:
+Those two runs cover everything checked for a release: host logic, that every example/sketch compiles, gated two-board round-trip for both generic protocols and every A/C vendor, and cross-implementation compatibility (via the studies). Notes:
 
-- Some compat cases can legitimately stay red — a real cross-implementation incompatibility (e.g. a HeatpumpIR variant that does not implement a modern frame), not a regression. The self-tests (`*_self`) are **not** gated on decode success and pass as long as the boards boot and the send/receive loop runs.
+- The self-tests (`*_self`) are **not** gated on decode success — they pass as long as the boards boot and the send/receive loop runs (both sides are the same library, so they only serve as an environment baseline).
 - No rig connected? Run the host-only subset — `uv run --env-file .env pytest pc -v` (codec_smoke + example builds + fixtures). The unqualified `pytest -v` and the studies command both need boards.
 
 ## Layout
@@ -52,5 +52,5 @@ Those two runs cover everything gated for a release: host logic, that every exam
   - `pc/fixtures/`: shared IR signal data plus Python checks on that data.
   - `pc/codec_smoke/`: codec / protocol / frame logic run on an Arduino host build.
   - `pc/compile/`: ESP32 build-only checks for examples and minimal sketches.
-- `hardware/`: ESP32 two-board automated tests that produce pass/fail. `hardware/link_smoke` is the stable release-gate smoke test.
+- `hardware/`: ESP32 two-board automated tests that produce pass/fail. `hardware/link_smoke` is the stable release-gate smoke test; `hardware/protocol_matrix` (generic protocols) and `hardware/protocol_matrix_ac` (the `ac::` layer) are the PulseKit self round-trip matrices.
 - `studies/`: on-demand board investigations that record observation logs (jitter, timing sweeps, external-library compatibility). Not auto-collected; conclusions need a human.

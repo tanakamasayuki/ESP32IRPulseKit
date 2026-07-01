@@ -20,7 +20,7 @@ IRは物理環境の影響を受けやすいため、`pc/codec_smoke` でArduino
 
 | 環境 | 実行するテスト |
 | --- | --- |
-| ローカル開発 | pc、hardware/link_smoke、hardware/protocol_matrix |
+| ローカル開発 | pc、hardware/link_smoke、hardware/protocol_matrix、hardware/protocol_matrix_ac |
 | GitHub Actions | pc（fixtures、codec_smoke、compile） |
 | 必要時 | studies |
 
@@ -49,6 +49,7 @@ IRは物理環境の影響を受けやすいため、`pc/codec_smoke` でArduino
 | RMT RX RAW受信 | | ✅ sketch build | ✅ NEC smoke | RX dutスケッチ + 2台smoke |
 | TX->RX loop | | | ✅ NEC smoke | TX/RX 2台構成のpytest追加済み |
 | protocol matrix | | ✅ sketch build | ✅ | ESP32IRPulseKit TX -> ESP32IRPulseKit RXでNEC/SONY12/SAMSUNG32/JVCを確認 |
+| エアコン protocol matrix | ✅ codec_smoke | ✅ sketch build | ✅ | 自前TX -> 自前RXの自己往復、各ベンダ1状態（Panasonic/Gree/Mitsubishi/Fujitsu/Daikin/Toshiba/Samsung/Sharp） |
 
 ## hardware構成
 
@@ -62,6 +63,8 @@ IRは物理環境の影響を受けやすいため、`pc/codec_smoke` でArduino
 `hardware/link_smoke/` はリリース判定用の安定smokeです。短時間で代表経路を確認し、通常のリリース前確認で実行します。
 
 `hardware/protocol_matrix/` は自前TX -> 自前RXの複数protocol実機確認です。`link_smoke` より広くprotocol差分を見ます。通常のリリース前確認で実行します。
+
+`hardware/protocol_matrix_ac/` はそのエアコン版です。`ac::` レイヤーの自前TX -> 自前RX 自己往復を各ベンダ1代表状態で行い、`ac::decodeAny` で復号します。外部ライブラリなしでエアコン層を実機ゲートします（実装間の相互運用は `studies/compat_matrix_ac/` が担当）。通常のリリース前確認で実行します。
 
 `studies/compat_matrix/` は任意の互換性・差分調査用です。親sketchをRX、`peer_tx/` をTXに固定します。peer名を `tx` に固定することで、外部ライブラリ比較を増やしても `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3` を使い回します。`compat_matrix` ではscore、raw_len、decode結果を観測ログとして残し、物理条件や外部ライブラリのtimerばらつきを評価します。
 
