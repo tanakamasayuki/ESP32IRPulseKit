@@ -88,7 +88,7 @@ namespace esp32irpk::ac::Samsung
         /*one_space_us=*/1432,
         /*trailer_mark_us=*/586,
         /*frame_gap_us=*/2886,
-        /*tol_pct=*/30,
+        /*tol_pct=*/40, // wide decode window: tolerate short 3rd-party bit marks + rx skew; integrity via signature/checksum (decode-only, unused when encoding)
         /*lsb_first=*/true,
     };
 

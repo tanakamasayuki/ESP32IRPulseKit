@@ -113,7 +113,7 @@ namespace esp32irpk::ac::Fujitsu
         /*one_space_us=*/1182,
         /*trailer_mark_us=*/448,
         /*frame_gap_us=*/8100,
-        /*tol_pct=*/30,
+        /*tol_pct=*/40, // wide decode window: 3rd-party encoders emit short bit marks (HeatpumpIR 410us) + the rx skews marks shorter; integrity is via signature/checksum, not tight per-bit windows (decode-only, unused when encoding)
         /*lsb_first=*/true,
     };
 

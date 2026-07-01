@@ -145,7 +145,7 @@ namespace esp32irpk::ac::Mitsubishi
         /*one_space_us=*/1300,
         /*trailer_mark_us=*/440,
         /*frame_gap_us=*/15500,
-        /*tol_pct=*/30,
+        /*tol_pct=*/40, // wide decode window: 3rd-party encoders emit short bit marks (HeatpumpIR 430us) + rx skew; integrity via signature/checksum (decode-only, unused when encoding)
         /*lsb_first=*/true,
     };
 

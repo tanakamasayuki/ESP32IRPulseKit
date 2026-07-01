@@ -80,7 +80,7 @@ namespace esp32irpk::ac::Toshiba
     // that real receivers — which shift the mark/space boundary and lengthen the
     // received space — keep the recovered zero-space clear of IRremoteESP8266's
     // tight default ceiling (490-kMarkExcess=440, x1.25 = 551us). Our own decoder
-    // (30% tolerance) and normal-bias receivers still recover it cleanly.
+    // (wide tolerance) and normal-bias receivers still recover it cleanly.
     inline constexpr AcTiming kTiming = {
         /*header_mark_us=*/4400,
         /*header_space_us=*/4300,
@@ -89,7 +89,7 @@ namespace esp32irpk::ac::Toshiba
         /*one_space_us=*/1600,
         /*trailer_mark_us=*/580,
         /*frame_gap_us=*/7400,
-        /*tol_pct=*/30,
+        /*tol_pct=*/40, // wide decode window: tolerate short 3rd-party bit marks + rx skew; integrity via signature/checksum (decode-only, unused when encoding)
         /*lsb_first=*/false,
     };
 

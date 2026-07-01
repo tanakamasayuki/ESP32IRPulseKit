@@ -138,7 +138,7 @@ namespace esp32irpk::ac::Panasonic
         /*one_space_us=*/1296,
         /*trailer_mark_us=*/432,
         /*frame_gap_us=*/10000,
-        /*tol_pct=*/35,
+        /*tol_pct=*/40, // wide decode window: tolerate short 3rd-party bit marks + rx skew; integrity via signature/checksum (decode-only, unused when encoding)
         /*lsb_first=*/true,
     };
 

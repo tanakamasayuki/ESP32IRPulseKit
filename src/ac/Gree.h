@@ -160,7 +160,7 @@ namespace esp32irpk::ac::Gree
         /*one_space_us=*/1600,
         /*trailer_mark_us=*/620,
         /*frame_gap_us=*/19980,
-        /*tol_pct=*/30,
+        /*tol_pct=*/40, // wide decode window: tolerate short 3rd-party bit marks + rx skew; integrity via signature/checksum (decode-only, unused when encoding)
         /*lsb_first=*/true,
     };
 
