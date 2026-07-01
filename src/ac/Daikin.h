@@ -85,6 +85,15 @@ namespace esp32irpk::ac::Daikin
   {
     // Documented classic Daikin pulse-distance timing. NOTE: zero_space ==
     // bit_mark (both 428us), so the phase-aligned carrier is required.
+    //
+    // tol_pct is 40 (wider than the usual 30): third-party Daikin encoders emit
+    // noticeably short bit marks (HeatpumpIR uses 360us vs the 428us protocol
+    // nominal), and the receiver skews marks shorter still, so a 30% window
+    // (floor 300us) rejects them once the rig's mark bias exceeds ~60us. 40%
+    // (floor 257us) spans the documented ~100us mark/space skew. Only the decode
+    // windows widen (tol_pct is unused when encoding); the space 0/1 split is a
+    // fixed midpoint threshold, and integrity is enforced by the three section
+    // signatures + checksums, not by tight per-bit mark windows.
     inline constexpr AcTiming kTiming = {
         /*header_mark_us=*/3650,
         /*header_space_us=*/1623,
@@ -93,7 +102,7 @@ namespace esp32irpk::ac::Daikin
         /*one_space_us=*/1280,
         /*trailer_mark_us=*/428,
         /*frame_gap_us=*/29428, // kDaikinZeroSpace + kDaikinGap (428 + 29000)
-        /*tol_pct=*/30,
+        /*tol_pct=*/40,
         /*lsb_first=*/true,
     };
 
