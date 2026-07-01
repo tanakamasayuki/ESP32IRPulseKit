@@ -29,6 +29,23 @@ uv run --env-file .env pytest hardware/link_smoke # board pass/fail regression
 uv run --env-file .env pytest -s -o python_files="study_*.py" studies/carrier_jitter/
 ```
 
+## Pre-release check
+
+Before cutting a release (running the **Release** GitHub Action), run the full suite on the two-board rig with `.env` configured:
+
+```sh
+uv run --env-file .env pytest -v                                                       # PC tests + example builds + two-board hardware tests
+uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v  # cross-implementation compat (generic + A/C)
+```
+
+- The first command collects `pc/` (host codec/frame logic, example + sketch compile, fixtures) **and** `hardware/` (`link_smoke`, `protocol_matrix`), so it needs the two-board rig. It does **not** collect `studies/` (those are `study_*.py`, not `test_*.py`).
+- The second command runs the compat-matrix studies against the external libraries (IRremoteESP8266, HeatpumpIR, Arduino-IRremote) — the interop that backs each A/C vendor's "Supported" status. `compat_matrix*` matches both `compat_matrix/` (generic protocols) and `compat_matrix_ac/` (A/C vendors).
+
+Those two runs cover everything gated for a release: host logic, that every example/sketch compiles, generic two-board protocol interop, and cross-implementation compatibility. Notes:
+
+- Some compat cases can legitimately stay red — a real cross-implementation incompatibility (e.g. a HeatpumpIR variant that does not implement a modern frame), not a regression. The self-tests (`*_self`) are **not** gated on decode success and pass as long as the boards boot and the send/receive loop runs.
+- No rig connected? Run the host-only subset — `uv run --env-file .env pytest pc -v` (codec_smoke + example builds + fixtures). The unqualified `pytest -v` and the studies command both need boards.
+
 ## Layout
 
 - `pc/`: automated tests that run on a PC with no board (CI runs the whole folder).

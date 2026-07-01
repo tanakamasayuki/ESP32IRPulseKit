@@ -35,6 +35,23 @@ uv run --env-file .env pytest hardware/link_smoke
 uv run --env-file .env pytest -s -o python_files="study_*.py" studies/carrier_jitter/
 ```
 
+## リリース前チェック
+
+リリース（**Release** GitHub Action の実行）前に、`.env` を設定した2ボードのリグで一式を回します。
+
+```sh
+uv run --env-file .env pytest -v                                                       # PCテスト＋例のコンパイル＋実機2台テスト
+uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v  # 実装間の互換（汎用＋エアコン）
+```
+
+- 1つ目は `pc/`（host のコーデック/フレームロジック・例＋スケッチのコンパイル・fixtures）**と** `hardware/`（`link_smoke`・`protocol_matrix`）を収集するため、**2ボードのリグが必要**です。`studies/` は収集しません（`test_*.py` ではなく `study_*.py` のため）。
+- 2つ目は compat-matrix studies を外部ライブラリ（IRremoteESP8266・HeatpumpIR・Arduino-IRremote）に対して実行します — 各エアコンベンダの「対応」を裏付ける相互運用テストです。`compat_matrix*` は `compat_matrix/`（汎用プロトコル）と `compat_matrix_ac/`（エアコン）の両方に一致します。
+
+この2回でリリースのゲート対象を網羅します: host ロジック・全例/スケッチのコンパイル・汎用2ボードのプロトコル相互運用・実装間互換。補足:
+
+- 一部の compat ケースは**赤のままで正当**な場合があります — 実装間の真の非互換（例: 現行フレームを実装していない HeatpumpIR の変種）であり、回帰ではありません。self テスト（`*_self`）はデコード成否で**ゲートせず**、ボードが起動して送受信ループが回れば PASS します。
+- リグが無い場合は host のみのサブセット — `uv run --env-file .env pytest pc -v`（codec_smoke＋例のコンパイル＋fixtures）。パス無しの `pytest -v` と studies コマンドはどちらもボードが必要です。
+
 ## ディレクトリ
 
 - `pc/`: 実機なしでPC上で動く自動テスト（CIはこのフォルダ全体を実行）。
