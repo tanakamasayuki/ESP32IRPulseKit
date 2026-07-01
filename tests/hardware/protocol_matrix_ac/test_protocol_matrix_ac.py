@@ -14,12 +14,16 @@ from pexpect import EOF, TIMEOUT
 # Cross-implementation interop (IRremoteESP8266, HeatpumpIR) is a separate concern
 # covered by studies/compat_matrix_ac.
 
+# NOTE: the trailing \r?\n is required. Vendors have different byte counts, so the
+# hex group is variable-length; without the newline anchor pexpect matches a partial
+# prefix as soon as the first serial chunk arrives (e.g. "aa5a") instead of waiting
+# for the whole line. Anchoring on the line end forces the full state to be captured.
 TX_OK_AC = re.compile(
-    rb"TX_OK_AC vendor=(?P<vendor>[A-Z]+) bytes=(?P<bytes>[0-9A-Fa-f]+)"
+    rb"TX_OK_AC vendor=(?P<vendor>[A-Z]+) bytes=(?P<bytes>[0-9A-Fa-f]+)\r?\n"
 )
 AC_DECODE = re.compile(
     rb"AC_DECODE vendor=(?P<vendor>[A-Z]+) checksum=(?P<checksum>ok|bad) "
-    rb"bytes=(?P<bytes>[0-9A-Fa-f]+)"
+    rb"bytes=(?P<bytes>[0-9A-Fa-f]+)\r?\n"
 )
 
 TRIALS = 5
