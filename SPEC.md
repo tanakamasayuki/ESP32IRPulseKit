@@ -721,7 +721,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | | A705 / A903 | Not yet |
 | Kelvinator | Kelvinator | 16-byte, two blocks | standard | **Supported**³ |
 | Midea | Midea | 48-bit (6-byte), 2 copies | standard | **Supported**⁴ |
-| Carrier | Carrier | 64-bit (8-byte) | CARRIER_AC64 | **Implemented**⁵ |
+| Carrier | Carrier | 64-bit (8-byte) | CARRIER_AC64 | **Supported**⁵ |
 
 ¹ Sharp (13-byte, A907 model), like Samsung, is verified by the IRremoteESP8266 bidirectional pair (`sharp_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Sharp support.
 
@@ -731,7 +731,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 ⁴ Midea (48-bit / 6-byte, standard), like Samsung, Sharp and Kelvinator, is verified by the IRremoteESP8266 bidirectional pair (`midea_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Midea support. The double-transmission framing (the 48 data bits followed by a bit-inverted copy) and the checksum are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`).
 
-⁵ Carrier (64-bit / 8-byte, CARRIER_AC64): the field map, the single-frame pulse-distance framing and the 4-bit nibble-sum checksum are verified in host `codec_smoke` against IRCarrierAc64's documented layout, and the self round-trip (`hardware/protocol_matrix_ac`) and bidirectional IRremoteESP8266 compat study (`carrier_irremoteesp8266_tx` / `_rx`) sketches are wired up but not yet run on the 2-board rig, so it is not yet promoted to **Supported**. HeatpumpIR has a Carrier class, but it implements the different NQV (9-byte) / MCA (6-byte) Carrier variants rather than CARRIER_AC64, so — like Samsung/Sharp/Kelvinator/Midea — verification rests on the IRremoteESP8266 bidirectional pair.
+⁵ Carrier (64-bit / 8-byte, CARRIER_AC64), like Samsung, Sharp, Kelvinator and Midea, is verified by the IRremoteESP8266 bidirectional pair (`carrier_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination: HeatpumpIR has a Carrier class, but it implements the different NQV (9-byte) / MCA (6-byte) Carrier variants rather than CARRIER_AC64. The single-frame pulse-distance framing and the 4-bit nibble-sum checksum are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`).
 
 **Candidate vendors (not yet started), in suggested implementation order.** Ordering weighs, in priority: a second independent reference (IRremoteESP8266 *and* HeatpumpIR, matching the verification used for the supported vendors), a clean byte-state fit for the `ac::` layer, framing simplicity, and device coverage. Target models are chosen at approval time, not pre-locked here. Bit-paired code formats (Coolix 24-bit, LG 28-bit, …) are deliberately out of scope — they are not multi-byte byte-state and would need a different code path outside this layer.
 
