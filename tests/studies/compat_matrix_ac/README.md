@@ -60,6 +60,10 @@ samsung_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Sharp (IRSharpAc, standard 13-byte SHARP_AC, A907 model, matching esp32irpk::ac::Sharp)
 sharp_irremoteesp8266_tx/    # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
 sharp_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+
+# Kelvinator (IRKelvinatorAC, standard 16-byte two-block, matching esp32irpk::ac::Kelvinator)
+kelvinator_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+kelvinator_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
 Each vendor uses the same `<extlib>_<role>` variants. Every variant folder is
@@ -216,6 +220,16 @@ harness are added one variant at a time. In place:
   0x00, which our encoder always emits). Auto/Dry carry no temperature, so temp is a
   don't-care there. Like Samsung there is **no** `sharp_heatpumpir_tx` (HeatpumpIR has
   no Sharp), so it is cross-checked by the IRremoteESP8266 bidirectional pair alone.
+
+- `kelvinator_irremoteesp8266_tx/` + `kelvinator_irremoteesp8266_rx/` -- the same calibration
+  and encoder-verification pair for the standard 16-byte Kelvinator protocol, using
+  IRremoteESP8266's `IRKelvinatorAC`. Two 8-byte blocks, LSB-first; each block is a
+  header + 32 bits + a 3-bit `B010` command footer + gap + 32 bits + gap, with a 4-bit
+  block checksum. Auto/Dry force 25 °C, so temp is a don't-care there. Like Samsung/Sharp
+  there is **no** `kelvinator_heatpumpir_tx` (HeatpumpIR has no Kelvinator), so it is
+  cross-checked by the IRremoteESP8266 bidirectional pair alone. The RX-side (IRremoteESP8266
+  receiver) uses a 55 ms capture timeout so both blocks (separated by a ~40 ms gap) land in
+  one message.
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `panasonic_heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`

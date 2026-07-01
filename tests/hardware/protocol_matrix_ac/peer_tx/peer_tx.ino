@@ -113,6 +113,7 @@ void handleSendAc(const String &line)
   else if (v == "TOSHIBA")    sendVendor<ac::Toshiba::Frame>("TOSHIBA");
   else if (v == "SAMSUNG")    sendVendor<ac::Samsung::Frame>("SAMSUNG");
   else if (v == "SHARP")      sendVendor<ac::Sharp::Frame>("SHARP");
+  else if (v == "KELVINATOR") sendVendor<ac::Kelvinator::Frame>("KELVINATOR");
   else
     Serial.println("TX_ERROR unsupported_vendor");
 }

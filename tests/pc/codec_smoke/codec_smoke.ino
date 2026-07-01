@@ -2483,6 +2483,159 @@ void testSharpAcStateMatrix()
   EXPECT_TRUE("sharp/state-matrix", all_ok);
 }
 
+// Kelvinator AC (standard 16-byte, two-block protocol): build a frame, render the
+// two-block burst (header + 32 bits + B010 footer + gap + 32 bits + gap, x2) and
+// decode it back. Field offsets + block checksums are derived from IRKelvinatorAC's
+// documented layout; the hardware study verifies them against IRKelvinatorAC.
+void testKelvinatorAcRoundtrip()
+{
+  using esp32irpk::ac::Kelvinator::Fan;
+  using esp32irpk::ac::Kelvinator::Frame;
+  using esp32irpk::ac::Kelvinator::Mode;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(24);
+  f.setFan(Fan::AUTO);
+
+  EXPECT_TRUE("kelvinator/power-get", f.power());
+  EXPECT_TRUE("kelvinator/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("kelvinator/temp-get", 24u, f.temperatureC());
+  EXPECT_TRUE("kelvinator/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("kelvinator/encode", f.toRaw(buf));
+  EXPECT_TRUE("kelvinator/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("kelvinator/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("kelvinator/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("kelvinator/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("kelvinator/decode-power", g.power());
+  EXPECT_TRUE("kelvinator/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("kelvinator/decode-temp", 24u, g.temperatureC());
+  EXPECT_TRUE("kelvinator/decode-fan", g.fan() == Fan::AUTO);
+
+  // On / cool / 24C / fan auto, from IRKelvinatorAC's struct + block checksums.
+  static const uint8_t kCanonicalCool24[Frame::kBytes] = {
+      0x09, 0x08, 0x00, 0x50, 0x00, 0x00, 0x00, 0xB0,
+      0x09, 0x08, 0x00, 0x70, 0x00, 0x00, 0x00, 0xB0};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonicalCool24[i])
+      canonical_match = false;
+  EXPECT_TRUE("kelvinator/canonical-bytes", canonical_match);
+
+  // A hardware capture does not record the final trailing gap (the RX ends on
+  // idle silence), so the last tick is the trailer mark with no gap after it.
+  // Decode must still succeed with that final gap stripped.
+  Frame ng{};
+  EXPECT_TRUE("kelvinator/decode-no-trailing-gap",
+              buf.len > 1 &&
+                  Frame::fromRaw(esp32irpk::IRRawTickView{buf.ticks, buf.len - 1}, ng) &&
+                  ng.checksum_ok && ng.mode() == Mode::COOL && ng.fan() == Fan::AUTO);
+
+  // Power off.
+  Frame p{};
+  p.setMode(Mode::HEAT);
+  p.setPower(false);
+  EXPECT_TRUE("kelvinator/poweroff", !p.power());
+  uint16_t t2[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer b2{t2, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("kelvinator/poweroff-encode", p.toRaw(b2));
+  Frame pg{};
+  EXPECT_TRUE("kelvinator/poweroff-decode", Frame::fromRaw(esp32irpk::IRRawTickView{b2.ticks, b2.len}, pg));
+  EXPECT_TRUE("kelvinator/poweroff-decode-off", !pg.power());
+
+  // Temperature clamps to the supported range.
+  Frame t{};
+  t.setMode(Mode::COOL);
+  t.setTemperatureC(40);
+  EXPECT_EQ("kelvinator/temp-clamp-high", 30u, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("kelvinator/temp-clamp-low", 16u, t.temperatureC());
+
+  // A non-Kelvinator waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("kelvinator/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power combination must encode -> decode back to
+// itself with a valid checksum. Auto/Dry force 25C, so temperature is only
+// asserted in the modes that keep it (Cool/Heat/Fan).
+void testKelvinatorAcStateMatrix()
+{
+  using esp32irpk::ac::Kelvinator::Fan;
+  using esp32irpk::ac::Kelvinator::Frame;
+  using esp32irpk::ac::Kelvinator::Mode;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::COOL, Mode::DRY, Mode::FAN, Mode::HEAT};
+  static const Fan fans[] = {Fan::AUTO, Fan::MIN_SPEED, Fan::LOW_SPEED,
+                             Fan::MED_SPEED, Fan::HIGH_SPEED, Fan::MAX_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 16; temp <= 30; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          Frame f{};
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+          f.setPower(power != 0);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan)
+            all_ok = false;
+          // Auto/Dry force 25C; the other modes keep the set temperature.
+          const bool keeps_temp = (m != Mode::AUTO && m != Mode::DRY);
+          if (keeps_temp && g.temperatureC() != temp)
+            all_ok = false;
+        }
+  EXPECT_TRUE("kelvinator/state-matrix", all_ok);
+}
+
+// decodeAny must classify each vendor's own rendered frame as that vendor. This
+// guards the cascade ordering -- notably Gree vs Kelvinator, whose frames share a
+// header + B010 footer + block checksum (a Gree frame is one Kelvinator block), so
+// the more-specific 16-byte Kelvinator must be tried before the 8-byte Gree.
+void testAcDecodeAny()
+{
+  namespace ac = esp32irpk::ac;
+  static uint16_t ticks[1024];
+  auto check = [&](auto frame, ac::AcVendor expected, const char *label) {
+    esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+    const bool ok = frame.toRaw(buf) &&
+                    ac::decodeAny(esp32irpk::IRRawTickView{buf.ticks, buf.len}) == expected;
+    EXPECT_TRUE(label, ok);
+  };
+  check(ac::Panasonic::Frame{}, ac::AcVendor::PANASONIC, "decodeany/panasonic");
+  check(ac::Gree::Frame{}, ac::AcVendor::GREE, "decodeany/gree");
+  check(ac::Mitsubishi::Frame{}, ac::AcVendor::MITSUBISHI, "decodeany/mitsubishi");
+  check(ac::Fujitsu::Frame{}, ac::AcVendor::FUJITSU, "decodeany/fujitsu");
+  check(ac::Daikin::Frame{}, ac::AcVendor::DAIKIN, "decodeany/daikin");
+  check(ac::Toshiba::Frame{}, ac::AcVendor::TOSHIBA, "decodeany/toshiba");
+  check(ac::Samsung::Frame{}, ac::AcVendor::SAMSUNG, "decodeany/samsung");
+  check(ac::Sharp::Frame{}, ac::AcVendor::SHARP, "decodeany/sharp");
+  check(ac::Kelvinator::Frame{}, ac::AcVendor::KELVINATOR, "decodeany/kelvinator");
+}
+
 // Each vendor's toString() maps an enum value to its identifier name (used by
 // printTo). Out-of-range values fall back to "?".
 void testAcEnumToString()
@@ -2495,6 +2648,7 @@ void testAcEnumToString()
   namespace TO = esp32irpk::ac::Toshiba;
   namespace SA = esp32irpk::ac::Samsung;
   namespace SH = esp32irpk::ac::Sharp;
+  namespace K = esp32irpk::ac::Kelvinator;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -2520,6 +2674,9 @@ void testAcEnumToString()
   EXPECT_TRUE("sharp/tostring-mode", strcmp(SH::toString(SH::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("sharp/tostring-fan-min", strcmp(SH::toString(SH::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("sharp/tostring-fan-max", strcmp(SH::toString(SH::Fan::MAX_SPEED), "MAX_SPEED") == 0);
+  EXPECT_TRUE("kelvinator/tostring-mode", strcmp(K::toString(K::Mode::HEAT), "HEAT") == 0);
+  EXPECT_TRUE("kelvinator/tostring-fan-min", strcmp(K::toString(K::Fan::MIN_SPEED), "MIN_SPEED") == 0);
+  EXPECT_TRUE("kelvinator/tostring-fan-max", strcmp(K::toString(K::Fan::MAX_SPEED), "MAX_SPEED") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -2760,6 +2917,32 @@ void testAcFromBytes()
     EXPECT_TRUE("sharp/frombytes-eq", eq);
     EXPECT_TRUE("sharp/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+  // Kelvinator: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Kelvinator::Fan;
+    using esp32irpk::ac::Kelvinator::Frame;
+    using esp32irpk::ac::Kelvinator::Mode;
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::MAX_SPEED);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("kelvinator/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("kelvinator/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("kelvinator/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("kelvinator/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("kelvinator/frombytes-eq", eq);
+    EXPECT_TRUE("kelvinator/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -2828,6 +3011,9 @@ void setup()
   testSamsungAcStateMatrix();
   testSharpAcRoundtrip();
   testSharpAcStateMatrix();
+  testKelvinatorAcRoundtrip();
+  testKelvinatorAcStateMatrix();
+  testAcDecodeAny();
   testAcEnumToString();
   testAcFromBytes();
 

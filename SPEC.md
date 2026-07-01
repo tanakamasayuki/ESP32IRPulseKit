@@ -719,16 +719,18 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | | extended (21-byte timer) | — | Not yet |
 | Sharp | Sharp AC | 13-byte | A907 | **Supported**¹ |
 | | | A705 / A903 | Not yet |
+| Kelvinator | Kelvinator | 16-byte, two blocks | standard | **Supported**³ |
 
 ¹ Sharp (13-byte, A907 model), like Samsung, is verified by the IRremoteESP8266 bidirectional pair (`sharp_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Sharp support.
 
 ² Samsung is verified by the IRremoteESP8266 bidirectional pair (`samsung_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination: HeatpumpIR's Samsung classes implement the older AQV (21-byte) and FJM (different section-2 checksum) variants, neither matching the modern 14-byte SAMSUNG_AC.
 
+³ Kelvinator (16-byte, standard), like Samsung and Sharp, is verified by the IRremoteESP8266 bidirectional pair (`kelvinator_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Kelvinator support. The two-block framing (per-block B010 command footer + gaps) and block checksums are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`).
+
 **Candidate vendors (not yet started), in suggested implementation order.** Ordering weighs, in priority: a second independent reference (IRremoteESP8266 *and* HeatpumpIR, matching the verification used for the supported vendors), a clean byte-state fit for the `ac::` layer, framing simplicity, and device coverage. Target models are chosen at approval time, not pre-locked here. Bit-paired code formats (Coolix 24-bit, LG 28-bit, …) are deliberately out of scope — they are not multi-byte byte-state and would need a different code path outside this layer.
 
 | Vendor | Format / size | References | Notes |
 |---|---|---|---|
-| Kelvinator | Kelvinator, 16-byte, two blocks | IRremoteESP8266 only | Two-block layout + block checksum nearly identical to Gree (already solved) — high code reuse, low effort. |
 | Midea | Midea, 48-bit (6-byte) | IRremoteESP8266 + HeatpumpIR | Large rebadge coverage (many OEM brands). Caveat: code + inverted-copy structure (no sum/XOR byte checksum) stretches the byte-state model; needs an inversion-check path. |
 | Carrier | Carrier AC, 32 / 64-bit + 128-bit (16-byte) | IRremoteESP8266 + HeatpumpIR | Dual reference, but several distinct wire formats — each a separate `Frame` type. Pick a target format before starting. |
 | Hitachi | Hitachi AC, 28-byte (+ 13–53-byte variants) | IRremoteESP8266 + HeatpumpIR | Hardest: many size variants with leader/section framing. Defer until the simpler vendors are done. |
@@ -745,6 +747,7 @@ Per-vendor framing of the supported formats:
 - `Toshiba` — the standard "Toshiba AC" protocol (WH-/RAS- remotes, rebadged Carrier units). A 9-byte pulse-distance frame transmitted twice (separated by the frame gap), **MSB-first** (the only MSB-first AC vendor), beginning with the fixed signature `F2 0D` (byte 1 = `~`byte 0; byte 3 = `~`byte 2), with an XOR checksum (of bytes 0–7) in byte 8. Power is carried by the Mode field (`Mode == 7` = off), not a separate bit, so `setPower(false)` writes mode 7 and `setPower(true)` restores the last set mode. `Mode` is `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`; `Fan` is `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (whole-degree temps, 17–30 °C). Swing is a separate short-message variant (reserved); the standard frame does not carry it. The 7-byte short and 10-byte long messages are separate `Frame` types.
 - `Samsung` — the standard "Samsung AC" protocol (AR-/ARH- series remotes). A 14-byte state, **LSB-first**, sent as a one-time leading header (690 µs mark + 17844 µs space) followed by two 7-byte sections, each with its own section header (3086/8864 µs) and a 2886 µs section gap. Each section carries a popcount (Hamming-weight) checksum, bitwise-inverted, split across two nibbles of its bytes 1–2. There is no fixed vendor signature, so `fromRaw` gates on both section checksums validating. Power is two 2-bit fields (byte 6 and byte 13): both `0b11` = on, both `0b00` = off. `Mode` is `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`; `Fan` is `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (whole-degree temps, 16–30 °C). Swing and the special fan flags (Powerful/WindFree/Econo) are not settable here. The 21-byte extended (timer) message is a separate `Frame` type.
 - `Sharp` — the standard "Sharp AC" protocol. A 13-byte single pulse-distance frame, **LSB-first**, beginning with the fixed header `AA 5A CF 10`, with a nibble-folded XOR checksum in the high nibble of byte 12. Power lives in the 4-bit `PowerSpecial` field (byte 5): on = 3, off = 2 (not a single bit). The `Special` byte (byte 10) records which button a real remote pressed; `toRaw` always emits the "power" value (0x00) so it is a complete state command. `Mode` is `AUTO`/`HEAT`/`COOL`/`DRY` (Auto and Fan share wire code `0b00`, so no standalone Fan); `Fan` is `AUTO`/`MIN_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (non-contiguous wire codes 2/4/3/5/7; whole-degree temps 15–30 °C). Auto and Dry modes carry no temperature (Temp = 0), so temperature is a don't-care there. This is the default A907 model; A705 / A903 (which remap Heat to Fan and use different fan codes, flagged by the Model/Model2 bits) are reserved. Swing, ion, clean and timer are documented but not settable.
+- `Kelvinator` — the standard "Kelvinator" protocol (also used by some Gree/Sharp-badged remotes). 16 bytes = two 8-byte blocks, **LSB-first**. Each block is a header + 32 data bits + a 3-bit command footer (`B010`) + a ~20 ms gap + 32 more data bits + a ~40 ms gap; bytes 8–10 repeat bytes 0–2, byte 3 / byte 11 are fixed markers (`0x50` / `0x70`), and each block ends with a 4-bit block checksum (high nibble of byte 7 / byte 15, Gree-style: 10 + low nibbles of the first four bytes + high nibbles of the next three, mod 16). `Mode` is `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`; `Fan` is `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` (the encoder mirrors the low speeds into the byte-0 BasicFan field, capped at 3); whole-degree temps 16–30 °C (Auto/Dry force 25 °C). Single format, no model axis. Vertical/horizontal swing, turbo, quiet, light, ion filter and X-Fan are documented but not settable.
 
 **Panasonic field map (decoded logical fields).** Where each control field lives in the 27-byte state. Status legend: ✅ implemented (decode + encode) · 🔜 planned · 🟡 documented, no setter (re-send via RAW replay) · ⛔ out of scope (separate frame type).
 
@@ -888,6 +891,22 @@ It is LSB-first; `toRaw` recomputes the two section checksums, then renders the 
 | checksum | byte 12 bits 4-7 | nibble-folded XOR of bytes 0–11 + byte 12 low nibble | ✅ |
 
 It is LSB-first; `toRaw` rewrites the fixed header, sets byte 4's high bits to 0xC0 in Cool/Heat (and zeroes the whole temp byte in Auto/Dry, which carry no temperature), sets the Special byte to the "power" value, and recomputes the nibble checksum. Power uses the PowerSpecial field (on = 3 / off = 2). The A705 / A903 models, swing, ion, clean and timer have no setters. This is the only Sharp model implemented; A705 / A903 are reserved.
+
+**Kelvinator field map (decoded logical fields).** Where each control field lives in the 16-byte state (two 8-byte blocks). Same status legend. Byte 3 = `0x50` and byte 11 = `0x70` are fixed markers; bytes 8–10 repeat bytes 0–2.
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| power | byte 0 bit 3 | 0/1 | ✅ |
+| mode | byte 0 bits 0-2 | auto=0 / cool=1 / dry=2 / fan=3 / heat=4 | ✅ |
+| temperature | byte 1 bits 0-3 | `°C − 16`, 16–30 °C (Auto/Dry force 25 °C) | ✅ |
+| fan | byte 14 bits 4-6 (+ byte 0 bits 4-5 BasicFan) | auto=0 / 1–5 (BasicFan capped at 3) | ✅ |
+| swing (vertical) | byte 0 bit 6 (auto) + byte 4 bits 0-3 (position) | — | 🟡 |
+| swing (horizontal) | byte 4 bit 4 | 0/1 | 🟡 |
+| turbo / light / ion / X-Fan | byte 2 bits 4-7 | — | 🟡 |
+| quiet | byte 12 bit 7 | — | 🟡 |
+| checksum | byte 7 bits 4-7 (block 1) / byte 15 bits 4-7 (block 2) | 4-bit block sums | ✅ |
+
+It is LSB-first; `toRaw` forces the fixed markers, mirrors bytes 0–2 into 8–10, recomputes both block checksums, then renders the two blocks (header, 32 bits, `B010` footer, ~20 ms gap, 32 bits, ~40 ms gap). Single format; no model axis. Swing / turbo / quiet / light / ion / X-Fan have no setters.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 

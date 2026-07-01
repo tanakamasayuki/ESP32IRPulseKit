@@ -10,6 +10,7 @@
 #include "Toshiba.h"
 #include "Samsung.h"
 #include "Sharp.h"
+#include "Kelvinator.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -29,6 +30,7 @@ namespace esp32irpk::ac
     TOSHIBA = 6,
     SAMSUNG = 7,
     SHARP = 8,
+    KELVINATOR = 9,
     // further vendors added incrementally
   };
 
@@ -62,6 +64,18 @@ namespace esp32irpk::ac
       if (out)
         pf.printTo(*out);
       return AcVendor::PANASONIC;
+    }
+    // Kelvinator (16-byte, two blocks) before Gree: a Gree frame is structurally
+    // one Kelvinator block (same header + B010 footer + block checksum), so Gree's
+    // fromRaw would otherwise greedily match a Kelvinator frame's first block.
+    // Kelvinator requires the full two-block form, so a real Gree frame fails it
+    // and falls through to Gree below.
+    Kelvinator::Frame kf;
+    if (Kelvinator::Frame::fromRaw(raw, kf))
+    {
+      if (out)
+        kf.printTo(*out);
+      return AcVendor::KELVINATOR;
     }
     Gree::Frame gf;
     if (Gree::Frame::fromRaw(raw, gf))
@@ -131,6 +145,14 @@ namespace esp32irpk::ac
                           pf.bytes, Panasonic::Frame::kBytes);
       return AcVendor::PANASONIC;
     }
+    // Kelvinator before Gree (see decodeAny): a Gree frame is one Kelvinator block.
+    Kelvinator::Frame kf;
+    if (Kelvinator::Frame::fromRaw(raw, kf))
+    {
+      printAcStateSnippet(out, "Kelvinator", "esp32irpk::ac::Kelvinator::Frame",
+                          kf.bytes, Kelvinator::Frame::kBytes);
+      return AcVendor::KELVINATOR;
+    }
     Gree::Frame gf;
     if (Gree::Frame::fromRaw(raw, gf))
     {
@@ -195,6 +217,13 @@ namespace esp32irpk::ac
     {
       pf.printSetterSnippet(out);
       return AcVendor::PANASONIC;
+    }
+    // Kelvinator before Gree (see decodeAny): a Gree frame is one Kelvinator block.
+    Kelvinator::Frame kf;
+    if (Kelvinator::Frame::fromRaw(raw, kf))
+    {
+      kf.printSetterSnippet(out);
+      return AcVendor::KELVINATOR;
     }
     Gree::Frame gf;
     if (Gree::Frame::fromRaw(raw, gf))

@@ -40,6 +40,7 @@ VENDORS = [
     "TOSHIBA",
     "SAMSUNG",
     "SHARP",
+    "KELVINATOR",
 ]
 
 

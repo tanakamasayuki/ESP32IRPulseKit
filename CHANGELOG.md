@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+- (EN) Kelvinator air-conditioner support (`esp32irpk::ac::Kelvinator`): decode/encode of the standard 16-byte Kelvinator protocol (two 8-byte blocks, each a header + 32 bits + a 3-bit `B010` command footer + gap + 32 bits + gap; bytes 8-10 repeat 0-2; a 4-bit block checksum per block), LSB-first. `Mode`/`Fan` accessors (the encoder mirrors low fan speeds into the byte-0 BasicFan field), `toString`, `printTo`, `fromBytes`. Verified field-for-field against IRremoteESP8266's IRKelvinatorAC in host `codec_smoke`, by the PulseKit self round-trip on hardware, and by the IRremoteESP8266 bidirectional compat pair (encode and decode) on hardware. `06_ac_learn` recognizes it too.
+- (JA) Kelvinator エアコン対応（`esp32irpk::ac::Kelvinator`）: 標準16バイト Kelvinator protocol（8バイト2ブロック、各ブロックは ヘッダ＋32bit＋3bit `B010` コマンドフッタ＋ギャップ＋32bit＋ギャップ、byte8-10 は 0-2 の複製、ブロック毎に4bitチェックサム）のデコード/エンコード。LSBファースト。`Mode`/`Fan` アクセサ（低速ファンは byte0 の BasicFan にも反映）・`toString`・`printTo`・`fromBytes` を提供。host `codec_smoke` で IRremoteESP8266 の IRKelvinatorAC とフィールド単位で照合し、実機での PulseKit 自己往復と IRremoteESP8266 双方向 compat ペア（エンコード・デコード両方向）でも検証済み。`06_ac_learn` も認識します。
 
 ## 1.0.4
 - (EN) A/C decode robustness: the per-vendor bit-mark matching window is now wider (tolerance 40%) so decoders accept the noticeably short marks some third-party encoders emit (e.g. HeatpumpIR's Daikin 360us / Fujitsu 410us) once the receiver skews marks shorter still. Decode-only — it does not change transmitted timing; the 0/1 space split stays a fixed midpoint threshold and frame integrity is still gated by each vendor's signature/checksum.
