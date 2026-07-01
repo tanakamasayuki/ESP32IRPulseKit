@@ -720,7 +720,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | Sharp | Sharp AC | 13-byte | A907 | **Supported**¹ |
 | | | A705 / A903 | Not yet |
 | Kelvinator | Kelvinator | 16-byte, two blocks | standard | **Supported**³ |
-| Midea | Midea | 48-bit (6-byte), 2 copies | standard | **Implemented**⁴ |
+| Midea | Midea | 48-bit (6-byte), 2 copies | standard | **Supported**⁴ |
 
 ¹ Sharp (13-byte, A907 model), like Samsung, is verified by the IRremoteESP8266 bidirectional pair (`sharp_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Sharp support.
 
@@ -728,7 +728,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 ³ Kelvinator (16-byte, standard), like Samsung and Sharp, is verified by the IRremoteESP8266 bidirectional pair (`kelvinator_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Kelvinator support. The two-block framing (per-block B010 command footer + gaps) and block checksums are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`).
 
-⁴ Midea (48-bit / 6-byte, standard): the field map, the double-transmission framing (the 48 data bits followed by a bit-inverted copy) and the checksum are verified in host `codec_smoke` against IRMideaAC's documented layout, and the self round-trip (`hardware/protocol_matrix_ac`) and bidirectional IRremoteESP8266 compat study (`midea_irremoteesp8266_tx` / `_rx`) sketches are wired up but not yet run on the 2-board rig, so it is not yet promoted to **Supported**. Like Samsung/Sharp/Kelvinator there is no HeatpumpIR second reference, so verification rests on the IRremoteESP8266 bidirectional pair.
+⁴ Midea (48-bit / 6-byte, standard), like Samsung, Sharp and Kelvinator, is verified by the IRremoteESP8266 bidirectional pair (`midea_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Midea support. The double-transmission framing (the 48 data bits followed by a bit-inverted copy) and the checksum are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`).
 
 **Candidate vendors (not yet started), in suggested implementation order.** Ordering weighs, in priority: a second independent reference (IRremoteESP8266 *and* HeatpumpIR, matching the verification used for the supported vendors), a clean byte-state fit for the `ac::` layer, framing simplicity, and device coverage. Target models are chosen at approval time, not pre-locked here. Bit-paired code formats (Coolix 24-bit, LG 28-bit, …) are deliberately out of scope — they are not multi-byte byte-state and would need a different code path outside this layer.
 

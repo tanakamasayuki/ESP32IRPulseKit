@@ -713,7 +713,7 @@ struct Frame {
 | Sharp | Sharp AC | 13バイト | A907 | **対応**¹ |
 | | | A705 / A903 | 未対応 |
 | Kelvinator | Kelvinator | 16バイト、2ブロック | 標準 | **対応**³ |
-| Midea | Midea | 48ビット（6バイト）、2コピー | 標準 | **実装済**⁴ |
+| Midea | Midea | 48ビット（6バイト）、2コピー | 標準 | **対応**⁴ |
 
 ¹ Sharp（13バイト、A907モデル）は Samsung 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`sharp_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR に Sharp サポートが無いため。
 
@@ -721,7 +721,7 @@ struct Frame {
 
 ³ Kelvinator（16バイト、標準）は Samsung/Sharp 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`kelvinator_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR に Kelvinator サポートが無いため。加えて2ブロックのフレーミング（ブロック毎の B010 コマンドフッタ＋ギャップ）・ブロックチェックサムを host `codec_smoke` で検証し、実機の PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通っている。
 
-⁴ Midea（48ビット / 6バイト、標準）: フィールドマップ・二重送信フレーミング（48bit のデータに続けてビット反転コピー）・チェックサムは host `codec_smoke` で IRMideaAC の記載レイアウトに対して検証済み。自己往復（`hardware/protocol_matrix_ac`）と双方向の IRremoteESP8266 compat study（`midea_irremoteesp8266_tx` / `_rx`）のスケッチは用意済みだが2ボードのリグで未実行のため、まだ **対応** には昇格していない。Samsung/Sharp/Kelvinator 同様 HeatpumpIR の第2リファレンスは無いので、検証は IRremoteESP8266 双方向ペアに依拠する。
+⁴ Midea（48ビット / 6バイト、標準）は Samsung/Sharp/Kelvinator 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`midea_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR に Midea サポートが無いため。加えて二重送信フレーミング（48bit のデータに続けてビット反転コピー）・チェックサムを host `codec_smoke` で検証し、実機の PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通っている。
 
 **未着手の候補ベンダ（推奨着手順）。** 優先順位の基準: ①第2の独立リファレンス（IRremoteESP8266 *と* HeatpumpIR の両方＝対応済みベンダと同じ検証体制）②`ac::`層に合う byte-state 構造 ③フレーミングの単純さ ④機種カバレッジ。対象モデルは承認時に決定し、ここで固定はしない。ビットペア方式（Coolix 24-bit、LG 28-bit など）は多バイトの byte-state ではなく別コード経路が必要なため、本レイヤの対象外とする。
 
