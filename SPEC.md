@@ -722,7 +722,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | Kelvinator | Kelvinator | 16-byte, two blocks | standard | **Supported**³ |
 | Midea | Midea | 48-bit (6-byte), 2 copies | standard | **Supported**⁴ |
 | Carrier | Carrier | 64-bit (8-byte) | CARRIER_AC64 | **Supported**⁵ |
-| Hitachi | Hitachi AC | 28-byte | HITACHI_AC | **Implemented**⁶ |
+| Hitachi | Hitachi AC | 28-byte | HITACHI_AC | **Supported**⁶ |
 
 ¹ Sharp (13-byte, A907 model), like Samsung, is verified by the IRremoteESP8266 bidirectional pair (`sharp_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Sharp support.
 
@@ -734,7 +734,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 ⁵ Carrier (64-bit / 8-byte, CARRIER_AC64), like Samsung, Sharp, Kelvinator and Midea, is verified by the IRremoteESP8266 bidirectional pair (`carrier_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination: HeatpumpIR has a Carrier class, but it implements the different NQV (9-byte) / MCA (6-byte) Carrier variants rather than CARRIER_AC64. The single-frame pulse-distance framing and the 4-bit nibble-sum checksum are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`).
 
-⁶ Hitachi (28-byte, HITACHI_AC): the field map, the per-byte bit-reversed field encoding and the sum-based checksum are verified in host `codec_smoke` against IRHitachiAc's documented layout, and the self round-trip (`hardware/protocol_matrix_ac`) and bidirectional IRremoteESP8266 compat study (`hitachi_irremoteesp8266_tx` / `_rx`) sketches are wired up but not yet run on the 2-board rig, so it is not yet promoted to **Supported**. HeatpumpIR has a Hitachi class, but it implements a different (non-28-byte) variant, so — like Samsung/Sharp/Kelvinator/Midea/Carrier — verification rests on the IRremoteESP8266 bidirectional pair. The other Hitachi sizes (13 / 27 / 33 / 37 / 43 / 53-byte) are reserved as separate frame types.
+⁶ Hitachi (28-byte, HITACHI_AC), like Samsung, Sharp, Kelvinator, Midea and Carrier, is verified by the IRremoteESP8266 bidirectional pair (`hitachi_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR's Hitachi class implements a different (non-28-byte) variant. The per-byte bit-reversed field encoding and the sum-based checksum are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`). The other Hitachi sizes (13 / 27 / 33 / 37 / 43 / 53-byte) are reserved as separate frame types.
 
 **Candidate vendors (not yet started).** No dual-reference (IRremoteESP8266 *and* HeatpumpIR) byte-state candidates remain. Further single-reference (IRremoteESP8266-only) byte-state options if more coverage is wanted: Haier (9-byte / 22-byte), TCL112 (14-byte), Electra (13-byte). Bit-paired code formats (Coolix 24-bit, LG 28-bit, …) are deliberately out of scope — they are not multi-byte byte-state and would need a different code path outside this layer. Target models are chosen at approval time, not pre-locked here.
 

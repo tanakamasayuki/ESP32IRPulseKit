@@ -715,7 +715,7 @@ struct Frame {
 | Kelvinator | Kelvinator | 16バイト、2ブロック | 標準 | **対応**³ |
 | Midea | Midea | 48ビット（6バイト）、2コピー | 標準 | **対応**⁴ |
 | Carrier | Carrier | 64ビット（8バイト） | CARRIER_AC64 | **対応**⁵ |
-| Hitachi | Hitachi AC | 28バイト | HITACHI_AC | **実装済**⁶ |
+| Hitachi | Hitachi AC | 28バイト | HITACHI_AC | **対応**⁶ |
 
 ¹ Sharp（13バイト、A907モデル）は Samsung 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`sharp_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR に Sharp サポートが無いため。
 
@@ -727,7 +727,7 @@ struct Frame {
 
 ⁵ Carrier（64ビット / 8バイト、CARRIER_AC64）は Samsung/Sharp/Kelvinator/Midea 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`carrier_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する: HeatpumpIR には Carrier クラスがあるが、CARRIER_AC64 ではなく別の NQV（9バイト）/ MCA（6バイト）変種の実装のため。加えて単一フレームの pulse-distance フレーミング・4bit ニブル総和チェックサムを host `codec_smoke` で検証し、実機の PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通っている。
 
-⁶ Hitachi（28バイト、HITACHI_AC）: フィールドマップ・バイト毎ビット反転のフィールドエンコード・総和ベースのチェックサムは host `codec_smoke` で IRHitachiAc の記載レイアウトに対して検証済み。自己往復（`hardware/protocol_matrix_ac`）と双方向の IRremoteESP8266 compat study（`hitachi_irremoteesp8266_tx` / `_rx`）のスケッチは用意済みだが2ボードのリグで未実行のため、まだ **対応** には昇格していない。HeatpumpIR には Hitachi クラスがあるが別（非28バイト）変種の実装なので、Samsung/Sharp/Kelvinator/Midea/Carrier 同様、検証は IRremoteESP8266 双方向ペアに依拠する。他の Hitachi サイズ（13 / 27 / 33 / 37 / 43 / 53バイト）は別フレーム型として予約。
+⁶ Hitachi（28バイト、HITACHI_AC）は Samsung/Sharp/Kelvinator/Midea/Carrier 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`hitachi_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR の Hitachi クラスは別（非28バイト）変種の実装のため。加えてバイト毎ビット反転のフィールドエンコード・総和ベースのチェックサムを host `codec_smoke` で検証し、実機の PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通っている。他の Hitachi サイズ（13 / 27 / 33 / 37 / 43 / 53バイト）は別フレーム型として予約。
 
 **未着手の候補ベンダ。** 第2の独立リファレンス（IRremoteESP8266 *と* HeatpumpIR の両方）を持つ byte-state 候補は残っていない。さらにカバレッジを広げたい場合の単一リファレンス（IRremoteESP8266のみ）byte-state 候補: Haier（9バイト / 22バイト）、TCL112（14バイト）、Electra（13バイト）。ビットペア方式（Coolix 24-bit、LG 28-bit など）は多バイトの byte-state ではなく別コード経路が必要なため、本レイヤの対象外。対象モデルは承認時に決定し、ここで固定はしない。
 
