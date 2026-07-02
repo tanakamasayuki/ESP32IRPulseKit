@@ -716,6 +716,7 @@ struct Frame {
 | Midea | Midea | 48ビット（6バイト）、2コピー | 標準 | **対応**⁴ |
 | Carrier | Carrier | 64ビット（8バイト） | CARRIER_AC64 | **対応**⁵ |
 | Hitachi | Hitachi AC | 28バイト | HITACHI_AC | **対応**⁶ |
+| Haier | Haier AC | 9バイト | HAIER_AC | **対応**⁷ |
 
 ¹ Sharp（13バイト、A907モデル）は Samsung 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`sharp_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR に Sharp サポートが無いため。
 
@@ -729,7 +730,9 @@ struct Frame {
 
 ⁶ Hitachi（28バイト、HITACHI_AC）は Samsung/Sharp/Kelvinator/Midea/Carrier 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`hitachi_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR の Hitachi クラスは別（非28バイト）変種の実装のため。加えてバイト毎ビット反転のフィールドエンコード・総和ベースのチェックサムを host `codec_smoke` で検証し、実機の PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通っている。他の Hitachi サイズ（13 / 27 / 33 / 37 / 43 / 53バイト）は別フレーム型として予約。
 
-**未着手の候補ベンダ。** 第2の独立リファレンス（IRremoteESP8266 *と* HeatpumpIR の両方）を持つ byte-state 候補は残っていない。さらにカバレッジを広げたい場合の単一リファレンス（IRremoteESP8266のみ）byte-state 候補: Haier（9バイト / 22バイト）、TCL112（14バイト）、Electra（13バイト）。ビットペア方式（Coolix 24-bit、LG 28-bit など）は多バイトの byte-state ではなく別コード経路が必要なため、本レイヤの対象外。対象モデルは承認時に決定し、ここで固定はしない。
+⁷ Haier（9バイト、HAIER_AC）は Samsung/Sharp/Kelvinator/Midea/Carrier/Hitachi 同様、通常の IRremoteESP8266 ＋ HeatpumpIR の組み合わせではなく IRremoteESP8266 双方向ペア（`haier_irremoteesp8266_tx` / `_rx` — エンコード・デコードそれぞれを独立スタックに対して実機検証）で検証している。HeatpumpIR に Haier サポートが無いため。ダブルヘッダのフレーミング（3000/4300 メインヘッダの前に 3000/3000 プリヘッダ）・コマンド指向の電源モデル・総和チェックサムは host `codec_smoke` でも検証済みで、実機で PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通過。これは単一リファレンスの9バイト版で、YRW02（14バイト）・AC160（20バイト）・AC176（22バイト）は別フレーム型として予約。
+
+**未着手の候補ベンダ。** 第2の独立リファレンス（IRremoteESP8266 *と* HeatpumpIR の両方）を持つ byte-state 候補は残っていない。さらにカバレッジを広げたい場合の単一リファレンス（IRremoteESP8266のみ）byte-state 候補: Haier の大型版（YRW02 14バイト・AC160 20バイト・AC176 22バイト）、TCL112（14バイト）、Electra（13バイト）。ビットペア方式（Coolix 24-bit、LG 28-bit など）は多バイトの byte-state ではなく別コード経路が必要なため、本レイヤの対象外。対象モデルは承認時に決定し、ここで固定はしない。
 
 対応フォーマットのベンダ別構造:
 
@@ -745,6 +748,7 @@ struct Frame {
 - `Midea` — 標準「Midea」protocol（OEM 多数: Pioneer・Comfee・Kaysun・Keystone・MrCool・Danby・Trotec・Lennox など）。48ビット / 6バイト、**MSBファースト**。1メッセージにつき2回送信: 48bit のデータ、続けて同じ48bit を全ビット**反転**したコピー（各コピーが 4480/4480 ヘッダ・560/1680 bit・5.6ms ギャップを持つ）。バイト順は送信順（byte0 = 固定 Header/Type バイト `0xA1`、byte5 = チェックサム）で、IRremoteESP8266 の `remote_state` union とは逆順。チェックサムは他5バイトをビット反転して総和し符号反転、さらにビット反転したもの。`fromRaw` は2コピー目が1コピー目の完全なビット反転であることと固定 Header フィールド（`0b10100`）で判定。`Mode` は `COOL`/`DRY`/`AUTO`/`HEAT`/`FAN`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`（4段のみ）。温度は整数 17–30℃で全モードで保持。摂氏のみ（華氏フラグは強制クリア）。単一フォーマットでモデル軸なし。sleep・オン/オフタイマー・センサ/follow-me・特殊トグルメッセージ（swing・econo・turbo・light・clean・8℃暖房・quiet）は記載のみで setter 未作成。
 - `Carrier` — CARRIER_AC64 protocol（Carrier/Surrey 619EGX / 53NGK インバータ機のリモコン）。8バイト（64ビット）単一 pulse-distance フレーム、**LSBファースト**、1回送信。固定シグネチャ `0x84 0x55` で始まり、byte2 の下位ニブルに4bitチェックサム（それより上の全ニブル＝byte2 上位ニブル＋byte3–7 の総和）。`Mode` は `HEAT`/`COOL`/`FAN`（Auto/Dry なし）。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`。温度は整数 16–30℃で全モードで保持。`SwingV` は設定可能。これは64ビット版で、他の Carrier 波形（AC / AC40 / AC84 / AC128）は別フレーム。sleep とオン/オフタイマーは記載のみで setter 未作成。
 - `Hitachi` — 28バイト HITACHI_AC protocol（RAS-/RAK- 系リモコン）。単一 pulse-distance フレーム、**MSBファースト**、1回送信。固定9バイトフレーミングプレフィックス（`80 08 0C 02 FD 80 7F 88 48`）で始まり、最終バイトに総和ベースのチェックサム（62から他全バイトのビット反転値を引き、さらにビット反転）。特殊な点として各論理フィールドはバイト内で**ビット反転**して格納され、フィールドが結合している: Fan モードはセンチネル温度を持ち、Dry モードはファンを低速2段に制限し、モード変更でファンが再クランプされる（IRHitachiAc を正確に踏襲）。`Mode` は `AUTO`/`HEAT`/`COOL`/`DRY`/`FAN`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`（非連続のワイヤコード 1/2/3/5）。温度は整数 16–32℃。`SwingV`/`SwingH` は設定可能。これは28バイト版で、他の Hitachi サイズ（13 / 27 / 33 / 37 / 43 / 53バイト）は別フレーム。タイマーとコンフォート系フラグは setter 未作成。
+- `Haier` — 9バイト HAIER_AC protocol（旧 HSU-/YR- 系リモコン）。単一 MSBファーストフレームで、特徴的な**ダブルヘッダ**（3000/3000 プリヘッダ＋3000/4300 メインヘッダ）を持ち、固定プレフィックス `0xA5` で始まり、末尾に総和チェックサム。**コマンド指向**で byte1 の下位ニブルが `Command` コード（押されたボタン）。永続的な電源ビットは無く、`setPower` は On/Off コマンドを書き、`power()` は「Off コマンドでない」を返す（Toshiba と同様）。`Mode` は `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`（ワイヤコードは反転: high=1, med=2, low=3）。温度は整数 16–30℃で全モードで保持。`SwingV`（`OFF`/`UP`/`DOWN`/`CYCLE`）は設定可能。これは9バイト版で、YRW02（14バイト）・AC160（20バイト）・AC176（22バイト）は別フレーム。タイマー・sleep・health は setter 未作成。
 
 **Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
 
@@ -953,6 +957,21 @@ LSBファースト。`toRaw` はシグネチャバイトを強制し、未使用
 | checksum | byte27 | 62 − Σ ビット反転バイト、ビット反転 | ✅ |
 
 MSBファースト。`toRaw` は固定プレフィックスと byte24 を強制し、チェックサムを再計算してから、28バイトフレームを1回描画する（1回送信）。setter は IRHitachiAc の結合（Fan モードのセンチネル温度・Dry モードのファンクランプ・モード変更時のファン再クランプ）を踏襲する。単一フォーマットでモデル軸なし。タイマーとコンフォートフラグは setter 未作成。
+
+**Haier フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが9バイト状態のどこに入るか。ステータス凡例は上と同じ。byte0 は固定プレフィックス `0xA5`、byte2 bit5 は定数1、タイマーバイトは IRHaierAC のリセット既定値。
+
+| フィールド | 位置（byte/bit） | コード / 範囲 | 状態 |
+|---|---|---|---|
+| prefix | byte0 | 固定 `0xA5` | ✅ |
+| command / power | byte1 bit0-3 | On=1 / Off=0（power = Off以外） | ✅ |
+| temperature | byte1 bit4-7 | `℃ − 16`、16–30℃（全モード） | ✅ |
+| 上下スイング | byte2 bit6-7 | off=0 / up=1 / down=2 / cycle=3 | ✅ |
+| fan | byte5 bit6-7 | 反転: auto=0 / high=1 / med=2 / low=3 | ✅ |
+| mode | byte6 bit5-7 | auto=0 / cool=1 / dry=2 / heat=3 / fan=4 | ✅ |
+| タイマー / sleep / health | byte2-7 | — | 🟡 |
+| checksum | byte8 | byte0-7 の総和 | ✅ |
+
+MSBファースト。`toRaw` はプレフィックスと定数ビットを強制し、総和チェックサムを再計算してから、ダブルヘッダ＋72bit＋トレーラを1回描画する（1回送信）。電源は On/Off コマンドなので、状態を組み立てる際は `setPower` を最後に呼ぶ。単一フォーマットでモデル軸なし。タイマー・sleep・health は setter 未作成。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 

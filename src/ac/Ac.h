@@ -14,6 +14,7 @@
 #include "Midea.h"
 #include "Carrier.h"
 #include "Hitachi.h"
+#include "Haier.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -37,6 +38,7 @@ namespace esp32irpk::ac
     MIDEA = 10,
     CARRIER = 11,
     HITACHI = 12,
+    HAIER = 13,
     // further vendors added incrementally
   };
 
@@ -160,6 +162,15 @@ namespace esp32irpk::ac
         hf.printTo(*out);
       return AcVendor::HITACHI;
     }
+    // Haier (9-byte) has a distinctive 3000/3000 double-header pre-header, so it is
+    // unambiguous; appended last.
+    Haier::Frame haf;
+    if (Haier::Frame::fromRaw(raw, haf))
+    {
+      if (out)
+        haf.printTo(*out);
+      return AcVendor::HAIER;
+    }
     if (out)
       out->println("// decoded: no AC vendor matched (raw replay still works)");
     return AcVendor::UNKNOWN;
@@ -258,6 +269,13 @@ namespace esp32irpk::ac
                           hf.bytes, Hitachi::Frame::kBytes);
       return AcVendor::HITACHI;
     }
+    Haier::Frame haf;
+    if (Haier::Frame::fromRaw(raw, haf))
+    {
+      printAcStateSnippet(out, "Haier", "esp32irpk::ac::Haier::Frame",
+                          haf.bytes, Haier::Frame::kBytes);
+      return AcVendor::HAIER;
+    }
     return AcVendor::UNKNOWN;
   }
 
@@ -339,6 +357,12 @@ namespace esp32irpk::ac
     {
       hf.printSetterSnippet(out);
       return AcVendor::HITACHI;
+    }
+    Haier::Frame haf;
+    if (Haier::Frame::fromRaw(raw, haf))
+    {
+      haf.printSetterSnippet(out);
+      return AcVendor::HAIER;
     }
     return AcVendor::UNKNOWN;
   }

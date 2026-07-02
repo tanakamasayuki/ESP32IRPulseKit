@@ -76,6 +76,10 @@ carrier_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Hitachi (IRHitachiAc, HITACHI_AC 28-byte, matching esp32irpk::ac::Hitachi)
 hitachi_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
 hitachi_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+
+# Haier (IRHaierAC, HAIER_AC 9-byte, matching esp32irpk::ac::Haier)
+haier_irremoteesp8266_tx/    # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+haier_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
 Each vendor uses the same `<extlib>_<role>` variants. Every variant folder is
@@ -274,6 +278,14 @@ harness are added one variant at a time. In place:
   same call order and treats temperature as a don't-care in Fan mode. HeatpumpIR has a
   Hitachi class but it implements a different (non-28-byte) variant, so like the others it
   is cross-checked by the IRremoteESP8266 bidirectional pair alone.
+
+- `haier_irremoteesp8266_tx/` + `haier_irremoteesp8266_rx/` -- the same calibration and
+  encoder-verification pair for the 9-byte HAIER_AC protocol, using IRremoteESP8266's
+  `IRHaierAC`. A single MSB-first frame with a distinctive double header (a 3000/3000
+  pre-header + the 3000/4300 main header), the fixed 0xA5 prefix, and a plain sum
+  checksum. It is command-oriented (no power bit; power is the On/Off command), so both
+  stacks set the command last and power is read as "not the Off command". HeatpumpIR has
+  no Haier class, so it is cross-checked by the IRremoteESP8266 bidirectional pair alone.
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `panasonic_heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`

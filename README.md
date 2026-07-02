@@ -14,11 +14,11 @@ It captures RAW mark/space waveforms, decodes them into normalized bits with sco
 - **Three working levels:** RAW ticks (`1 tick = 10us`), normalized `IRDecodedBits`, and protocol-specific `Frame` types — drop down or stay high-level as needed.
 - **Phase-aligned, symbol-encoded carrier by default,** so demodulated marks are stable frame to frame and decode cleanly in other libraries.
 - **Learn-and-replay of any waveform** through the RAW path, including protocols without a dedicated decoder.
-- **Air-conditioner support** as a separate `esp32irpk::ac` layer over the RAW path — whole multi-byte state frames decode/encode into named fields (twelve vendors: Panasonic, Gree, Mitsubishi, Fujitsu, Daikin, Toshiba, Samsung, Sharp, Kelvinator, Midea, Carrier, Hitachi).
+- **Air-conditioner support** as a separate `esp32irpk::ac` layer over the RAW path — whole multi-byte state frames decode/encode into named fields (thirteen vendors: Panasonic, Gree, Mitsubishi, Fujitsu, Daikin, Toshiba, Samsung, Sharp, Kelvinator, Midea, Carrier, Hitachi, Haier).
 
 ## Scope
 
-This library targets short consumer-remote frames (NEC, Sony, AEHA, etc.) — decoding them into meaningful bits, distinguishing similar protocols, and re-sending them. Air-conditioner / heat-pump remotes, where one button sends a whole multi-byte state frame, do not fit the generic codec and are handled by a **separate `esp32irpk::ac` layer** over the RAW path (twelve vendors supported — Panasonic, Gree, Mitsubishi, Fujitsu, Daikin, Toshiba, Samsung, Sharp, Kelvinator, Midea, Carrier, Hitachi — and more can be added). It does not try to cover every exotic protocol — broad protocol-count coverage is a non-goal, and raw capture/replay already handles arbitrary waveforms when you only need learn-and-replay.
+This library targets short consumer-remote frames (NEC, Sony, AEHA, etc.) — decoding them into meaningful bits, distinguishing similar protocols, and re-sending them. Air-conditioner / heat-pump remotes, where one button sends a whole multi-byte state frame, do not fit the generic codec and are handled by a **separate `esp32irpk::ac` layer** over the RAW path (thirteen vendors supported — Panasonic, Gree, Mitsubishi, Fujitsu, Daikin, Toshiba, Samsung, Sharp, Kelvinator, Midea, Carrier, Hitachi, Haier — and more can be added). It does not try to cover every exotic protocol — broad protocol-count coverage is a non-goal, and raw capture/replay already handles arbitrary waveforms when you only need learn-and-replay.
 
 ## Supported Protocols
 

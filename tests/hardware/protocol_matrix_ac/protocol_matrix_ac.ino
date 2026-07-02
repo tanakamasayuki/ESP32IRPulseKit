@@ -78,6 +78,7 @@ void printAcDecode(const esp32irpk::IRRawTickView &raw)
   case AcVendor::MIDEA:      emit<ac::Midea::Frame>(raw, "MIDEA"); break;
   case AcVendor::CARRIER:    emit<ac::Carrier::Frame>(raw, "CARRIER"); break;
   case AcVendor::HITACHI:    emit<ac::Hitachi::Frame>(raw, "HITACHI"); break;
+  case AcVendor::HAIER:      emit<ac::Haier::Frame>(raw, "HAIER"); break;
   default:
     Serial.print("AC_RAW vendor=NONE raw_len=");
     Serial.println(raw.len);

@@ -3018,6 +3018,139 @@ void testHitachiAcStateMatrix()
   EXPECT_TRUE("hitachi/state-matrix", all_ok);
 }
 
+// Haier AC (9-byte HAIER_AC: double-header, command-based, MSB-first): build a
+// frame, render the burst and decode it back. Field offsets, the inverted fan wire
+// code and the sum checksum are derived from IRHaierAC's documented layout; the
+// hardware study verifies them against IRHaierAC. Power is the On/Off command.
+void testHaierAcRoundtrip()
+{
+  using esp32irpk::ac::Haier::Fan;
+  using esp32irpk::ac::Haier::Frame;
+  using esp32irpk::ac::Haier::Mode;
+  using esp32irpk::ac::Haier::SwingV;
+
+  Frame f{};
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(24);
+  f.setFan(Fan::AUTO);
+  f.setSwingV(SwingV::OFF);
+  f.setPower(true);
+
+  EXPECT_TRUE("haier/power-get", f.power());
+  EXPECT_TRUE("haier/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("haier/temp-get", 24u, f.temperatureC());
+  EXPECT_TRUE("haier/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("haier/encode", f.toRaw(buf));
+  EXPECT_TRUE("haier/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("haier/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("haier/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("haier/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("haier/decode-power", g.power());
+  EXPECT_TRUE("haier/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("haier/decode-temp", 24u, g.temperatureC());
+  EXPECT_TRUE("haier/decode-fan", g.fan() == Fan::AUTO);
+
+  // On / cool / 24C / fan auto / swing off, from IRHaierAC's layout + checksum.
+  static const uint8_t kCanonical[Frame::kBytes] = {0xA5, 0x81, 0x20, 0x00, 0x0C, 0x00, 0x20, 0x00, 0x72};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonical[i])
+      canonical_match = false;
+  EXPECT_TRUE("haier/canonical-bytes", canonical_match);
+
+  // A hardware capture does not record the final trailing gap.
+  Frame ng{};
+  EXPECT_TRUE("haier/decode-no-trailing-gap",
+              buf.len > 1 &&
+                  Frame::fromRaw(esp32irpk::IRRawTickView{buf.ticks, buf.len - 1}, ng) &&
+                  ng.checksum_ok && ng.mode() == Mode::COOL && ng.fan() == Fan::AUTO);
+
+  // SwingV round-trips (2-bit field).
+  Frame s{};
+  s.setMode(Mode::COOL);
+  s.setSwingV(SwingV::UP);
+  s.setPower(true);
+  uint16_t st[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer sb{st, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("haier/swingv-encode", s.toRaw(sb));
+  Frame sg{};
+  EXPECT_TRUE("haier/swingv-decode", Frame::fromRaw(esp32irpk::IRRawTickView{sb.ticks, sb.len}, sg));
+  EXPECT_TRUE("haier/swingv-decode-up", sg.swingV() == SwingV::UP);
+
+  // Power off is the Off command.
+  Frame p{};
+  p.setMode(Mode::HEAT);
+  p.setPower(false);
+  EXPECT_TRUE("haier/poweroff", !p.power());
+  uint16_t t2[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer b2{t2, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("haier/poweroff-encode", p.toRaw(b2));
+  Frame pg{};
+  EXPECT_TRUE("haier/poweroff-decode", Frame::fromRaw(esp32irpk::IRRawTickView{b2.ticks, b2.len}, pg));
+  EXPECT_TRUE("haier/poweroff-decode-off", !pg.power());
+
+  // Temperature clamps to the supported 16-30C range.
+  Frame t{};
+  t.setMode(Mode::COOL);
+  t.setTemperatureC(40);
+  EXPECT_EQ("haier/temp-clamp-high", 30u, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("haier/temp-clamp-low", 16u, t.temperatureC());
+
+  // A non-Haier waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("haier/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power combination must encode -> decode back to
+// itself with a valid checksum. HAIER_AC carries temperature in all modes.
+void testHaierAcStateMatrix()
+{
+  using esp32irpk::ac::Haier::Fan;
+  using esp32irpk::ac::Haier::Frame;
+  using esp32irpk::ac::Haier::Mode;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::COOL, Mode::DRY, Mode::HEAT, Mode::FAN};
+  static const Fan fans[] = {Fan::AUTO, Fan::LOW_SPEED, Fan::MED_SPEED, Fan::HIGH_SPEED};
+
+  bool all_ok = true;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 16; temp <= 30; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          Frame f{};
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+          f.setPower(power != 0);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan ||
+              g.temperatureC() != temp)
+            all_ok = false;
+        }
+  EXPECT_TRUE("haier/state-matrix", all_ok);
+}
+
 // decodeAny must classify each vendor's own rendered frame as that vendor. This
 // guards the cascade ordering -- notably Gree vs Kelvinator, whose frames share a
 // header + B010 footer + block checksum (a Gree frame is one Kelvinator block), so
@@ -3044,6 +3177,7 @@ void testAcDecodeAny()
   check(ac::Midea::Frame{}, ac::AcVendor::MIDEA, "decodeany/midea");
   check(ac::Carrier::Frame{}, ac::AcVendor::CARRIER, "decodeany/carrier");
   check(ac::Hitachi::Frame{}, ac::AcVendor::HITACHI, "decodeany/hitachi");
+  check(ac::Haier::Frame{}, ac::AcVendor::HAIER, "decodeany/haier");
 }
 
 // Each vendor's toString() maps an enum value to its identifier name (used by
@@ -3062,6 +3196,7 @@ void testAcEnumToString()
   namespace MI = esp32irpk::ac::Midea;
   namespace CA = esp32irpk::ac::Carrier;
   namespace HI = esp32irpk::ac::Hitachi;
+  namespace HA = esp32irpk::ac::Haier;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -3099,6 +3234,9 @@ void testAcEnumToString()
   EXPECT_TRUE("hitachi/tostring-mode", strcmp(HI::toString(HI::Mode::DRY), "DRY") == 0);
   EXPECT_TRUE("hitachi/tostring-fan-auto", strcmp(HI::toString(HI::Fan::AUTO), "AUTO") == 0);
   EXPECT_TRUE("hitachi/tostring-fan-high", strcmp(HI::toString(HI::Fan::HIGH_SPEED), "HIGH_SPEED") == 0);
+  EXPECT_TRUE("haier/tostring-mode", strcmp(HA::toString(HA::Mode::DRY), "DRY") == 0);
+  EXPECT_TRUE("haier/tostring-fan-high", strcmp(HA::toString(HA::Fan::HIGH_SPEED), "HIGH_SPEED") == 0);
+  EXPECT_TRUE("haier/tostring-swing", strcmp(HA::toString(HA::SwingV::CYCLE), "CYCLE") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -3445,6 +3583,34 @@ void testAcFromBytes()
     EXPECT_TRUE("hitachi/frombytes-eq", eq);
     EXPECT_TRUE("hitachi/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+  // Haier: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Haier::Fan;
+    using esp32irpk::ac::Haier::Frame;
+    using esp32irpk::ac::Haier::Mode;
+    using esp32irpk::ac::Haier::SwingV;
+    Frame a{};
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::HIGH_SPEED);
+    a.setSwingV(SwingV::UP);
+    a.setPower(true);
+    uint16_t t[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{t, Frame::kMaxTicks, 0};
+    EXPECT_TRUE("haier/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("haier/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("haier/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("haier/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("haier/frombytes-eq", eq);
+    EXPECT_TRUE("haier/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -3521,6 +3687,8 @@ void setup()
   testCarrierAcStateMatrix();
   testHitachiAcRoundtrip();
   testHitachiAcStateMatrix();
+  testHaierAcRoundtrip();
+  testHaierAcStateMatrix();
   testAcDecodeAny();
   testAcEnumToString();
   testAcFromBytes();

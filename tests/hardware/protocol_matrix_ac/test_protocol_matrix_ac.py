@@ -44,6 +44,7 @@ VENDORS = [
     "MIDEA",
     "CARRIER",
     "HITACHI",
+    "HAIER",
 ]
 
 
