@@ -26,6 +26,7 @@ The primary sketch is RX and `peer_tx/` is TX. The peer name stays fixed as `tx`
 - HITACHI
 - HAIER
 - MITSUBISHI_HEAVY
+- TCL
 
 ## Run
 

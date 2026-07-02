@@ -84,6 +84,10 @@ haier_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Mitsubishi Heavy (IRMitsubishiHeavy152Ac, MITSUBISHI_HEAVY_152 19-byte, matching esp32irpk::ac::MitsubishiHeavy)
 mitsubishiheavy_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
 mitsubishiheavy_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+
+# TCL (IRTcl112Ac, TCL112AC 14-byte, matching esp32irpk::ac::Tcl)
+tcl_irremoteesp8266_tx/      # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+tcl_irremoteesp8266_rx/      # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
 Each vendor uses the same `<extlib>_<role>` variants. Every variant folder is
@@ -300,6 +304,15 @@ harness are added one variant at a time. In place:
   Mitsubishi Electric MSZ vendor. HeatpumpIR's Mitsubishi Heavy class primarily targets the
   88-bit ZJ variant, so this 152-bit format is cross-checked by the IRremoteESP8266
   bidirectional pair alone.
+
+- `tcl_irremoteesp8266_tx/` + `tcl_irremoteesp8266_rx/` -- the same calibration and
+  encoder-verification pair for the 14-byte TCL112AC protocol (TCL TAC-09CHSD/XA31I and
+  the many OEM-rebadged units), using IRremoteESP8266's `IRTcl112Ac`. A single LSB-first
+  pulse-distance frame with a fixed 3-byte signature (`23 CB 26`), a plain sum checksum,
+  and a temperature encoded inverted (`31 − whole degrees`) with a separate half-degree
+  bit (0.5 °C resolution). TCL112AC and Mitsubishi112 share the reference's decoder,
+  distinguished by the header plus byte 2 == `0x26`. HeatpumpIR has no TCL class, so it is
+  cross-checked by the IRremoteESP8266 bidirectional pair alone.
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `panasonic_heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`

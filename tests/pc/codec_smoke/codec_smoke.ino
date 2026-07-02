@@ -3289,6 +3289,136 @@ void testMitsubishiHeavyAcStateMatrix()
   EXPECT_TRUE("mheavy/state-matrix", all_ok);
 }
 
+// TCL AC (14-byte TCL112AC: single LSB-first frame, fixed 23 CB 26 signature, plain
+// sum checksum, inverted+half-degree temperature): build a frame, render the burst
+// and decode it back. Field offsets and the mode/fan/swing codes come from
+// IRTcl112Ac's documented layout; the hardware study verifies them. Canonical bytes
+// were derived from the reference (its stateReset with the sum recomputed).
+void testTclAcRoundtrip()
+{
+  using esp32irpk::ac::Tcl::Fan;
+  using esp32irpk::ac::Tcl::Frame;
+  using esp32irpk::ac::Tcl::Mode;
+  using esp32irpk::ac::Tcl::SwingV;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(24.0f);
+  f.setFan(Fan::AUTO);
+  f.setSwingV(SwingV::OFF);
+  f.setSwingH(false);
+
+  EXPECT_TRUE("tcl/power-get", f.power());
+  EXPECT_TRUE("tcl/mode-get", f.mode() == Mode::COOL);
+  EXPECT_TRUE("tcl/temp-get", f.temperatureC() == 24.0f);
+  EXPECT_TRUE("tcl/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("tcl/encode", f.toRaw(buf));
+  EXPECT_TRUE("tcl/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("tcl/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("tcl/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("tcl/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("tcl/decode-power", g.power());
+  EXPECT_TRUE("tcl/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_TRUE("tcl/decode-temp", g.temperatureC() == 24.0f);
+  EXPECT_TRUE("tcl/decode-fan", g.fan() == Fan::AUTO);
+
+  // On / cool / 24C / fan auto / swing off, from IRTcl112Ac's stateReset.
+  static const uint8_t kCanonical[Frame::kBytes] = {
+      0x23, 0xCB, 0x26, 0x01, 0x00, 0x24, 0x03, 0x07, 0x40, 0x00, 0x00, 0x00, 0x00, 0x83};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonical[i])
+      canonical_match = false;
+  EXPECT_TRUE("tcl/canonical-bytes", canonical_match);
+
+  // A hardware capture does not record the final trailing gap.
+  Frame ng{};
+  EXPECT_TRUE("tcl/decode-no-trailing-gap",
+              buf.len > 1 &&
+                  Frame::fromRaw(esp32irpk::IRRawTickView{buf.ticks, buf.len - 1}, ng) &&
+                  ng.checksum_ok && ng.mode() == Mode::COOL && ng.fan() == Fan::AUTO);
+
+  // Half-degree temperature round-trips (0.5 C resolution).
+  Frame h{};
+  h.setPower(true);
+  h.setMode(Mode::HEAT);
+  h.setTemperatureC(22.5f);
+  uint16_t ht[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer hb{ht, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("tcl/half-encode", h.toRaw(hb));
+  Frame hg{};
+  EXPECT_TRUE("tcl/half-decode", Frame::fromRaw(esp32irpk::IRRawTickView{hb.ticks, hb.len}, hg));
+  EXPECT_TRUE("tcl/half-decode-val", hg.temperatureC() == 22.5f);
+
+  // Temperature clamps to the supported 16-31C range.
+  Frame t{};
+  t.setTemperatureC(40.0f);
+  EXPECT_TRUE("tcl/temp-clamp-high", t.temperatureC() == 31.0f);
+  t.setTemperatureC(5.0f);
+  EXPECT_TRUE("tcl/temp-clamp-low", t.temperatureC() == 16.0f);
+
+  // A non-TCL waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("tcl/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power/swing combination must encode -> decode back to
+// itself with a valid checksum. TCL112AC carries temperature in all modes.
+void testTclAcStateMatrix()
+{
+  using esp32irpk::ac::Tcl::Fan;
+  using esp32irpk::ac::Tcl::Frame;
+  using esp32irpk::ac::Tcl::Mode;
+  using esp32irpk::ac::Tcl::SwingV;
+
+  static const Mode modes[] = {Mode::HEAT, Mode::DRY, Mode::COOL, Mode::FAN, Mode::AUTO};
+  static const Fan fans[] = {Fan::AUTO, Fan::MIN_SPEED, Fan::LOW_SPEED, Fan::MED_SPEED, Fan::HIGH_SPEED};
+  static const SwingV svs[] = {SwingV::OFF, SwingV::UP, SwingV::MIDDLE, SwingV::DOWN, SwingV::SWING};
+
+  bool all_ok = true;
+  size_t sv_i = 0;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 16; temp <= 31; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          SwingV sv = svs[sv_i++ % (sizeof(svs) / sizeof(svs[0]))];
+          // setFan is called after setMode, so it overrides setMode(FAN)'s
+          // fan=high side effect -- the final fan is the loop value.
+          Frame f{};
+          f.setPower(power != 0);
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(static_cast<float>(temp));
+          f.setSwingV(sv);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan ||
+              g.temperatureC() != static_cast<float>(temp) || g.swingV() != sv)
+            all_ok = false;
+        }
+  EXPECT_TRUE("tcl/state-matrix", all_ok);
+}
+
 // decodeAny must classify each vendor's own rendered frame as that vendor. This
 // guards the cascade ordering -- notably Gree vs Kelvinator, whose frames share a
 // header + B010 footer + block checksum (a Gree frame is one Kelvinator block), so
@@ -3317,6 +3447,7 @@ void testAcDecodeAny()
   check(ac::Hitachi::Frame{}, ac::AcVendor::HITACHI, "decodeany/hitachi");
   check(ac::Haier::Frame{}, ac::AcVendor::HAIER, "decodeany/haier");
   check(ac::MitsubishiHeavy::Frame{}, ac::AcVendor::MITSUBISHI_HEAVY, "decodeany/mheavy");
+  check(ac::Tcl::Frame{}, ac::AcVendor::TCL, "decodeany/tcl");
 }
 
 // Each vendor's toString() maps an enum value to its identifier name (used by
@@ -3337,6 +3468,7 @@ void testAcEnumToString()
   namespace HI = esp32irpk::ac::Hitachi;
   namespace HA = esp32irpk::ac::Haier;
   namespace MH = esp32irpk::ac::MitsubishiHeavy;
+  namespace TC = esp32irpk::ac::Tcl;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -3382,6 +3514,10 @@ void testAcEnumToString()
   EXPECT_TRUE("mheavy/tostring-fan-econo", strcmp(MH::toString(MH::Fan::ECONO), "ECONO") == 0);
   EXPECT_TRUE("mheavy/tostring-swingv", strcmp(MH::toString(MH::SwingV::UP), "UP") == 0);
   EXPECT_TRUE("mheavy/tostring-swingh", strcmp(MH::toString(MH::SwingH::LEFT_RIGHT), "LEFT_RIGHT") == 0);
+  EXPECT_TRUE("tcl/tostring-mode", strcmp(TC::toString(TC::Mode::COOL), "COOL") == 0);
+  EXPECT_TRUE("tcl/tostring-fan-min", strcmp(TC::toString(TC::Fan::MIN_SPEED), "MIN_SPEED") == 0);
+  EXPECT_TRUE("tcl/tostring-fan-high", strcmp(TC::toString(TC::Fan::HIGH_SPEED), "HIGH_SPEED") == 0);
+  EXPECT_TRUE("tcl/tostring-swingv", strcmp(TC::toString(TC::SwingV::SWING), "SWING") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -3786,6 +3922,36 @@ void testAcFromBytes()
     EXPECT_TRUE("mheavy/frombytes-eq", eq);
     EXPECT_TRUE("mheavy/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+
+  // TCL: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::Tcl::Fan;
+    using esp32irpk::ac::Tcl::Frame;
+    using esp32irpk::ac::Tcl::Mode;
+    using esp32irpk::ac::Tcl::SwingV;
+
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28.5f);
+    a.setFan(Fan::HIGH_SPEED);
+    a.setSwingV(SwingV::MIDDLE);
+    uint16_t ticks[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+    EXPECT_TRUE("tcl/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("tcl/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("tcl/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("tcl/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("tcl/frombytes-eq", eq);
+    EXPECT_TRUE("tcl/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -3866,6 +4032,8 @@ void setup()
   testHaierAcStateMatrix();
   testMitsubishiHeavyAcRoundtrip();
   testMitsubishiHeavyAcStateMatrix();
+  testTclAcRoundtrip();
+  testTclAcStateMatrix();
   testAcDecodeAny();
   testAcEnumToString();
   testAcFromBytes();

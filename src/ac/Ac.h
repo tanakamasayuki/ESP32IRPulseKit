@@ -16,6 +16,7 @@
 #include "Hitachi.h"
 #include "Haier.h"
 #include "MitsubishiHeavy.h"
+#include "Tcl.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -41,6 +42,7 @@ namespace esp32irpk::ac
     HITACHI = 12,
     HAIER = 13,
     MITSUBISHI_HEAVY = 14,
+    TCL = 15,
     // further vendors added incrementally
   };
 
@@ -174,6 +176,15 @@ namespace esp32irpk::ac
         mhf.printTo(*out);
       return AcVendor::MITSUBISHI_HEAVY;
     }
+    // TCL (14-byte TCL112AC) gates on its fixed 23 CB 26 signature; its 3000/1650
+    // header would otherwise overlap the ~3000-header group.
+    Tcl::Frame tcf;
+    if (Tcl::Frame::fromRaw(raw, tcf))
+    {
+      if (out)
+        tcf.printTo(*out);
+      return AcVendor::TCL;
+    }
     // Haier (9-byte) has a distinctive 3000/3000 double-header pre-header, so it is
     // unambiguous; appended last.
     Haier::Frame haf;
@@ -288,6 +299,13 @@ namespace esp32irpk::ac
                           mhf.bytes, MitsubishiHeavy::Frame::kBytes);
       return AcVendor::MITSUBISHI_HEAVY;
     }
+    Tcl::Frame tcf;
+    if (Tcl::Frame::fromRaw(raw, tcf))
+    {
+      printAcStateSnippet(out, "TCL", "esp32irpk::ac::Tcl::Frame",
+                          tcf.bytes, Tcl::Frame::kBytes);
+      return AcVendor::TCL;
+    }
     Haier::Frame haf;
     if (Haier::Frame::fromRaw(raw, haf))
     {
@@ -382,6 +400,12 @@ namespace esp32irpk::ac
     {
       mhf.printSetterSnippet(out);
       return AcVendor::MITSUBISHI_HEAVY;
+    }
+    Tcl::Frame tcf;
+    if (Tcl::Frame::fromRaw(raw, tcf))
+    {
+      tcf.printSetterSnippet(out);
+      return AcVendor::TCL;
     }
     Haier::Frame haf;
     if (Haier::Frame::fromRaw(raw, haf))

@@ -725,6 +725,7 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 | Carrier | Carrier | 64-bit (8-byte) | CARRIER_AC64 | **Supported**⁵ |
 | Hitachi | Hitachi AC | 28-byte | HITACHI_AC | **Supported**⁶ |
 | Haier | Haier AC | 9-byte | HAIER_AC | **Supported**⁷ |
+| TCL | TCL AC | 14-byte | TCL112AC | **Supported**⁹ |
 
 ¹ Sharp (13-byte, A907 model), like Samsung, is verified by the IRremoteESP8266 bidirectional pair (`sharp_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Sharp support.
 
@@ -742,9 +743,9 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 ⁸ Mitsubishi Heavy (152-bit / 19-byte, MITSUBISHI_HEAVY_152) is a distinct vendor from the Mitsubishi Electric MSZ frame above (a different manufacturer, its own `esp32irpk::ac::MitsubishiHeavy` namespace). Like Samsung/Sharp/Kelvinator/Midea/Carrier/Hitachi/Haier it is verified by the IRremoteESP8266 bidirectional pair (`mitsubishiheavy_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR's Mitsubishi Heavy class primarily targets the 88-bit ZJ variant. The field map, the fixed 5-byte signature (`AD 51 3C E5 1A`), the inverted-byte-pair integrity scheme (no arithmetic checksum) and the reversed 0/1 space lengths (a 1-bit uses the *shorter* space) are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`). The 88-bit SRKxxZJ-S format is reserved as a separate frame type.
 
-**Roadmap.** One more vendor is approved as the next addition; after it, further vendors and the reserved models of already-supported vendors are added on demand rather than pre-emptively. Mitsubishi Heavy (152-bit), the other approved addition, is now **Supported** (footnote ⁸).
+⁹ TCL (14-byte, TCL112AC — TCL TAC-09CHSD/XA31I and the many OEM-rebadged units: Leberg, Teknopoint, Daewoo, Electrolux GYKQ remotes) is, like Samsung/Sharp/Kelvinator/Midea/Carrier/Hitachi/Haier/Mitsubishi Heavy, verified by the IRremoteESP8266 bidirectional pair (`tcl_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no TCL support. The field map, the fixed 3-byte signature (`23 CB 26`), the sum checksum and the inverted half-degree temperature encoding are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`). The 96-bit TCL96AC and the "special/quiet" message type are reserved as separate frames.
 
-1. **TCL112** (14-byte), single-reference (IRremoteESP8266 only; HeatpumpIR has no TCL). Small implementation cost (a plain pulse-distance frame) and broad share via TCL itself plus its many OEM-rebadged units.
+**Roadmap.** With Mitsubishi Heavy (footnote ⁸) and TCL (footnote ⁹) both **Supported**, the roadmap of pre-emptive additions is complete. Further vendors and the reserved models of already-supported vendors are added on demand rather than pre-emptively. See the reserved candidates and the LG/Coolix note below.
 
 Other single-reference byte-state options (Electra 13-byte, Corona, Whirlpool, Sanyo, the larger Haier variants YRW02 / AC160 / AC176, …) and the reserved models of already-supported vendors (Gree YAW1F/YX1FSF, Sharp A705/A903, the other Fujitsu / Daikin / Hitachi / Toshiba / Samsung formats) are demand-based — added when requested, not pre-locked here.
 
@@ -766,6 +767,7 @@ Per-vendor framing of the supported formats:
 - `Hitachi` — the 28-byte HITACHI_AC protocol (RAS-/RAK- series remotes). A single pulse-distance frame, **MSB-first**, sent once, beginning with a fixed 9-byte framing prefix (`80 08 0C 02 FD 80 7F 88 48`), with a sum-based checksum in the last byte (62 minus the bit-reversed value of every other byte, bit-reversed). Unusually, each logical field is stored **bit-reversed** within its byte, and the fields are coupled: Fan mode carries a sentinel temperature, Dry mode limits the fan to two low speeds, and changing the mode re-clamps the fan — this mirrors IRHitachiAc exactly. `Mode` is `AUTO`/`HEAT`/`COOL`/`DRY`/`FAN`; `Fan` is `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED` (non-contiguous wire codes 1/2/3/5); whole-degree temps 16–32 °C. `SwingV` and `SwingH` are settable. This is the 28-byte format; the other Hitachi sizes (13 / 27 / 33 / 37 / 43 / 53-byte) are separate frames. Timers and the comfort flags are not settable.
 - `Haier` — the 9-byte HAIER_AC protocol (older HSU-/YR- series remotes). A single MSB-first frame with a distinctive **double header** (a 3000/3000 pre-header followed by the 3000/4300 main header), beginning with the fixed prefix `0xA5`, ending with a plain sum checksum. It is **command-oriented**: byte 1's low nibble is a `Command` code (which button was pressed); there is no persistent power bit, so `setPower` writes the On/Off command and `power()` reads "not the Off command" (compare Toshiba). `Mode` is `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`; `Fan` is `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED` (the wire code is inverted: high=1, med=2, low=3); whole-degree temps 16–30 °C, carried in every mode. `SwingV` (`OFF`/`UP`/`DOWN`/`CYCLE`) is settable. This is the 9-byte format; the YRW02 (14-byte), AC160 (20-byte) and AC176 (22-byte) remotes are separate frames. Timers, sleep and health are not settable.
 - `MitsubishiHeavy` — the 152-bit MITSUBISHI_HEAVY_152 protocol (Mitsubishi Heavy Industries "Beaver" SRKxxZM-S / ZMXA-S units, RLA502A700B remote). A separate vendor from the Mitsubishi Electric `Mitsubishi` frame above. A single 19-byte pulse-distance frame, **LSB-first**, sent once, beginning with the fixed 5-byte signature `AD 51 3C E5 1A`. It has no arithmetic checksum; instead every byte from offset 3 on is followed by its bitwise complement (inverted byte pairs), which `fromRaw` validates. Unusually the wire uses a **shorter** space for a 1-bit (420 µs) than a 0-bit (1220 µs), the reverse of the usual convention (the codec classifies spaces by nearest length, so both orderings work). `Mode` is `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`; `Fan` is `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` plus the two special speeds `ECONO` and `TURBO` that share the field; whole-degree temps 17–31 °C, carried in every mode. `SwingV` (`AUTO`/`UP`/`MIDDLE_UP`/`MIDDLE`/`MIDDLE_DOWN`/`DOWN`/`OFF`) and `SwingH` (`AUTO`/`LEFT_MAX`/`LEFT`/`MIDDLE`/`RIGHT`/`RIGHT_MAX`/`RIGHT_LEFT`/`LEFT_RIGHT`/`OFF`) are settable. This is the 152-bit format; the 88-bit SRKxxZJ-S is a separate frame. The Night, Silent, Filter, Clean and 3D flags are preserved across a decode→encode round-trip but are not settable.
+- `TCL` — the 14-byte TCL112AC protocol (TCL TAC-09CHSD/XA31I and the many OEM-rebadged units: Leberg, Teknopoint, Daewoo, Electrolux GYKQ remotes). A single pulse-distance frame, **LSB-first**, sent once, beginning with the fixed 3-byte signature `23 CB 26`, with a plain sum-of-bytes checksum in byte 13. The temperature is unusual: the wire field is inverted (`31 − whole degrees`) and a separate half-degree bit gives **0.5 °C resolution** (16–31 °C, all modes). `Mode` is `HEAT`/`DRY`/`COOL`/`FAN`/`AUTO` (setting `FAN` mode also forces the fan to high, mirroring the reference); `Fan` is `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED` (non-contiguous wire codes 0/1/2/3/5, `MIN_SPEED` = the remote's Night/Quiet speed). `SwingV` (`OFF`/`UP`/`MIDDLE_UP`/`MIDDLE`/`MIDDLE_DOWN`/`DOWN`/`SWING`) and `SwingH` (on/off) are settable. This targets the standard 14-byte "normal" message; the 96-bit TCL96AC and the special/quiet message type are separate frames. Quiet, Light, Econo, Health, Turbo and the on/off timers are preserved across a round-trip but are not settable.
 
 **Panasonic field map (decoded logical fields).** Where each control field lives in the 27-byte state. Status legend: ✅ implemented (decode + encode) · 🔜 planned · 🟡 documented, no setter (re-send via RAW replay) · ⛔ out of scope (separate frame type).
 
@@ -1008,6 +1010,25 @@ It is MSB-first; `toRaw` forces the prefix and the const bit, recomputes the sum
 | inverted pairs | bytes 4,6,8,…,18 | complement of the preceding odd byte | ✅ |
 
 It is LSB-first; `toRaw` forces the signature and `0x80` marker, recomputes the inverted byte pairs, then renders the header + 152 bits + trailer once (sent once). Single format (no model axis); the 88-bit SRKxxZJ-S is a separate frame. Night, Silent, Filter, Clean and 3D are preserved across a round-trip but have no setters.
+
+**TCL field map (decoded logical fields).** Where each control field lives in the 14-byte TCL112AC state. Same status legend. Bytes 0–2 are the fixed signature `23 CB 26`; byte 3 is the message type (`0x01` = normal).
+
+| Field | Location (byte/bit) | Code / range | Status |
+|---|---|---|---|
+| signature | bytes 0-2 | fixed `23 CB 26` | ✅ |
+| message type | byte 3 bits 0-1 | normal = `0b01` | ✅ |
+| power | byte 5 bit 2 | 1=on / 0=off | ✅ |
+| quiet / light / econo | byte 5 bits 5-7 | flags (preserved, not set) | 🟡 |
+| mode | byte 6 bits 0-3 | heat=1 / dry=2 / cool=3 / fan=7 / auto=8 | ✅ |
+| health / turbo | byte 6 bits 4-5 | flags (preserved, not set) | 🟡 |
+| temperature | byte 7 bits 0-3 (+ byte 12 bit 5) | `31 − whole °C`, half-degree bit → 0.5 °C steps, 16–31 °C | ✅ |
+| fan | byte 8 bits 0-2 | auto=0 / min=1 / low=2 / med=3 / high=5 | ✅ |
+| swing (vertical) | byte 8 bits 3-5 | off=0 / highest=1 / high=2 / middle=3 / low=4 / lowest=5 / swing=7 | ✅ |
+| swing (horizontal) | byte 12 bit 3 | 1=on / 0=off | ✅ |
+| timers | bytes 5,9,10 | — | 🟡 |
+| checksum | byte 13 | sum of bytes 0-12 | ✅ |
+
+It is LSB-first; `toRaw` forces the signature, recomputes the sum checksum, then renders the header + 112 bits + trailer once (sent once). Single "normal" message type (no model axis); the 96-bit TCL96AC and the special/quiet message are separate frames. Quiet, Light, Econo, Health, Turbo and the timers are preserved across a round-trip but have no setters.
 
 AC types are not send APIs. Sending is always handled by `IRSender::send()`.
 

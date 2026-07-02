@@ -718,6 +718,7 @@ struct Frame {
 | Carrier | Carrier | 64ビット（8バイト） | CARRIER_AC64 | **対応**⁵ |
 | Hitachi | Hitachi AC | 28バイト | HITACHI_AC | **対応**⁶ |
 | Haier | Haier AC | 9バイト | HAIER_AC | **対応**⁷ |
+| TCL | TCL AC | 14バイト | TCL112AC | **対応**⁹ |
 
 ¹ Sharp（13バイト、A907モデル）は Samsung 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`sharp_irremoteesp8266_tx` / `_rx` — エンコードとデコードをそれぞれ実機上で独立スタックに対して検証）で検証する。HeatpumpIR に Sharp サポートが無いため。
 
@@ -735,9 +736,9 @@ struct Frame {
 
 ⁸ Mitsubishi Heavy（152ビット/19バイト、MITSUBISHI_HEAVY_152）は上の三菱電機 MSZ フレームとは別ベンダ（別メーカー・独自の `esp32irpk::ac::MitsubishiHeavy` 名前空間）。Samsung/Sharp/Kelvinator/Midea/Carrier/Hitachi/Haier 同様、通常の IRremoteESP8266 ＋ HeatpumpIR の組み合わせではなく IRremoteESP8266 双方向ペア（`mitsubishiheavy_irremoteesp8266_tx` / `_rx` — エンコード・デコードそれぞれを独立スタックに対して実機検証）で検証している。HeatpumpIR の Mitsubishi Heavy クラスは主に88ビット ZJ 版が対象のため。フィールドマップ・固定5バイト署名（`AD 51 3C E5 1A`）・バイトペア反転による整合方式（算術チェックサム無し）・0/1スペース長の反転（1ビットが*短い*スペース）は host `codec_smoke` でも検証済みで、実機で PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通過。88ビット SRKxxZJ-S は別フレーム型として予約。
 
-**ロードマップ。** 次に追加するベンダを1つ承認済み。それ以降のベンダおよび対応済みベンダの予約モデルは、先回りせず要望ベースで追加する。もう一方の承認済み追加だった Mitsubishi Heavy（152ビット）は **対応**（脚注⁸）。
+⁹ TCL（14バイト、TCL112AC — TCL TAC-09CHSD/XA31I および多数の OEM リブランド: Leberg・Teknopoint・Daewoo・Electrolux GYKQ リモコン）は Samsung/Sharp/Kelvinator/Midea/Carrier/Hitachi/Haier/Mitsubishi Heavy 同様、通常の IRremoteESP8266 ＋ HeatpumpIR ではなく IRremoteESP8266 双方向ペア（`tcl_irremoteesp8266_tx` / `_rx` — エンコード・デコードそれぞれを独立スタックに対して実機検証）で検証する。HeatpumpIR に TCL サポートが無いため。フィールドマップ・固定3バイト署名（`23 CB 26`）・総和チェックサム・反転＋0.5℃の温度エンコードは host `codec_smoke` でも検証済みで、実機で PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通過。96ビット TCL96AC と special/quiet メッセージ型は別フレームとして予約。
 
-1. **TCL112**（14バイト）。単一リファレンス（IRremoteESP8266 のみ、HeatpumpIR に TCL 無し）。素直な pulse-distance フレームで実装コストが小さく、TCL 本体＋多数の OEM リブランドでシェアが広い。
+**ロードマップ。** Mitsubishi Heavy（脚注⁸）と TCL（脚注⁹）が両方 **対応** となり、先回り追加のロードマップは完了。それ以降のベンダおよび対応済みベンダの予約モデルは、先回りせず要望ベースで追加する。予約候補と LG/Coolix の注記は下記参照。
 
 その他の単一リファレンス byte-state 候補（Electra 13バイト、Corona、Whirlpool、Sanyo、Haier 大型版 YRW02 / AC160 / AC176 …）および対応済みベンダの予約モデル（Gree YAW1F/YX1FSF、Sharp A705/A903、その他の Fujitsu / Daikin / Hitachi / Toshiba / Samsung 形式）は要望ベース（要望が来たら追加、ここでは固定しない）。
 
@@ -759,6 +760,7 @@ struct Frame {
 - `Hitachi` — 28バイト HITACHI_AC protocol（RAS-/RAK- 系リモコン）。単一 pulse-distance フレーム、**MSBファースト**、1回送信。固定9バイトフレーミングプレフィックス（`80 08 0C 02 FD 80 7F 88 48`）で始まり、最終バイトに総和ベースのチェックサム（62から他全バイトのビット反転値を引き、さらにビット反転）。特殊な点として各論理フィールドはバイト内で**ビット反転**して格納され、フィールドが結合している: Fan モードはセンチネル温度を持ち、Dry モードはファンを低速2段に制限し、モード変更でファンが再クランプされる（IRHitachiAc を正確に踏襲）。`Mode` は `AUTO`/`HEAT`/`COOL`/`DRY`/`FAN`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`（非連続のワイヤコード 1/2/3/5）。温度は整数 16–32℃。`SwingV`/`SwingH` は設定可能。これは28バイト版で、他の Hitachi サイズ（13 / 27 / 33 / 37 / 43 / 53バイト）は別フレーム。タイマーとコンフォート系フラグは setter 未作成。
 - `Haier` — 9バイト HAIER_AC protocol（旧 HSU-/YR- 系リモコン）。単一 MSBファーストフレームで、特徴的な**ダブルヘッダ**（3000/3000 プリヘッダ＋3000/4300 メインヘッダ）を持ち、固定プレフィックス `0xA5` で始まり、末尾に総和チェックサム。**コマンド指向**で byte1 の下位ニブルが `Command` コード（押されたボタン）。永続的な電源ビットは無く、`setPower` は On/Off コマンドを書き、`power()` は「Off コマンドでない」を返す（Toshiba と同様）。`Mode` は `AUTO`/`COOL`/`DRY`/`HEAT`/`FAN`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`（ワイヤコードは反転: high=1, med=2, low=3）。温度は整数 16–30℃で全モードで保持。`SwingV`（`OFF`/`UP`/`DOWN`/`CYCLE`）は設定可能。これは9バイト版で、YRW02（14バイト）・AC160（20バイト）・AC176（22バイト）は別フレーム。タイマー・sleep・health は setter 未作成。
 - `MitsubishiHeavy` — 152ビット MITSUBISHI_HEAVY_152 protocol（三菱重工「ビーバーエアコン」SRKxxZM-S / ZMXA-S、RLA502A700B リモコン）。上の三菱電機 `Mitsubishi` フレームとは別ベンダ。単一19バイト pulse-distance フレームで、**LSBファースト**、1回送信、固定5バイト署名 `AD 51 3C E5 1A` で始まる。算術チェックサムは無く、代わりにオフセット3以降の各バイトの直後にそのビット反転が続く（バイトペア反転）を `fromRaw` が検証。特徴的に、ワイヤは1ビットに**短い**スペース（420µs）、0ビットに長いスペース（1220µs）を使い通常と逆（コーデックは最近傍長でスペースを判定するため両順序に対応）。`Mode` は `AUTO`/`COOL`/`DRY`/`FAN`/`HEAT`。`Fan` は `AUTO`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`/`MAX_SPEED` に加え、同フィールドを共有する特殊速度 `ECONO`・`TURBO`。温度は整数 17–31℃で全モードで保持。`SwingV`（`AUTO`/`UP`/`MIDDLE_UP`/`MIDDLE`/`MIDDLE_DOWN`/`DOWN`/`OFF`）と `SwingH`（`AUTO`/`LEFT_MAX`/`LEFT`/`MIDDLE`/`RIGHT`/`RIGHT_MAX`/`RIGHT_LEFT`/`LEFT_RIGHT`/`OFF`）は設定可能。これは152ビット版で、88ビット SRKxxZJ-S は別フレーム。Night・Silent・Filter・Clean・3D はデコード→エンコードの往復で保持されるが setter 未作成。
+- `TCL` — 14バイト TCL112AC protocol（TCL TAC-09CHSD/XA31I および多数の OEM リブランド: Leberg・Teknopoint・Daewoo・Electrolux GYKQ リモコン）。単一 pulse-distance フレームで、**LSBファースト**、1回送信、固定3バイト署名 `23 CB 26` で始まり、byte13 に総和チェックサム。温度が特殊で、ワイヤのフィールドは反転（`31 − 整数℃`）＋別の半度ビットで **0.5℃刻み**（16–31℃、全モード）。`Mode` は `HEAT`/`DRY`/`COOL`/`FAN`/`AUTO`（`FAN` モード設定時はファンを high に強制、リファレンス踏襲）。`Fan` は `AUTO`/`MIN_SPEED`/`LOW_SPEED`/`MED_SPEED`/`HIGH_SPEED`（非連続ワイヤコード 0/1/2/3/5、`MIN_SPEED`＝リモコンの Night/Quiet）。`SwingV`（`OFF`/`UP`/`MIDDLE_UP`/`MIDDLE`/`MIDDLE_DOWN`/`DOWN`/`SWING`）と `SwingH`（on/off）は設定可能。標準14バイトの「normal」メッセージが対象で、96ビット TCL96AC と special/quiet メッセージ型は別フレーム。Quiet・Light・Econo・Health・Turbo・タイマーは往復で保持されるが setter 未作成。
 
 **Panasonic フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが27バイト状態のどこに入るか。ステータス凡例: ✅実装済（decode+encode）・🔜実装予定・🟡記載のみ（setter無し。RAW replayで再送）・⛔スコープ外（別Frame型）。
 
@@ -1001,6 +1003,25 @@ MSBファースト。`toRaw` はプレフィックスと定数ビットを強制
 | 反転ペア | byte4,6,8,…,18 | 直前の奇数バイトの補数 | ✅ |
 
 LSBファースト。`toRaw` は署名と `0x80` マーカーを強制し、バイトペア反転を再計算してから、ヘッダ＋152bit＋トレーラを1回描画する（1回送信）。単一フォーマットでモデル軸なし。88ビット SRKxxZJ-S は別フレーム。Night・Silent・Filter・Clean・3D は往復で保持されるが setter なし。
+
+**TCL フィールドマップ（デコードされる論理フィールド）。** 各制御フィールドが14バイト TCL112AC 状態のどこに入るか。ステータス凡例は上と同じ。byte0-2 は固定署名 `23 CB 26`、byte3 はメッセージ型（`0x01`＝normal）。
+
+| フィールド | 位置（byte/bit） | コード / 範囲 | 状態 |
+|---|---|---|---|
+| 署名 | byte0-2 | 固定 `23 CB 26` | ✅ |
+| メッセージ型 | byte3 bit0-1 | normal = `0b01` | ✅ |
+| power | byte5 bit2 | 1=on / 0=off | ✅ |
+| quiet / light / econo | byte5 bit5-7 | フラグ（保持のみ、setter なし） | 🟡 |
+| mode | byte6 bit0-3 | heat=1 / dry=2 / cool=3 / fan=7 / auto=8 | ✅ |
+| health / turbo | byte6 bit4-5 | フラグ（保持のみ、setter なし） | 🟡 |
+| temperature | byte7 bit0-3（＋byte12 bit5） | `31 − 整数℃`、半度ビットで0.5℃刻み、16–31℃ | ✅ |
+| fan | byte8 bit0-2 | auto=0 / min=1 / low=2 / med=3 / high=5 | ✅ |
+| 上下スイング | byte8 bit3-5 | off=0 / highest=1 / high=2 / middle=3 / low=4 / lowest=5 / swing=7 | ✅ |
+| 左右スイング | byte12 bit3 | 1=on / 0=off | ✅ |
+| タイマー | byte5,9,10 | — | 🟡 |
+| checksum | byte13 | byte0-12 の総和 | ✅ |
+
+LSBファースト。`toRaw` は署名を強制し、総和チェックサムを再計算してから、ヘッダ＋112bit＋トレーラを1回描画する（1回送信）。単一の「normal」メッセージ型でモデル軸なし。96ビット TCL96AC と special/quiet メッセージは別フレーム。Quiet・Light・Econo・Health・Turbo・タイマーは往復で保持されるが setter なし。
 
 AC型は送信APIではありません。送信は常に `IRSender::send()` が担当します。
 

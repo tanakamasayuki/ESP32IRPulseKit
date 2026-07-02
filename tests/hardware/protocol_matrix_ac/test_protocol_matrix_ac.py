@@ -46,6 +46,7 @@ VENDORS = [
     "HITACHI",
     "HAIER",
     "MITSUBISHI_HEAVY",
+    "TCL",
 ]
 
 
