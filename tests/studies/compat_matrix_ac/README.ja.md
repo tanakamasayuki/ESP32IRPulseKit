@@ -79,6 +79,10 @@ hitachi_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Haier（esp32irpk::ac::Haier に合わせて IRHaierAC の HAIER_AC 9バイトを使用）
 haier_irremoteesp8266_tx/    # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
 haier_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
+
+# Mitsubishi Heavy（esp32irpk::ac::MitsubishiHeavy に合わせて IRMitsubishiHeavy152Ac の MITSUBISHI_HEAVY_152 19バイトを使用）
+mitsubishiheavy_irremoteesp8266_tx/  # TX: IRremoteESP8266（既知状態） -> RX: ESP32IRPulseKit  （当方decode較正）
+mitsubishiheavy_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266              （当方encode検証）
 ```
 
 各ベンダは同じ `<extlib>_<role>` バリアントを使う。バリアントのフォルダ名は

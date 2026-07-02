@@ -70,14 +70,18 @@ namespace esp32irpk::ac
     // Classify each bit's space by nearest of the 0/1 lengths rather than by
     // narrow windows around each: real IR receivers (and senders) skew mark and
     // space lengths by ~100us, so a fixed-window scheme leaves a dead zone that
-    // rejects otherwise-valid frames. A space far longer than a one-space is the
-    // trailer's inter-frame gap, which ends the frame. Integrity is enforced by
-    // the vendor checksum, not by tight per-bit windows.
-    const uint32_t one_threshold_us = (t.zero_space_us + t.one_space_us) / 2;
+    // rejects otherwise-valid frames. The classification is order-agnostic (some
+    // vendors, e.g. Mitsubishi Heavy, use a SHORTER space for 1 than for 0), so
+    // it compares distance to each nominal length instead of a directional
+    // threshold. A space far longer than the longest data space is the trailer's
+    // inter-frame gap, which ends the frame. Integrity is enforced by the vendor
+    // checksum, not by tight per-bit windows.
+    const uint32_t max_data_space_us =
+        (t.one_space_us > t.zero_space_us) ? t.one_space_us : t.zero_space_us;
     const uint32_t frame_end_us =
-        (t.frame_gap_us > t.one_space_us)
-            ? (t.one_space_us + t.frame_gap_us) / 2
-            : t.one_space_us + t.one_space_us / 2;
+        (t.frame_gap_us > max_data_space_us)
+            ? (max_data_space_us + t.frame_gap_us) / 2
+            : max_data_space_us + max_data_space_us / 2;
 
     const size_t max_bits = out_cap * 8;
     size_t bit_count = 0;
@@ -95,7 +99,11 @@ namespace esp32irpk::ac
       }
       if (bit_count >= max_bits)
         return 0; // payload exceeds caller buffer
-      if (space_us >= one_threshold_us)
+      const uint32_t d_one = (space_us > t.one_space_us) ? space_us - t.one_space_us
+                                                         : t.one_space_us - space_us;
+      const uint32_t d_zero = (space_us > t.zero_space_us) ? space_us - t.zero_space_us
+                                                           : t.zero_space_us - space_us;
+      if (d_one <= d_zero)
       {
         // Bit order within the byte follows t.lsb_first (MSB-first vendors, e.g.
         // Toshiba, send bit 7 first).

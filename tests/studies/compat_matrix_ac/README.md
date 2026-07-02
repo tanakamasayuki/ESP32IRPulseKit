@@ -80,6 +80,10 @@ hitachi_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266       
 # Haier (IRHaierAC, HAIER_AC 9-byte, matching esp32irpk::ac::Haier)
 haier_irremoteesp8266_tx/    # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
 haier_irremoteesp8266_rx/    # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
+
+# Mitsubishi Heavy (IRMitsubishiHeavy152Ac, MITSUBISHI_HEAVY_152 19-byte, matching esp32irpk::ac::MitsubishiHeavy)
+mitsubishiheavy_irremoteesp8266_tx/  # TX: IRremoteESP8266 (known state) -> RX: ESP32IRPulseKit  (calibrate our decode)
+mitsubishiheavy_irremoteesp8266_rx/  # TX: ESP32IRPulseKit -> RX: IRremoteESP8266                (verify our encode)
 ```
 
 Each vendor uses the same `<extlib>_<role>` variants. Every variant folder is
@@ -286,6 +290,16 @@ harness are added one variant at a time. In place:
   checksum. It is command-oriented (no power bit; power is the On/Off command), so both
   stacks set the command last and power is read as "not the Off command". HeatpumpIR has
   no Haier class, so it is cross-checked by the IRremoteESP8266 bidirectional pair alone.
+
+- `mitsubishiheavy_irremoteesp8266_tx/` + `mitsubishiheavy_irremoteesp8266_rx/` -- the same
+  calibration and encoder-verification pair for the 19-byte MITSUBISHI_HEAVY_152 protocol
+  (Mitsubishi Heavy Industries "Beaver" SRKxxZM-S units), using IRremoteESP8266's
+  `IRMitsubishiHeavy152Ac`. A single LSB-first pulse-distance frame with a fixed 5-byte
+  signature (`AD 51 3C E5 1A`), no arithmetic checksum but inverted byte pairs from offset
+  3, and a shorter space for a 1-bit than a 0-bit. This is a different manufacturer from the
+  Mitsubishi Electric MSZ vendor. HeatpumpIR's Mitsubishi Heavy class primarily targets the
+  88-bit ZJ variant, so this 152-bit format is cross-checked by the IRremoteESP8266
+  bidirectional pair alone.
 
 - `gree_heatpumpir_tx/` + `mitsubishi_heatpumpir_tx/` + `fujitsu_heatpumpir_tx/` + `daikin_heatpumpir_tx/` + `toshiba_heatpumpir_tx/` -- a second independent
   reference for each, mirroring `panasonic_heatpumpir_tx`: HeatpumpIR (`GreeGenericHeatpumpIR`

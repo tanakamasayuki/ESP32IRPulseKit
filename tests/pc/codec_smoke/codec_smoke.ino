@@ -3151,6 +3151,144 @@ void testHaierAcStateMatrix()
   EXPECT_TRUE("haier/state-matrix", all_ok);
 }
 
+// Mitsubishi Heavy AC (152-bit MITSUBISHI_HEAVY_152: single LSB-first frame with
+// a 5-byte signature, inverted byte pairs, and a SHORTER 1-space than 0-space):
+// build a frame, render the burst and decode it back. Field offsets and the
+// mode/fan/swing codes come from IRMitsubishiHeavy152Ac's documented layout; the
+// hardware study verifies them. Canonical bytes were derived from the reference.
+void testMitsubishiHeavyAcRoundtrip()
+{
+  using esp32irpk::ac::MitsubishiHeavy::Fan;
+  using esp32irpk::ac::MitsubishiHeavy::Frame;
+  using esp32irpk::ac::MitsubishiHeavy::Mode;
+  using esp32irpk::ac::MitsubishiHeavy::SwingH;
+  using esp32irpk::ac::MitsubishiHeavy::SwingV;
+
+  Frame f{};
+  f.setPower(true);
+  f.setMode(Mode::COOL);
+  f.setTemperatureC(24);
+  f.setFan(Fan::AUTO);
+  f.setSwingV(SwingV::OFF);
+  f.setSwingH(SwingH::OFF);
+
+  EXPECT_TRUE("mheavy/power-get", f.power());
+  EXPECT_TRUE("mheavy/mode-get", f.mode() == Mode::COOL);
+  EXPECT_EQ("mheavy/temp-get", 24u, f.temperatureC());
+  EXPECT_TRUE("mheavy/fan-get", f.fan() == Fan::AUTO);
+
+  uint16_t ticks[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+  EXPECT_TRUE("mheavy/encode", f.toRaw(buf));
+  EXPECT_TRUE("mheavy/encode-nonempty", buf.len > 0);
+
+  esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+  Frame g{};
+  EXPECT_TRUE("mheavy/decode", Frame::fromRaw(view, g));
+  EXPECT_TRUE("mheavy/decode-checksum", g.checksum_ok);
+  EXPECT_EQ("mheavy/decode-bytelen", Frame::kBytes, g.byte_length);
+  EXPECT_TRUE("mheavy/decode-power", g.power());
+  EXPECT_TRUE("mheavy/decode-mode", g.mode() == Mode::COOL);
+  EXPECT_EQ("mheavy/decode-temp", 24u, g.temperatureC());
+  EXPECT_TRUE("mheavy/decode-fan", g.fan() == Fan::AUTO);
+  EXPECT_TRUE("mheavy/decode-swingv", g.swingV() == SwingV::OFF);
+  EXPECT_TRUE("mheavy/decode-swingh", g.swingH() == SwingH::OFF);
+
+  // On / cool / 24C / fan auto / swingV off / swingH off, from IRMitsubishiHeavy152Ac.
+  static const uint8_t kCanonical[Frame::kBytes] = {
+      0xAD, 0x51, 0x3C, 0xE5, 0x1A, 0x09, 0xF6, 0x07, 0xF8,
+      0x00, 0xFF, 0xC0, 0x3F, 0x08, 0xF7, 0x00, 0xFF, 0x80, 0x7F};
+  bool canonical_match = true;
+  for (size_t i = 0; i < Frame::kBytes; ++i)
+    if (g.bytes[i] != kCanonical[i])
+      canonical_match = false;
+  EXPECT_TRUE("mheavy/canonical-bytes", canonical_match);
+
+  // A hardware capture does not record the final trailing gap.
+  Frame ng{};
+  EXPECT_TRUE("mheavy/decode-no-trailing-gap",
+              buf.len > 1 &&
+                  Frame::fromRaw(esp32irpk::IRRawTickView{buf.ticks, buf.len - 1}, ng) &&
+                  ng.checksum_ok && ng.mode() == Mode::COOL && ng.fan() == Fan::AUTO);
+
+  // The two special fan speeds (Econo, Turbo) share the fan field and round-trip.
+  Frame ef{};
+  ef.setPower(true);
+  ef.setMode(Mode::COOL);
+  ef.setFan(Fan::TURBO);
+  uint16_t et[Frame::kMaxTicks];
+  esp32irpk::IRRawTickBuffer eb{et, Frame::kMaxTicks, 0};
+  EXPECT_TRUE("mheavy/turbo-encode", ef.toRaw(eb));
+  Frame eg{};
+  EXPECT_TRUE("mheavy/turbo-decode", Frame::fromRaw(esp32irpk::IRRawTickView{eb.ticks, eb.len}, eg));
+  EXPECT_TRUE("mheavy/turbo-decode-val", eg.fan() == Fan::TURBO);
+
+  // Temperature clamps to the supported 17-31C range.
+  Frame t{};
+  t.setTemperatureC(40);
+  EXPECT_EQ("mheavy/temp-clamp-high", 31u, t.temperatureC());
+  t.setTemperatureC(5);
+  EXPECT_EQ("mheavy/temp-clamp-low", 17u, t.temperatureC());
+
+  // A non-Mitsubishi-Heavy waveform (NEC) must be rejected.
+  esp32irpk::IRRawTickView nec{};
+  nec.ticks = test_fixtures::nec_normal_00ff_34_raw_ticks;
+  nec.len = test_fixtures::nec_normal_00ff_34_raw_len;
+  Frame nf{};
+  EXPECT_TRUE("mheavy/reject-nec", !Frame::fromRaw(nec, nf));
+}
+
+// Every mode/fan/temperature/power/swing combination must encode -> decode back
+// to itself with valid inverted byte pairs. Temperature is carried in all modes.
+void testMitsubishiHeavyAcStateMatrix()
+{
+  using esp32irpk::ac::MitsubishiHeavy::Fan;
+  using esp32irpk::ac::MitsubishiHeavy::Frame;
+  using esp32irpk::ac::MitsubishiHeavy::Mode;
+  using esp32irpk::ac::MitsubishiHeavy::SwingH;
+  using esp32irpk::ac::MitsubishiHeavy::SwingV;
+
+  static const Mode modes[] = {Mode::AUTO, Mode::COOL, Mode::DRY, Mode::FAN, Mode::HEAT};
+  static const Fan fans[] = {Fan::AUTO, Fan::LOW_SPEED, Fan::MED_SPEED, Fan::HIGH_SPEED,
+                             Fan::MAX_SPEED, Fan::ECONO, Fan::TURBO};
+  static const SwingV svs[] = {SwingV::AUTO, SwingV::UP, SwingV::MIDDLE, SwingV::DOWN, SwingV::OFF};
+  static const SwingH shs[] = {SwingH::AUTO, SwingH::LEFT, SwingH::MIDDLE, SwingH::RIGHT, SwingH::OFF};
+
+  bool all_ok = true;
+  size_t sv_i = 0, sh_i = 0;
+  for (Mode m : modes)
+    for (Fan fan : fans)
+      for (uint8_t temp = 17; temp <= 31; ++temp)
+        for (uint8_t power = 0; power <= 1; ++power)
+        {
+          // Cycle the swing axes so every value is exercised without a 4th nested loop.
+          SwingV sv = svs[sv_i++ % (sizeof(svs) / sizeof(svs[0]))];
+          SwingH sh = shs[sh_i++ % (sizeof(shs) / sizeof(shs[0]))];
+          Frame f{};
+          f.setPower(power != 0);
+          f.setMode(m);
+          f.setFan(fan);
+          f.setTemperatureC(temp);
+          f.setSwingV(sv);
+          f.setSwingH(sh);
+
+          uint16_t ticks[Frame::kMaxTicks];
+          esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+          if (!f.toRaw(buf))
+          {
+            all_ok = false;
+            continue;
+          }
+          esp32irpk::IRRawTickView view{buf.ticks, buf.len};
+          Frame g{};
+          if (!Frame::fromRaw(view, g) || !g.checksum_ok ||
+              g.power() != (power != 0) || g.mode() != m || g.fan() != fan ||
+              g.temperatureC() != temp || g.swingV() != sv || g.swingH() != sh)
+            all_ok = false;
+        }
+  EXPECT_TRUE("mheavy/state-matrix", all_ok);
+}
+
 // decodeAny must classify each vendor's own rendered frame as that vendor. This
 // guards the cascade ordering -- notably Gree vs Kelvinator, whose frames share a
 // header + B010 footer + block checksum (a Gree frame is one Kelvinator block), so
@@ -3178,6 +3316,7 @@ void testAcDecodeAny()
   check(ac::Carrier::Frame{}, ac::AcVendor::CARRIER, "decodeany/carrier");
   check(ac::Hitachi::Frame{}, ac::AcVendor::HITACHI, "decodeany/hitachi");
   check(ac::Haier::Frame{}, ac::AcVendor::HAIER, "decodeany/haier");
+  check(ac::MitsubishiHeavy::Frame{}, ac::AcVendor::MITSUBISHI_HEAVY, "decodeany/mheavy");
 }
 
 // Each vendor's toString() maps an enum value to its identifier name (used by
@@ -3197,6 +3336,7 @@ void testAcEnumToString()
   namespace CA = esp32irpk::ac::Carrier;
   namespace HI = esp32irpk::ac::Hitachi;
   namespace HA = esp32irpk::ac::Haier;
+  namespace MH = esp32irpk::ac::MitsubishiHeavy;
   EXPECT_TRUE("panasonic/tostring-mode", strcmp(P::toString(P::Mode::COOL), "COOL") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-min", strcmp(P::toString(P::Fan::MIN_SPEED), "MIN_SPEED") == 0);
   EXPECT_TRUE("panasonic/tostring-fan-quiet", strcmp(P::toString(P::Fan::QUIET), "QUIET") == 0);
@@ -3237,6 +3377,11 @@ void testAcEnumToString()
   EXPECT_TRUE("haier/tostring-mode", strcmp(HA::toString(HA::Mode::DRY), "DRY") == 0);
   EXPECT_TRUE("haier/tostring-fan-high", strcmp(HA::toString(HA::Fan::HIGH_SPEED), "HIGH_SPEED") == 0);
   EXPECT_TRUE("haier/tostring-swing", strcmp(HA::toString(HA::SwingV::CYCLE), "CYCLE") == 0);
+  EXPECT_TRUE("mheavy/tostring-mode", strcmp(MH::toString(MH::Mode::HEAT), "HEAT") == 0);
+  EXPECT_TRUE("mheavy/tostring-fan-turbo", strcmp(MH::toString(MH::Fan::TURBO), "TURBO") == 0);
+  EXPECT_TRUE("mheavy/tostring-fan-econo", strcmp(MH::toString(MH::Fan::ECONO), "ECONO") == 0);
+  EXPECT_TRUE("mheavy/tostring-swingv", strcmp(MH::toString(MH::SwingV::UP), "UP") == 0);
+  EXPECT_TRUE("mheavy/tostring-swingh", strcmp(MH::toString(MH::SwingH::LEFT_RIGHT), "LEFT_RIGHT") == 0);
   // Out-of-range value falls back to "?".
   EXPECT_TRUE("panasonic/tostring-unknown", strcmp(P::toString((P::Mode)99), "?") == 0);
 }
@@ -3611,6 +3756,36 @@ void testAcFromBytes()
     EXPECT_TRUE("haier/frombytes-eq", eq);
     EXPECT_TRUE("haier/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
   }
+
+  // Mitsubishi Heavy: bit-exact replay through fromBytes.
+  {
+    using esp32irpk::ac::MitsubishiHeavy::Fan;
+    using esp32irpk::ac::MitsubishiHeavy::Frame;
+    using esp32irpk::ac::MitsubishiHeavy::Mode;
+    using esp32irpk::ac::MitsubishiHeavy::SwingV;
+
+    Frame a{};
+    a.setPower(true);
+    a.setMode(Mode::HEAT);
+    a.setTemperatureC(28);
+    a.setFan(Fan::MAX_SPEED);
+    a.setSwingV(SwingV::UP);
+    uint16_t ticks[Frame::kMaxTicks];
+    esp32irpk::IRRawTickBuffer buf{ticks, sizeof(ticks) / sizeof(ticks[0]), 0};
+    EXPECT_TRUE("mheavy/frombytes-enc", a.toRaw(buf));
+    esp32irpk::IRRawTickView v{buf.ticks, buf.len};
+    Frame dec{};
+    EXPECT_TRUE("mheavy/frombytes-dec", Frame::fromRaw(v, dec));
+    Frame fb{};
+    EXPECT_TRUE("mheavy/frombytes", Frame::fromBytes(dec.bytes, Frame::kBytes, fb));
+    EXPECT_TRUE("mheavy/frombytes-checksum", fb.checksum_ok);
+    bool eq = true;
+    for (size_t i = 0; i < Frame::kBytes; ++i)
+      if (fb.bytes[i] != dec.bytes[i])
+        eq = false;
+    EXPECT_TRUE("mheavy/frombytes-eq", eq);
+    EXPECT_TRUE("mheavy/frombytes-badlen", !Frame::fromBytes(dec.bytes, Frame::kBytes - 1, fb));
+  }
 }
 } // namespace
 
@@ -3689,6 +3864,8 @@ void setup()
   testHitachiAcStateMatrix();
   testHaierAcRoundtrip();
   testHaierAcStateMatrix();
+  testMitsubishiHeavyAcRoundtrip();
+  testMitsubishiHeavyAcStateMatrix();
   testAcDecodeAny();
   testAcEnumToString();
   testAcFromBytes();

@@ -15,6 +15,7 @@
 #include "Carrier.h"
 #include "Hitachi.h"
 #include "Haier.h"
+#include "MitsubishiHeavy.h"
 
 // Air-conditioner support layer. AC frames are multi-byte vendor state that
 // does not fit the generic 64-bit IRDecodedBits codec, so this layer works on
@@ -39,6 +40,7 @@ namespace esp32irpk::ac
     CARRIER = 11,
     HITACHI = 12,
     HAIER = 13,
+    MITSUBISHI_HEAVY = 14,
     // further vendors added incrementally
   };
 
@@ -162,6 +164,16 @@ namespace esp32irpk::ac
         hf.printTo(*out);
       return AcVendor::HITACHI;
     }
+    // Mitsubishi Heavy (152-bit) gates on its fixed 5-byte AD 51 3C E5 1A
+    // signature, so its ~3140/1630 header does not collide with the other
+    // ~3400/1700-header vendors.
+    MitsubishiHeavy::Frame mhf;
+    if (MitsubishiHeavy::Frame::fromRaw(raw, mhf))
+    {
+      if (out)
+        mhf.printTo(*out);
+      return AcVendor::MITSUBISHI_HEAVY;
+    }
     // Haier (9-byte) has a distinctive 3000/3000 double-header pre-header, so it is
     // unambiguous; appended last.
     Haier::Frame haf;
@@ -269,6 +281,13 @@ namespace esp32irpk::ac
                           hf.bytes, Hitachi::Frame::kBytes);
       return AcVendor::HITACHI;
     }
+    MitsubishiHeavy::Frame mhf;
+    if (MitsubishiHeavy::Frame::fromRaw(raw, mhf))
+    {
+      printAcStateSnippet(out, "MitsubishiHeavy", "esp32irpk::ac::MitsubishiHeavy::Frame",
+                          mhf.bytes, MitsubishiHeavy::Frame::kBytes);
+      return AcVendor::MITSUBISHI_HEAVY;
+    }
     Haier::Frame haf;
     if (Haier::Frame::fromRaw(raw, haf))
     {
@@ -357,6 +376,12 @@ namespace esp32irpk::ac
     {
       hf.printSetterSnippet(out);
       return AcVendor::HITACHI;
+    }
+    MitsubishiHeavy::Frame mhf;
+    if (MitsubishiHeavy::Frame::fromRaw(raw, mhf))
+    {
+      mhf.printSetterSnippet(out);
+      return AcVendor::MITSUBISHI_HEAVY;
     }
     Haier::Frame haf;
     if (Haier::Frame::fromRaw(raw, haf))

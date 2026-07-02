@@ -14,11 +14,11 @@ RAWなmark/space波形をキャプチャし、スコア付きのプロトコル�
 - **3つの抽象レベル。** RAW tick（`1 tick = 10us`）、正規化された `IRDecodedBits`、プロトコル固有の `Frame` 型。必要に応じて低レベルにも高レベルにも扱えます。
 - **既定で位相整合・シンボルエンコードのキャリア。** 復調後のmarkがフレーム間で安定し、他ライブラリでもきれいにデコードされます。
 - **あらゆる波形を学習・再送。** 専用デコーダのないプロトコルを含め、RAW経路で学習・再送できます。
-- **エアコン対応。** RAW経路上の独立した `esp32irpk::ac` レイヤーとして、1ボタンで送る多バイトの状態フレームを名前付きフィールドへデコード/エンコードします（13ベンダ: Panasonic・Gree・Mitsubishi・Fujitsu・Daikin・Toshiba・Samsung・Sharp・Kelvinator・Midea・Carrier・Hitachi・Haier）。
+- **エアコン対応。** RAW経路上の独立した `esp32irpk::ac` レイヤーとして、1ボタンで送る多バイトの状態フレームを名前付きフィールドへデコード/エンコードします（14ベンダ: Panasonic・Gree・Mitsubishi・Mitsubishi Heavy・Fujitsu・Daikin・Toshiba・Samsung・Sharp・Kelvinator・Midea・Carrier・Hitachi・Haier）。
 
 ## 対象範囲
 
-本ライブラリは短い民生リモコンのフレーム（NEC・Sony・AEHA など）を対象とし、意味のあるビットへのデコード、類似プロトコルの判別、再送を行います。エアコン／ヒートポンプ系のリモコン（1ボタンで多バイトの状態フレーム全体を送るもの）は汎用コーデックには乗らないため、RAW経路上の**独立した `esp32irpk::ac` レイヤー**で扱います（13ベンダに対応 — Panasonic・Gree・Mitsubishi・Fujitsu・Daikin・Toshiba・Samsung・Sharp・Kelvinator・Midea・Carrier・Hitachi・Haier。ベンダは追加可能）。あらゆるマイナープロトコルの網羅は目指さず、対応プロトコル数の網羅性は目標ではありません。学習・再送だけでよければRAWキャプチャ/再送が任意の波形を扱えます。
+本ライブラリは短い民生リモコンのフレーム（NEC・Sony・AEHA など）を対象とし、意味のあるビットへのデコード、類似プロトコルの判別、再送を行います。エアコン／ヒートポンプ系のリモコン（1ボタンで多バイトの状態フレーム全体を送るもの）は汎用コーデックには乗らないため、RAW経路上の**独立した `esp32irpk::ac` レイヤー**で扱います（14ベンダに対応 — Panasonic・Gree・Mitsubishi・Mitsubishi Heavy・Fujitsu・Daikin・Toshiba・Samsung・Sharp・Kelvinator・Midea・Carrier・Hitachi・Haier。ベンダは追加可能）。あらゆるマイナープロトコルの網羅は目指さず、対応プロトコル数の網羅性は目標ではありません。学習・再送だけでよければRAWキャプチャ/再送が任意の波形を扱えます。
 
 ## 対応プロトコル
 
