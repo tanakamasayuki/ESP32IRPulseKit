@@ -739,7 +739,14 @@ This is why a model is a parameter rather than a type-per-model: a received fram
 
 ⁷ Haier (9-byte, HAIER_AC), like Samsung, Sharp, Kelvinator, Midea, Carrier and Hitachi, is verified by the IRremoteESP8266 bidirectional pair (`haier_irremoteesp8266_tx` / `_rx` — encode and decode each checked against an independent stack on hardware) rather than the usual IRremoteESP8266 + HeatpumpIR combination, because HeatpumpIR has no Haier support. The double-header framing (a 3000/3000 pre-header before the 3000/4300 main header), the command-oriented power model and the sum checksum are additionally checked in host `codec_smoke`, and it passes the PulseKit self round-trip on hardware (`hardware/protocol_matrix_ac`). This is the single-reference 9-byte format; the YRW02 (14-byte), AC160 (20-byte) and AC176 (22-byte) remotes are reserved as separate frame types.
 
-**Candidate vendors (not yet started).** No dual-reference (IRremoteESP8266 *and* HeatpumpIR) byte-state candidates remain. Further single-reference (IRremoteESP8266-only) byte-state options if more coverage is wanted: the larger Haier variants (YRW02 14-byte, AC160 20-byte, AC176 22-byte), TCL112 (14-byte), Electra (13-byte). Bit-paired code formats (Coolix 24-bit, LG 28-bit, …) are deliberately out of scope — they are not multi-byte byte-state and would need a different code path outside this layer. Target models are chosen at approval time, not pre-locked here.
+**Roadmap.** Two more vendors are approved as the next additions; after those, further vendors and the reserved models of already-supported vendors are added on demand rather than pre-emptively.
+
+1. **Mitsubishi Heavy** (Mitsubishi Heavy Industries "Beaver" — the 152-bit / 19-byte and 88-bit / 11-byte formats), a new vendor distinct from the supported Mitsubishi Electric MSZ frame. It has both references (IRremoteESP8266 *and* HeatpumpIR), so it can be verified the usual two-reference way, and it fills a real gap in the Japanese market.
+2. **TCL112** (14-byte), single-reference (IRremoteESP8266 only; HeatpumpIR has no TCL). Small implementation cost (a plain pulse-distance frame) and broad share via TCL itself plus its many OEM-rebadged units.
+
+Other single-reference byte-state options (Electra 13-byte, Corona, Whirlpool, Sanyo, the larger Haier variants YRW02 / AC160 / AC176, …) and the reserved models of already-supported vendors (Gree YAW1F/YX1FSF, Sharp A705/A903, the other Fujitsu / Daikin / Hitachi / Toshiba / Samsung formats) are demand-based — added when requested, not pre-locked here.
+
+**Reserved for a future bit-paired code path.** LG (28-bit) and Coolix (24-bit) have the widest share of the still-missing formats, but they are bit-paired *code* protocols, not multi-byte byte-state, so they do not fit this `ac::` layer and would need a separate code path. They are reserved as future work, not yet started.
 
 Per-vendor framing of the supported formats:
 

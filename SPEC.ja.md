@@ -732,7 +732,14 @@ struct Frame {
 
 ⁷ Haier（9バイト、HAIER_AC）は Samsung/Sharp/Kelvinator/Midea/Carrier/Hitachi 同様、通常の IRremoteESP8266 ＋ HeatpumpIR の組み合わせではなく IRremoteESP8266 双方向ペア（`haier_irremoteesp8266_tx` / `_rx` — エンコード・デコードそれぞれを独立スタックに対して実機検証）で検証している。HeatpumpIR に Haier サポートが無いため。ダブルヘッダのフレーミング（3000/4300 メインヘッダの前に 3000/3000 プリヘッダ）・コマンド指向の電源モデル・総和チェックサムは host `codec_smoke` でも検証済みで、実機で PulseKit 自己往復（`hardware/protocol_matrix_ac`）も通過。これは単一リファレンスの9バイト版で、YRW02（14バイト）・AC160（20バイト）・AC176（22バイト）は別フレーム型として予約。
 
-**未着手の候補ベンダ。** 第2の独立リファレンス（IRremoteESP8266 *と* HeatpumpIR の両方）を持つ byte-state 候補は残っていない。さらにカバレッジを広げたい場合の単一リファレンス（IRremoteESP8266のみ）byte-state 候補: Haier の大型版（YRW02 14バイト・AC160 20バイト・AC176 22バイト）、TCL112（14バイト）、Electra（13バイト）。ビットペア方式（Coolix 24-bit、LG 28-bit など）は多バイトの byte-state ではなく別コード経路が必要なため、本レイヤの対象外。対象モデルは承認時に決定し、ここで固定はしない。
+**ロードマップ。** 次に追加する2ベンダを承認済み。それ以降のベンダおよび対応済みベンダの予約モデルは、先回りせず要望ベースで追加する。
+
+1. **Mitsubishi Heavy**（三菱重工「ビーバーエアコン」— 152ビット/19バイト および 88ビット/11バイト形式）。対応済みの三菱電機 MSZ フレームとは別の新ベンダ。IRremoteESP8266 *と* HeatpumpIR の両参照を持つため通常の二重リファレンス方式で検証でき、日本市場の実質的な穴を埋める。
+2. **TCL112**（14バイト）。単一リファレンス（IRremoteESP8266 のみ、HeatpumpIR に TCL 無し）。素直な pulse-distance フレームで実装コストが小さく、TCL 本体＋多数の OEM リブランドでシェアが広い。
+
+その他の単一リファレンス byte-state 候補（Electra 13バイト、Corona、Whirlpool、Sanyo、Haier 大型版 YRW02 / AC160 / AC176 …）および対応済みベンダの予約モデル（Gree YAW1F/YX1FSF、Sharp A705/A903、その他の Fujitsu / Daikin / Hitachi / Toshiba / Samsung 形式）は要望ベース（要望が来たら追加、ここでは固定しない）。
+
+**将来のビットペアコード経路として予約。** LG（28ビット）と Coolix（24ビット）は未対応形式の中で最もシェアが広いが、多バイトの byte-state ではなくビットペア*コード*方式のため本 `ac::` レイヤには乗らず、別コード経路が必要。将来課題として予約し、未着手。
 
 対応フォーマットのベンダ別構造:
 
