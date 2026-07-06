@@ -133,7 +133,6 @@ namespace esp32irpk::ac::Tcl
     inline constexpr uint8_t kSwingVMask = 0x38; // bits 3-5
     inline constexpr uint8_t kSwingHMask = 0x08; // bit 3
     inline constexpr uint8_t kHalfDegMask = 0x20; // bit 5 of byte 12
-    inline constexpr uint8_t kMsgTypeNormal = 0x01;
 
     inline constexpr uint8_t kTempMaxC = 31; // Temp field = 31 - floor(C)
     inline constexpr uint8_t kTempMinC = 16;

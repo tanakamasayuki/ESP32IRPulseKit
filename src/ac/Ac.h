@@ -176,8 +176,12 @@ namespace esp32irpk::ac
         mhf.printTo(*out);
       return AcVendor::MITSUBISHI_HEAVY;
     }
-    // TCL (14-byte TCL112AC) gates on its fixed 23 CB 26 signature; its 3000/1650
-    // header would otherwise overlap the ~3000-header group.
+    // TCL (14-byte TCL112AC). Its 23 CB 26 signature prefix is shared with the
+    // Mitsubishi Electric frame (same Kaseikyo lineage) and its 3000/1650 header
+    // overlaps that group, so the signature alone does not disambiguate. The real
+    // separator is frame length: each fromRaw requires an exact bit count (TCL 112
+    // vs Mitsubishi 144), and Mitsubishi is tried earlier, so a genuine frame of
+    // either vendor is claimed by its own decoder and rejected by the other's.
     Tcl::Frame tcf;
     if (Tcl::Frame::fromRaw(raw, tcf))
     {

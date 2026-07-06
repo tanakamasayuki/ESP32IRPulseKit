@@ -164,27 +164,22 @@ namespace esp32irpk::ac::MitsubishiHeavy
 
     // Field-bearing bytes (odd offsets from 5 on); the following even byte holds
     // the complement. Byte 3/4 are part of the signature but also a valid pair.
-    inline constexpr size_t kOffModePower = 5; // Mode 0-2, Power 3, Clean 5, Filter 6
+    // Only the settable fields have offsets/masks here; the preserved-not-settable
+    // flags (Clean/Filter in byte 5, 3D in byte 11, Night/Silent in byte 15) survive
+    // a round-trip via the verbatim byte copy and are documented in SPEC §11.2.
+    inline constexpr size_t kOffModePower = 5; // Mode 0-2, Power 3
     inline constexpr size_t kOffTemp = 7;      // Temp 0-3 (degC - 17)
     inline constexpr size_t kOffFan = 9;       // Fan 0-3
-    inline constexpr size_t kOffSwing3D = 11;  // Three 1, D 4, SwingV 5-7
+    inline constexpr size_t kOffSwing3D = 11;  // SwingV 5-7
     inline constexpr size_t kOffSwingH = 13;   // SwingH 0-3
-    inline constexpr size_t kOffNightSilent = 15; // Night 6, Silent 7
     inline constexpr size_t kByte17 = 17;      // fixed 0x80
 
     inline constexpr uint8_t kModeMask = 0x07;
     inline constexpr uint8_t kPowerMask = 0x08;
-    inline constexpr uint8_t kCleanMask = 0x20;
-    inline constexpr uint8_t kFilterMask = 0x40;
     inline constexpr uint8_t kTempMask = 0x0F;
     inline constexpr uint8_t kFanMask = 0x0F;
     inline constexpr uint8_t kSwingVMask = 0xE0; // bits 5-7
-    inline constexpr uint8_t kThreeMask = 0x02;  // bit 1
-    inline constexpr uint8_t kDMask = 0x10;      // bit 4
-    inline constexpr uint8_t k3DMask = 0x12;     // Three | D
     inline constexpr uint8_t kSwingHMask = 0x0F;
-    inline constexpr uint8_t kNightMask = 0x40;
-    inline constexpr uint8_t kSilentMask = 0x80;
 
     inline constexpr uint8_t kMinTempC = 17;
     inline constexpr uint8_t kMaxTempC = 31;
