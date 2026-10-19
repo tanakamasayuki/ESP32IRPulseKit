@@ -1,5 +1,6 @@
 #include <ESP32IRPulseKit.h>
 #include <codec/Encoder.h>
+#include <hal/RmtRxCapacity.h>
 #include "verified_fixtures.h"
 
 namespace
@@ -1032,6 +1033,46 @@ void testReceiverDecodeLifecycle()
 
   EXPECT_TRUE("receiver-decode/clear", rx.clearProtocols());
   EXPECT_TRUE("receiver-decode/after-clear", !rx.decode(view, result));
+}
+
+void testRxCapacityPlanning()
+{
+  using namespace esp32irpk::hal;
+
+  // Chips without RX ping-pong (ESP32: 8 x 64-word blocks, ESP32-S2: 4 x 64):
+  // RX may take at most half of the shared RMT memory so TX can coexist.
+  EXPECT_EQ("rxcap/max-blocks-esp32", 4u, rxMaxMemBlocks(8));
+  EXPECT_EQ("rxcap/max-blocks-esp32s2", 2u, rxMaxMemBlocks(4));
+  EXPECT_EQ("rxcap/max-blocks-min", 1u, rxMaxMemBlocks(1));
+
+  // Blocks hold the capacity plus one sentinel symbol, clamped to [1, max].
+  EXPECT_EQ("rxcap/blocks-63", 1u, rxMemBlocksFor(63, 64, 4));
+  EXPECT_EQ("rxcap/blocks-64", 2u, rxMemBlocksFor(64, 64, 4));
+  EXPECT_EQ("rxcap/blocks-127", 2u, rxMemBlocksFor(127, 64, 4));
+  EXPECT_EQ("rxcap/blocks-191", 3u, rxMemBlocksFor(191, 64, 4));
+  EXPECT_EQ("rxcap/blocks-default", 4u, rxMemBlocksFor(256, 64, 4));
+  EXPECT_EQ("rxcap/blocks-clamped", 4u, rxMemBlocksFor(1000, 64, 4));
+  EXPECT_EQ("rxcap/blocks-s2-clamped", 2u, rxMemBlocksFor(256, 64, 2));
+  EXPECT_EQ("rxcap/blocks-tiny", 1u, rxMemBlocksFor(1, 64, 4));
+
+  // The receive buffer keeps one sentinel slot past the capacity.
+  EXPECT_EQ("rxcap/buffer", 257u, rxBufferSymbols(256));
+
+  // Ping-pong chips (hw_symbols = 0): only the capacity limits a capture.
+  EXPECT_TRUE("rxcap/pp-short", !rxCaptureTruncated(200, 256, 0));
+  EXPECT_TRUE("rxcap/pp-at-cap", !rxCaptureTruncated(64, 64, 0));
+  EXPECT_TRUE("rxcap/pp-over-cap", rxCaptureTruncated(65, 64, 0));
+
+  // No ping-pong: a capture that fills the hardware memory was cut by it.
+  EXPECT_TRUE("rxcap/hw-short", !rxCaptureTruncated(255, 256, 256));
+  EXPECT_TRUE("rxcap/hw-full", rxCaptureTruncated(256, 256, 256));
+  EXPECT_TRUE("rxcap/hw-at-cap", !rxCaptureTruncated(64, 64, 128));
+  EXPECT_TRUE("rxcap/hw-over-cap", rxCaptureTruncated(65, 64, 128));
+  EXPECT_TRUE("rxcap/hw-fallback-full", rxCaptureTruncated(64, 256, 64));
+
+  // Delivered length never exceeds the capacity.
+  EXPECT_EQ("rxcap/clamp-under", 200u, rxCapturedSymbols(200, 256));
+  EXPECT_EQ("rxcap/clamp-over", 64u, rxCapturedSymbols(65, 64));
 }
 
 void testReceiverConfigurationLifecycle()
@@ -3993,6 +4034,7 @@ void setup()
   testCandidateOrderBreaksScoreTies();
   testReceiverDecodeLifecycle();
   testReceiverConfigurationLifecycle();
+  testRxCapacityPlanning();
   testDecodeCandidateLimitZero();
   testDecodeConsumesConcatenatedFramePrefix();
   testFrameConversions();

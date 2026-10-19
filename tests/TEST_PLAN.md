@@ -20,7 +20,7 @@ IR behavior is affected by the physical environment, so `pc/codec_smoke` asserts
 
 | Environment | Tests |
 | --- | --- |
-| Local development | pc, hardware/link_smoke, hardware/protocol_matrix, hardware/protocol_matrix_ac |
+| Local development | pc, hardware/link_smoke, hardware/protocol_matrix, hardware/protocol_matrix_ac, hardware/rx_capacity |
 | GitHub Actions | pc (fixtures, codec_smoke, compile) |
 | As needed | studies |
 
@@ -47,6 +47,7 @@ Select a top-level folder such as `pc` or `hardware/link_smoke`. Files under `st
 | Examples build | | ✅ | | Build tests exist |
 | RMT TX RAW send | | ✅ sketch build | ✅ NEC smoke | TX peer sketch + two-board smoke |
 | RMT RX RAW receive | | ✅ sketch build | ✅ NEC smoke | RX dut sketch + two-board smoke |
+| RX capture capacity / RAW_TRUNCATED | ✅ planning | ✅ ESP32 build | ✅ rx_capacity (ESP32-S3) | Block sizing and truncation rules in host; ESP32/S2 multi-block path is build-only until an ESP32 classic RX board is available |
 | TX->RX loop | | | ✅ NEC smoke | Two-board pytest exists |
 | Protocol matrix | | ✅ sketch build | ✅ | ESP32IRPulseKit TX -> ESP32IRPulseKit RX checks NEC/SONY12/SAMSUNG32/JVC |
 | A/C protocol matrix | ✅ codec_smoke | ✅ sketch build | ✅ | ESP32IRPulseKit TX -> ESP32IRPulseKit RX self round-trip, one state per vendor (Panasonic/Gree/Mitsubishi/Fujitsu/Daikin/Toshiba/Samsung/Sharp) |

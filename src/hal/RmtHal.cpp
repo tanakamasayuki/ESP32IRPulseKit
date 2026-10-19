@@ -1,4 +1,5 @@
 #include "RmtHal.h"
+#include "RmtRxCapacity.h"
 #include "../ESP32IRPulseKit.h"
 
 #include <algorithm>
@@ -354,12 +355,34 @@ namespace esp32irpk::hal
     rmt_rx_channel_config_t cfg = {};
     cfg.clk_src = selectRmtClkSrc();
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
-    cfg.mem_block_symbols = 64;
     cfg.resolution_hz = kRmtResolutionHz;
     cfg.flags.invert_in = inverted_;
     cfg.flags.with_dma = false;
 
-    if (rmt_new_rx_channel(&cfg, reinterpret_cast<rmt_channel_handle_t *>(&rx_channel_)) != ESP_OK)
+#if defined(SOC_RMT_SUPPORT_RX_PINGPONG) && SOC_RMT_SUPPORT_RX_PINGPONG
+    // The driver streams symbols into sym_buf_, so the hardware memory only
+    // sets the refill interval and does not limit the capture.
+    cfg.mem_block_symbols = 64;
+    esp_err_t err = rmt_new_rx_channel(&cfg, reinterpret_cast<rmt_channel_handle_t *>(&rx_channel_));
+    rx_hw_symbols_ = 0;
+#else
+    // No RX ping-pong: the whole frame must fit in the channel's hardware memory.
+    // Size it from the capacity, falling back to fewer blocks while other RMT
+    // channels hold the shared memory.
+    const size_t want_blocks = rxMemBlocksFor(max_rx_symbols_, SOC_RMT_MEM_WORDS_PER_CHANNEL,
+                                              rxMaxMemBlocks(SOC_RMT_RX_CANDIDATES_PER_GROUP));
+    esp_err_t err = ESP_ERR_NOT_FOUND;
+    for (size_t blocks = want_blocks; blocks > 0 && err == ESP_ERR_NOT_FOUND; --blocks)
+    {
+      cfg.mem_block_symbols = blocks * SOC_RMT_MEM_WORDS_PER_CHANNEL;
+      err = rmt_new_rx_channel(&cfg, reinterpret_cast<rmt_channel_handle_t *>(&rx_channel_));
+    }
+    rx_hw_symbols_ = cfg.mem_block_symbols;
+    if (err == ESP_OK && rx_hw_symbols_ < want_blocks * SOC_RMT_MEM_WORDS_PER_CHANNEL)
+      ESP_LOGW(kTag, "RMT RX: only %u of %u symbols of hardware memory free; longer frames are truncated",
+               (unsigned)rx_hw_symbols_, (unsigned)(want_blocks * SOC_RMT_MEM_WORDS_PER_CHANNEL));
+#endif
+    if (err != ESP_OK)
       return false;
 
     rmt_rx_event_callbacks_t cbs = {};
@@ -420,6 +443,7 @@ namespace esp32irpk::hal
       vSemaphoreDelete(static_cast<SemaphoreHandle_t>(rx_sem_));
       rx_sem_ = nullptr;
     }
+    rx_hw_symbols_ = 0;
     sym_count_ = 0;
     has_frame_ = false;
     receiving_ = false;
@@ -563,7 +587,7 @@ namespace esp32irpk::hal
     if (!rx_channel_)
       return false;
     receiving_ = false;
-    sym_buf_.resize(max_rx_symbols_ ? max_rx_symbols_ : kMaxRxSymbols);
+    sym_buf_.resize(rxBufferSymbols(max_rx_symbols_));
     rmt_receive_config_t rcfg = {};
     rcfg.signal_range_min_ns = 0;
     rcfg.signal_range_max_ns = idle_threshold_us_ * 1000;
@@ -580,13 +604,9 @@ namespace esp32irpk::hal
 
   bool IRAM_ATTR RmtRx::handleRecvDone(const rmt_rx_done_event_data_t *edata)
   {
-    sym_count_ = edata->num_symbols;
-    const size_t cap = max_rx_symbols_ ? max_rx_symbols_ : kMaxRxSymbols;
-    if (sym_count_ > cap)
-    {
-      sym_count_ = cap;
+    sym_count_ = rxCapturedSymbols(edata->num_symbols, max_rx_symbols_);
+    if (rxCaptureTruncated(edata->num_symbols, max_rx_symbols_, rx_hw_symbols_))
       last_truncated_ = true;
-    }
     has_frame_ = true;
     BaseType_t hp_task_woken = pdFALSE;
     xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(rx_sem_), &hp_task_woken);

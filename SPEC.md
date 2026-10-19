@@ -337,6 +337,7 @@ The default `setIdleThresholdUs()` value is `30000us`. When decode is enabled, t
 - The default is sized for normal short remote frames. Captures that exceed the capacity are truncated and `RAW_TRUNCATED` is set.
 - A long waveform such as an air-conditioner frame (section 11) needs a larger value. Raise it together with `setIdleThresholdUs()` so the whole burst lands in one capture.
 - A larger capacity costs RAM per receiver, so it is opt-in rather than a global default.
+- On ESP32 and ESP32-S2 (no RMT RX ping-pong) a whole frame must fit in the RX channel's RMT hardware memory. The receiver takes enough RMT memory blocks for the capacity, up to half of the RMT memory (256 symbols on ESP32, 128 on ESP32-S2) so a TX channel can coexist. If other RMT channels hold that memory, `begin()` still succeeds with fewer blocks; frames that do not fit are truncated with `RAW_TRUNCATED`. Other SoCs stream the capture and are limited only by the capacity.
 
 ## 5. IRReceiver
 

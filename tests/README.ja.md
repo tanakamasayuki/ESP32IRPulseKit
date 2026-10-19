@@ -44,7 +44,7 @@ uv run --env-file .env pytest -v                                                
 uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v  # 実装間の互換（汎用＋エアコン）
 ```
 
-- 1つ目は `pc/`（host のコーデック/フレームロジック・例＋スケッチのコンパイル・fixtures）**と** `hardware/`（`link_smoke`・`protocol_matrix`・`protocol_matrix_ac`）を収集するため、**2ボードのリグが必要**です。`studies/` は収集しません（`test_*.py` ではなく `study_*.py` のため）。`protocol_matrix` は汎用プロトコル（NEC/Sony/Samsung/JVC/AEHA/RC5/RC6）、`protocol_matrix_ac` はエアコン層の PulseKit 自己往復（TX -> RX、各ベンダ1状態）を検証します — どちらもゲートされた合否です。
+- 1つ目は `pc/`（host のコーデック/フレームロジック・例＋スケッチのコンパイル・fixtures）**と** `hardware/`（`link_smoke`・`protocol_matrix`・`protocol_matrix_ac`・`rx_capacity`）を収集するため、**2ボードのリグが必要**です。`studies/` は収集しません（`test_*.py` ではなく `study_*.py` のため）。`protocol_matrix` は汎用プロトコル（NEC/Sony/Samsung/JVC/AEHA/RC5/RC6）、`protocol_matrix_ac` はエアコン層の PulseKit 自己往復（TX -> RX、各ベンダ1状態）を検証します — どちらもゲートされた合否です。
 - 2つ目は compat-matrix studies を外部ライブラリ（IRremoteESP8266・HeatpumpIR・Arduino-IRremote）に対して実行します — 各エアコンベンダの「対応」を裏付ける**実装間**相互運用テストです。`compat_matrix*` は `compat_matrix/`（汎用プロトコル）と `compat_matrix_ac/`（エアコン）の両方に一致します。
 
 この2回でリリースの確認対象を網羅します: host ロジック・全例/スケッチのコンパイル・汎用プロトコルとエアコン両方のゲートされた2ボード自己往復・実装間互換（studies 経由）。補足:
