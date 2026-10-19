@@ -49,6 +49,9 @@ uv run python studies/link_quality/monitor.py
 
 # 書き込みを省略して、書き込み済みボードに接続
 uv run python studies/link_quality/monitor.py --no-flash
+
+# ESP32無印のペアで計測（既定はESP32-S3のペア）
+uv run python studies/link_quality/monitor.py --profile rx_esp32 --peer-profile tx:tx_esp32
 ```
 
 書き込みを既定にしているのは意図的：再書き込みは安いが、古い／不一致のファームを
@@ -58,8 +61,10 @@ uv run python studies/link_quality/monitor.py --no-flash
 既定0.2）、`--bits HEX`（NECペイロード、既定 `cb3400ff`）、`--no-color`。
 
 ポートとGPIOは `tests/.env` から取得します
-（`TEST_SERIAL_PORT_RX_ESP32S3`, `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`,
-`TEST_IR_RX_GPIO/INVERTED`, `TEST_IR_TX_GPIO/INVERTED`）。
+（ポートはpytestと同じ規則でプロファイル名から引きます。既定は
+`TEST_SERIAL_PORT_RX_ESP32S3`, `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`、
+ESP32無印なら `TEST_SERIAL_PORT_RX_ESP32`, `TEST_SERIAL_PORT_PEER_TX_TX_ESP32`。
+GPIOは `TEST_IR_RX_GPIO/INVERTED`, `TEST_IR_TX_GPIO/INVERTED`）。
 
 ## 構成
 

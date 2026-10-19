@@ -176,11 +176,23 @@ def main():
     ap.add_argument("--interval", type=float, default=0.2, help="seconds between sends")
     ap.add_argument("--bits", default="cb3400ff", help="NEC payload (hex)")
     ap.add_argument("--no-color", action="store_true")
+    ap.add_argument("--profile", default="rx_esp32s3",
+                    help="RX sketch profile (e.g. rx_esp32); port from TEST_SERIAL_PORT_<PROFILE>")
+    ap.add_argument("--peer-profile", default="tx:tx_esp32s3", metavar="tx:PROFILE",
+                    help="TX sketch profile (e.g. tx:tx_esp32); port from "
+                         "TEST_SERIAL_PORT_PEER_TX_<PROFILE>")
     args = ap.parse_args()
+    peer_name, _, tx_profile = args.peer_profile.partition(":")
+    if peer_name != "tx" or not tx_profile:
+        ap.error("--peer-profile must be tx:PROFILE")
+    rx_profile = args.profile
 
     env = load_env()
-    rx_port = env.get("TEST_SERIAL_PORT_RX_ESP32S3", "/dev/ttyUSB1")
-    tx_port = env.get("TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3", "/dev/ttyUSB0")
+    # Same port keys as pytest-embedded-arduino-cli uses for these profiles.
+    rx_key = rx_profile.upper().replace("-", "_")
+    tx_key = tx_profile.upper().replace("-", "_")
+    rx_port = env.get(f"TEST_SERIAL_PORT_{rx_key}", "/dev/ttyUSB1")
+    tx_port = env.get(f"TEST_SERIAL_PORT_PEER_TX_{tx_key}", "/dev/ttyUSB0")
     rx_gpio = env.get("TEST_IR_RX_GPIO", "4")
     rx_inv = env.get("TEST_IR_RX_INVERTED", "1")
     tx_gpio = env.get("TEST_IR_TX_GPIO", "4")
@@ -188,9 +200,9 @@ def main():
     color = not args.no_color and sys.stdout.isatty()
 
     if not args.no_flash:
-        flash(RX_DIR, "rx_esp32s3", rx_port,
+        flash(RX_DIR, rx_profile, rx_port,
               f'build.defines=-DIR_RX_GPIO="{rx_gpio}" -DIR_RX_INVERTED="{rx_inv}"')
-        flash(TX_DIR, "tx_esp32s3", tx_port,
+        flash(TX_DIR, tx_profile, tx_port,
               f'build.defines=-DIR_TX_GPIO="{tx_gpio}" -DIR_TX_INVERTED="{tx_inv}"')
 
     expect_bits = int(args.bits, 16)

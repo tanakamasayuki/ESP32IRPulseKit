@@ -53,6 +53,9 @@ uv run python studies/link_quality/monitor.py
 
 # skip flashing and connect to already-flashed boards
 uv run python studies/link_quality/monitor.py --no-flash
+
+# measure an ESP32 classic pair (default is the ESP32-S3 pair)
+uv run python studies/link_quality/monitor.py --profile rx_esp32 --peer-profile tx:tx_esp32
 ```
 
 Flashing is the default on purpose: re-flashing is cheap, but measuring stale or
@@ -63,7 +66,9 @@ between sends, default 0.2), `--bits HEX` (NEC payload, default `cb3400ff`),
 `--no-color`.
 
 Ports and GPIOs come from `tests/.env`
-(`TEST_SERIAL_PORT_RX_ESP32S3`, `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3`,
+(ports are looked up from the profile names with the same keys pytest uses —
+`TEST_SERIAL_PORT_RX_ESP32S3` / `TEST_SERIAL_PORT_PEER_TX_TX_ESP32S3` by default,
+`TEST_SERIAL_PORT_RX_ESP32` / `TEST_SERIAL_PORT_PEER_TX_TX_ESP32` for ESP32 classic; GPIOs from
 `TEST_IR_RX_GPIO/INVERTED`, `TEST_IR_TX_GPIO/INVERTED`).
 
 ## Layout
