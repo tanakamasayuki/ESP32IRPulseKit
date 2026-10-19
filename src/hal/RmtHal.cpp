@@ -31,6 +31,11 @@ namespace esp32irpk::hal
     constexpr uint32_t kRmtTickUs = 10;
     constexpr uint32_t kDefaultCarrierFrequencyHz = 38000;
     constexpr size_t kMaxRxSymbols = 256;
+    // PATCH: classic ESP32 has no RMT RX ping-pong (SOC_RMT_SUPPORT_RX_PINGPONG),
+    // so a frame must fit entirely in the channel's hardware memory. The stock
+    // library hard-coded ONE block (64 symbols = 128 durations), which cuts any
+    // long frame (AC remotes). Allocate several blocks instead.
+    constexpr size_t kMaxRxBlocks = 4;
     constexpr size_t kMaxQueuedFrames = 4;
     constexpr uint32_t kTickUs = 10; // library tick = 10us
 
@@ -354,13 +359,33 @@ namespace esp32irpk::hal
     rmt_rx_channel_config_t cfg = {};
     cfg.clk_src = selectRmtClkSrc();
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
-    cfg.mem_block_symbols = 64;
     cfg.resolution_hz = kRmtResolutionHz;
     cfg.flags.invert_in = inverted_;
     cfg.flags.with_dma = false;
 
-    if (rmt_new_rx_channel(&cfg, reinterpret_cast<rmt_channel_handle_t *>(&rx_channel_)) != ESP_OK)
+    // PATCH: size hardware RX memory from the requested capacity, falling back
+    // to fewer blocks if the RMT memory pool is shared with other channels.
+    size_t want_blocks = (max_rx_symbols_ + SOC_RMT_MEM_WORDS_PER_CHANNEL - 1) / SOC_RMT_MEM_WORDS_PER_CHANNEL;
+    if (want_blocks < 1)
+      want_blocks = 1;
+    if (want_blocks > kMaxRxBlocks)
+      want_blocks = kMaxRxBlocks;
+
+    bool allocated = false;
+    for (size_t blocks = want_blocks; blocks >= 1; --blocks)
+    {
+      cfg.mem_block_symbols = blocks * SOC_RMT_MEM_WORDS_PER_CHANNEL;
+      if (rmt_new_rx_channel(&cfg, reinterpret_cast<rmt_channel_handle_t *>(&rx_channel_)) == ESP_OK)
+      {
+        rx_hw_symbols_ = cfg.mem_block_symbols;
+        allocated = true;
+        break;
+      }
+      rx_channel_ = nullptr;
+    }
+    if (!allocated)
       return false;
+    ESP_LOGV(kTag, "RMT RX hw memory: %u symbols", (unsigned)rx_hw_symbols_);
 
     rmt_rx_event_callbacks_t cbs = {};
     cbs.on_recv_done = [](rmt_channel_handle_t channel,
@@ -563,7 +588,12 @@ namespace esp32irpk::hal
     if (!rx_channel_)
       return false;
     receiving_ = false;
-    sym_buf_.resize(max_rx_symbols_ ? max_rx_symbols_ : kMaxRxSymbols);
+    {
+      size_t want = max_rx_symbols_ ? max_rx_symbols_ : kMaxRxSymbols;
+      if (want < rx_hw_symbols_)
+        want = rx_hw_symbols_; // driver requires buffer >= hw memory
+      sym_buf_.resize(want);
+    }
     rmt_receive_config_t rcfg = {};
     rcfg.signal_range_min_ns = 0;
     rcfg.signal_range_max_ns = idle_threshold_us_ * 1000;
@@ -587,6 +617,10 @@ namespace esp32irpk::hal
       sym_count_ = cap;
       last_truncated_ = true;
     }
+    // PATCH: no ping-pong on classic ESP32 -> a full hardware block means the
+    // frame was cut by memory size, not by the idle gap.
+    if (edata->num_symbols >= rx_hw_symbols_)
+      last_truncated_ = true;
     has_frame_ = true;
     BaseType_t hp_task_woken = pdFALSE;
     xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(rx_sem_), &hp_task_woken);

@@ -93,6 +93,7 @@ namespace esp32irpk::hal
     bool begun_ = false;
     uint32_t idle_threshold_us_ = 30000;
     size_t max_rx_symbols_ = 0; // 0 = default capacity (kMaxRxSymbols)
+    size_t rx_hw_symbols_ = 64; // RMT hardware RX memory actually allocated (symbols)
     void *rx_channel_ = nullptr;
     void *rx_sem_ = nullptr;
     std::vector<uint32_t> sym_buf_;
