@@ -2,7 +2,9 @@
 //
 // Sends a synthetic frame of an exact pulse count so the RX side can check how
 // many symbols a capture holds. Timing is A/C-like (short marks, alternating
-// short/long spaces), which IR receiver modules pass through for long bursts.
+// short/long spaces), split into sections by a gap every kSectionPulses marks
+// like a multi-section A/C frame: IR receiver modules (AGC) and the TX LED
+// supply do not hold up a continuous burst of several hundred ms.
 #include <ESP32IRPulseKit.h>
 
 #include <vector>
@@ -25,6 +27,10 @@ namespace
 constexpr uint16_t kMarkTicks = 45;       // 450us
 constexpr uint16_t kShortSpaceTicks = 45; // 450us
 constexpr uint16_t kLongSpaceTicks = 130; // 1300us
+// Section gap: shorter than the receiver's idle threshold (30ms default), so
+// the whole frame still lands in one capture.
+constexpr uint16_t kSectionGapTicks = 2000; // 20ms
+constexpr uint32_t kSectionPulses = 100;    // ~130ms of burst per section
 constexpr uint32_t kMaxPulses = 1000;
 
 void sendReady()
@@ -56,7 +62,9 @@ bool sendPulses(uint32_t pulses)
   {
     if (i > 0)
     {
-      ticks.push_back((i % 2) ? kShortSpaceTicks : kLongSpaceTicks);
+      ticks.push_back((i % kSectionPulses) == 0 ? kSectionGapTicks
+                      : (i % 2)                 ? kShortSpaceTicks
+                                                : kLongSpaceTicks);
     }
     ticks.push_back(kMarkTicks);
   }

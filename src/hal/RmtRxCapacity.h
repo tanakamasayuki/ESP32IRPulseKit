@@ -12,15 +12,19 @@
 // Chips with RX ping-pong (ESP32-S3/C3/C6/H2/P4) stream symbols from a small
 // hardware memory into the buffer, so only the buffer limits a capture. Chips
 // without it (ESP32, ESP32-S2) need the whole frame in the channel's hardware
-// memory, so the RX channel is given several RMT memory blocks.
+// memory, so the RX channel is given several RMT memory blocks (see
+// rxMaxMemBlocks() for the limit).
 namespace esp32irpk::hal
 {
 
-  // Blocks an RX channel may take on chips without RX ping-pong: at most half
-  // of the shared RMT memory, so a TX channel can always coexist.
-  constexpr size_t rxMaxMemBlocks(size_t total_blocks)
+  // Blocks an RX channel may take on chips without RX ping-pong. With the
+  // default capacity: at most half of the shared RMT memory, leaving room for
+  // other RMT users (IR TX, WS2812 LEDs, ...). With a capacity set explicitly
+  // by setMaxRxSymbols(): all but one block, so one TX channel can still coexist.
+  constexpr size_t rxMaxMemBlocks(size_t total_blocks, bool explicit_capacity = false)
   {
-    return total_blocks / 2 > 0 ? total_blocks / 2 : 1;
+    return explicit_capacity ? (total_blocks > 1 ? total_blocks - 1 : 1)
+                             : (total_blocks / 2 > 0 ? total_blocks / 2 : 1);
   }
 
   // Blocks needed to hold the capacity plus the sentinel, clamped to [1, max_blocks].

@@ -348,7 +348,8 @@ namespace esp32irpk::hal
     // (1 tick = kRmtTickUs). Clamp so signal_range_max_ns stays representable.
     constexpr uint32_t kMaxIdleUs = 0x7FFFu * kRmtTickUs;
     idle_threshold_us_ = idle_threshold_us > kMaxIdleUs ? kMaxIdleUs : idle_threshold_us;
-    max_rx_symbols_ = max_rx_symbols ? max_rx_symbols : kMaxRxSymbols;
+    const bool explicit_capacity = max_rx_symbols != 0;
+    max_rx_symbols_ = explicit_capacity ? max_rx_symbols : kMaxRxSymbols;
     ESP_LOGV(kTag, "RMT RX begin: gpio=%d inverted=%d idle_threshold_us=%u tick_us=%u max_rx_symbols=%u",
              gpio_, inverted_ ? 1 : 0, idle_threshold_us_, kRmtTickUs, (unsigned)max_rx_symbols_);
 
@@ -368,9 +369,11 @@ namespace esp32irpk::hal
 #else
     // No RX ping-pong: the whole frame must fit in the channel's hardware memory.
     // Size it from the capacity, falling back to fewer blocks while other RMT
-    // channels hold the shared memory.
+    // channels hold the shared memory. Only an explicit capacity may take more
+    // than half of the RMT memory.
     const size_t want_blocks = rxMemBlocksFor(max_rx_symbols_, SOC_RMT_MEM_WORDS_PER_CHANNEL,
-                                              rxMaxMemBlocks(SOC_RMT_RX_CANDIDATES_PER_GROUP));
+                                              rxMaxMemBlocks(SOC_RMT_RX_CANDIDATES_PER_GROUP,
+                                                             explicit_capacity));
     esp_err_t err = ESP_ERR_NOT_FOUND;
     for (size_t blocks = want_blocks; blocks > 0 && err == ESP_ERR_NOT_FOUND; --blocks)
     {

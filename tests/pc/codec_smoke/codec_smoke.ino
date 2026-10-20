@@ -1044,6 +1044,12 @@ void testRxCapacityPlanning()
   EXPECT_EQ("rxcap/max-blocks-esp32", 4u, rxMaxMemBlocks(8));
   EXPECT_EQ("rxcap/max-blocks-esp32s2", 2u, rxMaxMemBlocks(4));
   EXPECT_EQ("rxcap/max-blocks-min", 1u, rxMaxMemBlocks(1));
+  // An explicit capacity (setMaxRxSymbols) may take all but one block.
+  EXPECT_EQ("rxcap/max-blocks-esp32-explicit", 7u, rxMaxMemBlocks(8, true));
+  EXPECT_EQ("rxcap/max-blocks-esp32s2-explicit", 3u, rxMaxMemBlocks(4, true));
+  EXPECT_EQ("rxcap/max-blocks-min-explicit", 1u, rxMaxMemBlocks(1, true));
+  EXPECT_EQ("rxcap/blocks-esp32-cap300", 5u, rxMemBlocksFor(300, 64, rxMaxMemBlocks(8, true)));
+  EXPECT_EQ("rxcap/blocks-esp32-cap1024", 7u, rxMemBlocksFor(1024, 64, rxMaxMemBlocks(8, true)));
 
   // Blocks hold the capacity plus one sentinel symbol, clamped to [1, max].
   EXPECT_EQ("rxcap/blocks-63", 1u, rxMemBlocksFor(63, 64, 4));

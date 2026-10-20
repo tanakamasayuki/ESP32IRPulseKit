@@ -5,8 +5,9 @@ import pytest
 from pexpect import EOF, TIMEOUT
 
 # RX capture capacity (setMaxRxSymbols) on real hardware. The peer sends a synthetic
-# frame of N marks (2N-1 ticks, captured as N RMT symbols); the RX reports the
-# captured length and the RAW_TRUNCATED flag.
+# frame of N marks (2N-1 ticks, captured as N RMT symbols; split into A/C-like
+# sections by short gaps, see peer_tx.ino); the RX reports the captured length and
+# the RAW_TRUNCATED flag.
 #
 # Requirements:
 #   - a frame of at most `cap` symbols arrives intact and is not flagged truncated

@@ -7,7 +7,7 @@ Checks the RX capture capacity set by `setMaxRxSymbols()` on real hardware.
 - A frame of at most `cap` symbols arrives intact and is not flagged truncated.
 - A longer frame is cut at `cap` symbols and `RAW_TRUNCATED` is set.
 
-The peer sends a synthetic frame of N marks (A/C-like timing: 450us marks, alternating 450us/1300us spaces). The receiver captures it as N RMT symbols, which is `2N-1` ticks when intact and `2*cap` ticks when cut.
+The peer sends a synthetic frame of N marks (A/C-like timing: 450us marks, alternating 450us/1300us spaces, with a 20ms gap every 100 marks like a multi-section A/C frame; a continuous burst of several hundred ms is degraded by the IR receiver module's AGC / the TX LED supply, not by the capture). The gap is shorter than the receiver's 30ms idle threshold, so the frame is still one capture. The receiver captures it as N RMT symbols, which is `2N-1` ticks when intact and `2*cap` ticks when cut.
 
 Wiring, `.env`, and the pytest-embedded peer layout are the same as [`link_smoke/`](../link_smoke/README.md).
 
@@ -24,7 +24,7 @@ RX prints `RX_RAW len=<ticks> truncated=<0|1>` for each capture (RAW-only mode).
 
 ## SoC coverage
 
-The standard rig is two ESP32-S3 boards, where the capture streams through RMT RX ping-pong. ESP32 and ESP32-S2 have no ping-pong, so the frame must fit in the RX channel's RMT hardware memory; running this test with an ESP32 classic RX board covers that path (expect frames over 256 symbols to be truncated there even with a larger `cap`).
+The standard rig is two ESP32-S3 boards, where the capture streams through RMT RX ping-pong. ESP32 and ESP32-S2 have no ping-pong, so the frame must fit in the RX channel's RMT hardware memory; running this test with an ESP32 classic RX board covers that path (an explicit `cap` there may take up to 7 of the 8 RMT blocks, 448 symbols; the default `cap 0` stays at 256).
 
 ```sh
 cd tests
