@@ -37,19 +37,22 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" studies/carrier_ji
 
 ## リリース前チェック
 
-リリース（**Release** GitHub Action の実行）前に、`.env` を設定した2ボードのリグで一式を回します。
+リリース（**Release** GitHub Action の実行）前に、`.env` を設定した2ボードのリグ（ESP32-S3 2台と ESP32無印 2台）で一式を回します。
 
 ```sh
-uv run --env-file .env pytest -v                                                       # PCテスト＋例のコンパイル＋実機2台テスト
-uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v  # 実装間の互換（汎用＋エアコン）
+uv run --env-file .env pytest -v --clean                                                         # PCテスト＋例のコンパイル＋実機2台テスト（ESP32-S3）
+uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v --clean    # 実装間の互換（汎用＋エアコン）
+uv run --env-file .env pytest hardware -v --clean --profile rx_esp32 --peer-profile tx:tx_esp32  # 実機2台テスト（ESP32無印）
 ```
 
 - 1つ目は `pc/`（host のコーデック/フレームロジック・例＋スケッチのコンパイル・fixtures）**と** `hardware/`（`link_smoke`・`protocol_matrix`・`protocol_matrix_ac`・`rx_capacity`）を収集するため、**2ボードのリグが必要**です。`studies/` は収集しません（`test_*.py` ではなく `study_*.py` のため）。`protocol_matrix` は汎用プロトコル（NEC/Sony/Samsung/JVC/AEHA/RC5/RC6）、`protocol_matrix_ac` はエアコン層の PulseKit 自己往復（TX -> RX、各ベンダ1状態）を検証します — どちらもゲートされた合否です。
 - 2つ目は compat-matrix studies を外部ライブラリ（IRremoteESP8266・HeatpumpIR・Arduino-IRremote）に対して実行します — 各エアコンベンダの「対応」を裏付ける**実装間**相互運用テストです。`compat_matrix*` は `compat_matrix/`（汎用プロトコル）と `compat_matrix_ac/`（エアコン）の両方に一致します。
+- 3つ目は `hardware/` を ESP32無印 のペアで回します。ESP32無印 は RMT RX ping-pong がなく、RXキャプチャがRMTハードウェアメモリに収まる必要があるなど S3 と別の経路を通るため、リリース前に確認します。PCテストと compat-matrix はチップに依存しないので S3 側の実行で足ります。
 
-この2回でリリースの確認対象を網羅します: host ロジック・全例/スケッチのコンパイル・汎用プロトコルとエアコン両方のゲートされた2ボード自己往復・実装間互換（studies 経由）。補足:
+この3回でリリースの確認対象を網羅します: host ロジック・全例/スケッチのコンパイル・汎用プロトコルとエアコン両方のゲートされた2ボード自己往復（ESP32-S3 と ESP32無印）・実装間互換（studies 経由）。補足:
 
 - self テスト（`*_self`）はデコード成否で**ゲートしません** — ボードが起動して送受信ループが回れば PASS します（両側が同一ライブラリなので環境ベースラインとしてのみ機能します）。
+- ESP32無印 のペアで失敗した場合は、まず光リンクを疑います。S3 と組み替えたクロス（`--profile rx_esp32 --peer-profile tx:tx_esp32s3` と `--profile rx_esp32s3 --peer-profile tx:tx_esp32`）が両方通れば、ESP32無印 の送信・受信は機能的に問題ありません。リンクの状態は `studies/link_quality` で確認できます。
 - リグが無い場合は host のみのサブセット — `uv run --env-file .env pytest pc -v`（codec_smoke＋例のコンパイル＋fixtures）。パス無しの `pytest -v` と studies コマンドはどちらもボードが必要です。
 
 ## ディレクトリ

@@ -31,19 +31,22 @@ uv run --env-file .env pytest -s -o python_files="study_*.py" studies/carrier_ji
 
 ## Pre-release check
 
-Before cutting a release (running the **Release** GitHub Action), run the full suite on the two-board rig with `.env` configured:
+Before cutting a release (running the **Release** GitHub Action), run the full suite on the two-board rigs (an ESP32-S3 pair and an ESP32 classic pair) with `.env` configured:
 
 ```sh
-uv run --env-file .env pytest -v                                                       # PC tests + example builds + two-board hardware tests
-uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v  # cross-implementation compat (generic + A/C)
+uv run --env-file .env pytest -v --clean                                                         # PC tests + example builds + two-board hardware tests (ESP32-S3)
+uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v --clean    # cross-implementation compat (generic + A/C)
+uv run --env-file .env pytest hardware -v --clean --profile rx_esp32 --peer-profile tx:tx_esp32  # two-board hardware tests (ESP32 classic)
 ```
 
 - The first command collects `pc/` (host codec/frame logic, example + sketch compile, fixtures) **and** `hardware/` (`link_smoke`, `protocol_matrix`, `protocol_matrix_ac`, `rx_capacity`), so it needs the two-board rig. It does **not** collect `studies/` (those are `study_*.py`, not `test_*.py`). `protocol_matrix` covers the generic protocols (NEC/Sony/Samsung/JVC/AEHA/RC5/RC6); `protocol_matrix_ac` covers the A/C layer as a PulseKit self round-trip (TX -> RX, one state per vendor) — both are gated pass/fail.
 - The second command runs the compat-matrix studies against the external libraries (IRremoteESP8266, HeatpumpIR, Arduino-IRremote) — the cross-implementation interop that backs each A/C vendor's "Supported" status. `compat_matrix*` matches both `compat_matrix/` (generic protocols) and `compat_matrix_ac/` (A/C vendors).
+- The third command runs `hardware/` on the ESP32 classic pair. ESP32 classic takes different paths from the S3 (no RMT RX ping-pong, so an RX capture must fit in the RMT hardware memory), so it is checked before a release too. The PC tests and the compat matrix do not depend on the chip, so the S3 run covers them.
 
-Those two runs cover everything checked for a release: host logic, that every example/sketch compiles, gated two-board round-trip for both generic protocols and every A/C vendor, and cross-implementation compatibility (via the studies). Notes:
+Those three runs cover everything checked for a release: host logic, that every example/sketch compiles, gated two-board round-trip for both generic protocols and every A/C vendor (ESP32-S3 and ESP32 classic), and cross-implementation compatibility (via the studies). Notes:
 
 - The self-tests (`*_self`) are **not** gated on decode success — they pass as long as the boards boot and the send/receive loop runs (both sides are the same library, so they only serve as an environment baseline).
+- If the ESP32 classic pair fails, suspect the optical link first. If both cross runs with the S3 boards pass (`--profile rx_esp32 --peer-profile tx:tx_esp32s3` and `--profile rx_esp32s3 --peer-profile tx:tx_esp32`), ESP32 classic TX and RX work. `studies/link_quality` shows the link condition.
 - No rig connected? Run the host-only subset — `uv run --env-file .env pytest pc -v` (codec_smoke + example builds + fixtures). The unqualified `pytest -v` and the studies command both need boards.
 
 ## Layout
