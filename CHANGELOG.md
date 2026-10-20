@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+
+## 1.0.6
 - (EN) RX capture capacity fixes. ESP32 / ESP32-S2 have no RMT RX ping-pong, and the RX channel had a single 64-symbol hardware block, so any frame over 64 symbols (most A/C frames) was cut there regardless of `setMaxRxSymbols()`. The RX channel now takes enough blocks for the capacity (up to half of the RMT memory with the default capacity: 256 symbols on ESP32, 128 on ESP32-S2; with an explicit `setMaxRxSymbols()`, all but one block: 448 / 192 symbols, enough for a 3-section Daikin frame), falling back to fewer blocks when other RMT channels hold the memory. `RAW_TRUNCATED` was never set on any SoC because the driver never reports more symbols than the buffer holds; the buffer now keeps a sentinel slot, so frames longer than the capacity (or than the ESP32/S2 hardware memory) are flagged. New two-board hardware test `hardware/rx_capacity`.
 - (JA) RXキャプチャ容量の修正。ESP32 / ESP32-S2 は RMT RX ping-pong がなく、RXチャンネルのハードウェアメモリが64シンボル1ブロック固定だったため、`setMaxRxSymbols()` に関係なく64シンボル超のフレーム（エアコンの大半）がそこで切れていた。容量に見合うブロック数（既定の容量ではRMTメモリの半分: ESP32で256シンボル、ESP32-S2で128シンボル。`setMaxRxSymbols()` で明示した場合は1ブロックを残して全部: 448 / 192シンボルで、3セクションのDaikinフレームも収まる）を確保し、他のRMTチャンネルが使用中ならブロック数を減らして継続するように。また、ドライバはバッファを超えるシンボル数を報告しないため、全SoCで `RAW_TRUNCATED` が立っていなかった。バッファに番兵スロットを1つ持たせ、容量（ESP32/S2ではハードウェアメモリ）を超えるフレームにフラグが立つように。2ボード実機テスト `hardware/rx_capacity` を追加。
 
