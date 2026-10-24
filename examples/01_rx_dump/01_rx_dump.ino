@@ -1,22 +1,28 @@
+// en: Receive and inspect protocol candidates
+// ja: 受信波形とプロトコル候補を調べる
 #include <ESP32IRPulseKit.h>
-#include <IRDebug.h> // en: optional Serial-formatting helpers / ja: 任意のシリアル整形ヘルパー
+// en: Optional Serial-formatting and generated-code helpers.
+// ja: シリアル表示とコード生成用の任意ヘルパーです。
+#include <IRDebug.h>
 
-// en: Simple RX example that prints decoded candidates to Serial.
-// ja: 受信した信号をデコードしてシリアルに出力する簡単な例。
-// en: Adjust GPIO numbers to your board wiring.
-// ja: GPIO番号はご利用環境の配線に合わせて変更してください。
-esp32irpk::IRReceiver rx(32, true); // en: common IR receiver modules output inverted / ja: よく使われる受信モジュールは出力が反転
+// en: Match this GPIO and input polarity to the receiver module OUT signal.
+// ja: GPIOと入力極性を受信モジュールのOUT信号に合わせます。
+esp32irpk::IRReceiver rx(32, true);
 
 void setup()
 {
   Serial.begin(115200);
   // rx.setScoreThreshold(-32768); // en: show negative-score candidates / ja: 負スコア候補も表示する
+  // en: Start capture after applying settings; check the bool result when adapting this example.
+  // ja: 設定後に受信を開始します。組み込む際はboolの戻り値も確認します。
   rx.begin();
 }
 
 void loop()
 {
   esp32irpk::IRReceiveResult r;
+  // en: No completed capture is available yet; yield briefly and try again on the next loop.
+  // ja: 受信結果がまだない場合は少し待ち、次のloopで再度確認します。
   if (!rx.read(r))
   {
     delay(1);
@@ -28,6 +34,8 @@ void loop()
   Serial.print((unsigned)r.raw.len);
   Serial.print(" flags=0x");
   Serial.println((unsigned)r.flags, HEX);
+  // en: Format borrowed RAW timings now, before the next read can replace the receiver buffer.
+  // ja: 次のreadでバッファが置き換わる前に、参照中のRAW時間列を表示します。
   esp32irpk::debug::printRawMicros(Serial, r.raw);
 
   if (r.count == 0)
@@ -37,8 +45,8 @@ void loop()
     return;
   }
 
-  // en: one line per candidate + its named-field decode (see <IRDebug.h>).
-  // ja: 候補ごとに1行＋名前付きフィールドデコード（<IRDebug.h> 参照）。
+  // en: Inspect every candidate; scores rank possible decodes rather than certifying the protocol.
+  // ja: 全候補を確認します。スコアは候補の順位付けで、プロトコルの確定保証ではありません。
   for (uint8_t i = 0; i < r.count; ++i)
   {
     const esp32irpk::IRDecodeCandidate &c = r.candidates[i];

@@ -6,9 +6,11 @@ IR remote send/receive library for ESP32 Arduino Core 3.x, built on the ESP-IDF 
 
 It captures RAW mark/space waveforms, decodes them into normalized bits with scored protocol candidates, and transmits using a phase-aligned carrier for stable cross-library interoperability.
 
+Start with the [example guide](docs/GUIDE_EXAMPLES.md), then choose an example from the [example index](examples/README.md). They explain wiring, result handling, RAW data lifetime and moving learned code into a sender.
+
 ## Features
 
-- **No busy-wait.** TX and RX run on the ESP32 RMT peripheral, not a bit-banged polling loop. Capture is hardware-timestamped and transmission is non-blocking, so the CPU stays free for the rest of your sketch and the timing does not drift under interrupt load.
+- **No busy-wait.** TX and RX run on the ESP32 RMT peripheral, not a bit-banged polling loop. Capture is hardware-timestamped and RMT generates the transmitted waveform. The public `send()` API waits for local transmission to complete, so the calling loop does not advance during that wait.
 - **Scoring-based decode, not exact-match.** Real IR timings shift with the receiver module, distance, angle, carrier duty, and ambient light. Instead of rejecting anything outside a fixed window, each capture is scored by how far it deviates from each protocol's spec, so a dirty, out-of-spec waveform still decodes as long as its bits are unambiguous.
 - **Distinguishes similar protocols.** Because the deviation is folded into the score rather than discarded, look-alike protocols on the same waveform stay as ranked candidates — you get the best match plus the runners-up and their score gap, not a single yes/no guess.
 - **Three working levels:** RAW ticks (`1 tick = 10us`), normalized `IRDecodedBits`, and protocol-specific `Frame` types — drop down or stay high-level as needed.

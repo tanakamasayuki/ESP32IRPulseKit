@@ -1,37 +1,20 @@
+// en: Capture and learn an air-conditioner state
+// ja: エアコンの状態信号を受信して学習する
 #include <ESP32IRPulseKit.h>
-#include <IRDebug.h> // en: optional Serial-formatting helpers / ja: 任意のシリアル整形ヘルパー
+// en: Optional Serial-formatting and generated-code helpers.
+// ja: シリアル表示とコード生成用の任意ヘルパーです。
+#include <IRDebug.h>
 
-// en: Learn an air-conditioner remote: capture it as RAW and print copy-paste
-//     C++ to send it, plus a decoded summary (as comments) when the vendor is
-//     recognized. RX only, so it runs on a single board (TX is usually a
-//     separate device). The RAW path reproduces any AC frame verbatim even when
-//     no vendor decoder matches. Adjust the GPIO number to your board wiring.
-// ja: エアコンのリモコンを学習する例: RAWでキャプチャして再送用のC++コードを
-//     貼り付け可能な形で出力し、ベンダが認識できればデコード結果も（コメントで）
-//     出力します。受信のみなので1台で動きます（送信側は別デバイスが普通）。
-//     ベンダデコーダに当たらなくてもRAW経路でそのまま再現できる。
-//     GPIO番号はご利用環境の配線に合わせて変更してください。
-esp32irpk::IRReceiver rx(32, true); // en: most receiver modules output inverted / ja: 多くの受信モジュールは出力反転
+// en: Match this GPIO and input polarity to the receiver module OUT signal.
+// ja: GPIOと入力極性を受信モジュールのOUT信号に合わせます。
+esp32irpk::IRReceiver rx(32, true);
 
-// en: Decode is done here at receive time: try each AC vendor and print the
-//     decoded settings as a comment. Vendors are added incrementally. When none
-//     match, the RAW snippet below still reproduces the frame.
-// ja: デコードは受信時にここで行う: 各ACベンダを試し、デコードした設定をコメント
-//     として出力する。ベンダは順次追加。どれにも当たらなくても下のRAWスニペット
-//     でフレームは再現できる。
-
-// en: helpers live in an anonymous namespace and are defined before use, so the
-//     Arduino .ino preprocessor does not auto-generate prototypes for them
-//     (its generated prototypes can mishandle namespaced/overloaded helpers).
-// ja: ヘルパは無名名前空間に置き使用前に定義する。こうすればArduinoの.ino前処理が
-//     自動プロトタイプを生成する必要がなく（生成プロトタイプは名前空間内/多重定義の
-//     ヘルパを壊すことがある）安全。
+// en: Keep helpers defined before use; the README explains the Arduino preprocessing detail.
+// ja: ヘルパーを使用前に定義します。Arduino前処理との関係はREADMEを参照してください。
 namespace
 {
-// en: AC RAW snippet: a phase-aligned-carrier reminder (AC frames are long, the
-//     large array is expected), then the generic tick array from <IRDebug.h>.
-// ja: AC用RAWスニペット: 位相整合キャリアの注意書き（ACフレームは長く配列が大きく
-//     なるのは想定どおり）の後、<IRDebug.h> の汎用tick配列を出力する。
+// en: Print reusable code only; this helper does not transmit an IR signal.
+// ja: 再利用するコードを表示するだけで、この関数から赤外線は送信しません。
 static void printRawSnippet(const esp32irpk::IRRawTickView &raw)
 {
   Serial.println("// en: send with setPhaseAlignedCarrier(true) -- the safe AC default;");
@@ -40,34 +23,31 @@ static void printRawSnippet(const esp32irpk::IRRawTickView &raw)
   Serial.println("//     一部ベンダ（例: Gree）はハードウェアキャリアだとフレームが落ちる）。");
   esp32irpk::debug::printRawSendSnippet(Serial, raw);
 }
-} // namespace
+}
 
 void setup()
 {
   Serial.begin(115200);
 
-  // en: AC capture mode = RAW-only + large capacity + idle long enough to keep
-  //     the whole multi-frame burst in one capture.
-  // ja: AC受信モード = RAWのみ + 容量拡張 + バースト全体を1キャプチャに収める
-  //     ための十分長いidle。
-  rx.setDecodeCandidates(0);       // en: RAW-only, no decode / ja: RAWのみ、デコードなし
-  rx.setMaxRxSymbols(1024);        // en: caps total capture length / ja: キャプチャ総長の上限
-  // en: idle ends the capture after this much silence, and must exceed the
-  //     frame's INTERNAL gap so a multi-frame AC burst is not split. Prefer a
-  //     generous value. Ceiling is ~300ms: a single duration is a 15-bit field
-  //     at the 10us RX tick (0x7FFF * 10us ~= 327ms). If one remote press prints
-  //     "---- learned ----" more than once, the burst was split -> raise this.
-  // ja: idleはこの長さの無信号でキャプチャを終了する。ACのフレーム内ギャップより
-  //     大きくしないとバーストが分割される。大きめ推奨。上限は約300ms（単一
-  //     durationは10us tickで15bit = 0x7FFF*10us ≈ 327ms）。1回の押下で
-  //     "---- learned ----" が複数回出たら分割されているので値を上げる。
-  rx.setIdleThresholdUs(100000);   // en: 100ms, well within the ~300ms ceiling / ja: 100ms、上限~300ms内
+  // en: Capture RAW only; a zero candidate count is intentional in this mode.
+  // ja: RAWのみ受信します。このモードで候補数が0になるのは意図どおりです。
+  rx.setDecodeCandidates(0);
+  // en: Reserve room for a long AC burst before begin(); inspect truncation after reception.
+  // ja: begin()前に長いAC信号用の容量を確保し、受信後に切り詰めの有無を確認します。
+  rx.setMaxRxSymbols(1024);
+  // en: Silence ends capture; keep internal AC gaps inside the same capture (see README).
+  // ja: 無信号時間で受信を終了します。AC信号内部の隙間で分割しないようにします（README参照）。
+  rx.setIdleThresholdUs(100000);
+  // en: Start capture after applying settings; check the bool result when adapting this example.
+  // ja: 設定後に受信を開始します。組み込む際はboolの戻り値も確認します。
   rx.begin();
 }
 
 void loop()
 {
   esp32irpk::IRReceiveResult<> r;
+  // en: No completed capture is available yet; yield briefly and try again on the next loop.
+  // ja: 受信結果がまだない場合は少し待ち、次のloopで再度確認します。
   if (!rx.read(r))
   {
     delay(1);
@@ -83,17 +63,14 @@ void loop()
   }
   Serial.println();
 
-  // en: decodeAny tries every built-in AC vendor and dumps the match via printTo.
-  //     A recognized frame then prints two send-code forms: an editable setter
-  //     template (lossy) and the compact bit-exact state bytes. An unrecognized
-  //     remote falls back to the (long) RAW replay.
-  // ja: decodeAny が全内蔵ACベンダを試し、一致を printTo で出力する。認識できたら
-  //     2形式の送信コード（編集テンプレートの setter 版＝lossy、コンパクトで完全一致な
-  //     状態バイト版）を出力。未対応リモコンは（長い）RAW replay にフォールバック。
+  // en: Try AC state decoders on the RAW capture; unrecognized data falls back to RAW code.
+  // ja: RAW波形をAC状態デコーダで調べ、未認識の場合はRAWコードに進みます。
   if (esp32irpk::ac::decodeAny(r.raw, &Serial) != esp32irpk::ac::AcVendor::UNKNOWN)
   {
-    esp32irpk::ac::printSetterSnippet(r.raw, Serial); // editable template (lossy)
-    esp32irpk::ac::printSendSnippet(r.raw, Serial);   // bit-exact state bytes
+    // en: Editable logical fields may omit settings; use state bytes below for exact decoded-state replay.
+    // ja: 論理項目の編集例は一部設定を省く場合があります。状態の再現には下の状態バイト版を使います。
+    esp32irpk::ac::printSetterSnippet(r.raw, Serial);
+    esp32irpk::ac::printSendSnippet(r.raw, Serial);
   }
   else
   {

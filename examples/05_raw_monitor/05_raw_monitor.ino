@@ -1,26 +1,30 @@
+// en: Inspect RAW reception and dropped captures
+// ja: RAW受信と取りこぼしを調べる
 #include <ESP32IRPulseKit.h>
-#include <IRDebug.h> // en: optional Serial-formatting helpers / ja: 任意のシリアル整形ヘルパー
+// en: Optional Serial-formatting and generated-code helpers.
+// ja: シリアル表示とコード生成用の任意ヘルパーです。
+#include <IRDebug.h>
 
-// en: RAW-only capture plus receive statistics. No protocol decode runs.
-// ja: RAWのみのキャプチャと受信統計。プロトコルデコードは行いません。
-// en: Adjust the GPIO number to your board wiring.
-// ja: GPIO番号はご利用環境の配線に合わせて変更してください。
+// en: Match this GPIO and input polarity to the receiver module OUT signal.
+// ja: GPIOと入力極性を受信モジュールのOUT信号に合わせます。
 esp32irpk::IRReceiver rx(32, true);
 
 void setup()
 {
   Serial.begin(115200);
-  // en: 0 candidates selects RAW-only mode: read() returns RAW with
-  //     DECODE_SKIPPED and registers no built-in protocols.
-  // ja: 候補数0でRAWのみモードになります。read()はDECODE_SKIPPED付きでRAWを返し、
-  //     内蔵プロトコルは登録されません。
+  // en: Capture RAW only; a zero candidate count is intentional in this mode.
+  // ja: RAWのみ受信します。このモードで候補数が0になるのは意図どおりです。
   rx.setDecodeCandidates(0);
+  // en: Start capture after applying settings; check the bool result when adapting this example.
+  // ja: 設定後に受信を開始します。組み込む際はboolの戻り値も確認します。
   rx.begin();
 }
 
 void loop()
 {
   esp32irpk::IRReceiveResult<> r;
+  // en: No completed capture is available yet; yield briefly and try again on the next loop.
+  // ja: 受信結果がまだない場合は少し待ち、次のloopで再度確認します。
   if (!rx.read(r))
   {
     delay(1);
@@ -34,10 +38,12 @@ void loop()
   Serial.print(" rmt_overflow=");
   Serial.println(r.rmtOverflow());
 
+  // en: Format borrowed RAW timings now, before the next read can replace the receiver buffer.
+  // ja: 次のreadでバッファが置き換わる前に、参照中のRAW時間列を表示します。
   esp32irpk::debug::printRawMicros(Serial, r.raw);
 
-  // en: Cumulative receive health counters. Watch these for dropped data.
-  // ja: 受信の健全性を示す累積カウンタ。データ欠落の監視に使えます。
+  // en: These totals accumulate across reads; compare changes to find dropped or incomplete captures.
+  // ja: readをまたいで累積する回数です。増加を比べて受信の欠落や不完全な取得を調べます。
   esp32irpk::IRRxStats s = rx.stats();
   Serial.print("stats: queue_overflow=");
   Serial.print((unsigned)s.queue_overflow_count);
