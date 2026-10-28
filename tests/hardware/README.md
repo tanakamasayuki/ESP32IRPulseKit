@@ -12,6 +12,7 @@ ESP32 hardware tests live here.
 | `protocol_matrix/` | Multi-protocol hardware matrix for ESP32IRPulseKit TX -> ESP32IRPulseKit RX | Release-gate candidate |
 | `protocol_matrix_ac/` | Air-conditioner self round-trip matrix (`ac::` layer, TX -> RX, one state per vendor) | Release-gate candidate |
 | `rx_capacity/` | RX capture capacity: frames within `setMaxRxSymbols()` arrive intact, longer ones are cut with `RAW_TRUNCATED` | Release-gate candidate |
+| `rmt_coexist/` | Single board: RX, TX, and another RMT user (WS2812-style) begin in every order on one chip | Release-gate candidate |
 
 These produce a clear pass/fail and are auto-collected by `pytest hardware`. Board investigations that only record observation logs (jitter, timing sweeps, external-library compatibility) live under `tests/studies/` and are not auto-collected.
 

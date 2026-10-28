@@ -24,12 +24,37 @@ namespace esp32irpk::hal
   namespace
   {
     constexpr const char *kTag = "ESP32IRPulseKit";
-    // RMT resolution: 100kHz (1 tick = 10us). Clock source is selected per SoC.
+    // Library tick rate: 100kHz (1 tick = 10us).
     constexpr uint32_t kRmtResolutionHz = 100000; // 1 tick = 10us (RMT resolution)
     // Fine resolution for the phase-aligned carrier path: 1MHz (1 tick = 1us),
     // so a carrier half-cycle (~13us at 38kHz) is representable as RMT symbols.
     constexpr uint32_t kRmtResolutionHzFine = 1000000; // 1 tick = 1us
     constexpr uint32_t kRmtTickUs = 10;
+
+    // Channel resolutions, all from the SoC's default RMT clock source (80MHz
+    // APB / PLL on most SoCs, 32MHz XTAL on ESP32-H2). Other RMT users (the
+    // Arduino RMT API behind rgbLedWrite(), WS2812 drivers) use that source too,
+    // and the clock source is shared by every channel, so a different one fails
+    // with "group clock conflict". Most SoCs also share the clock divider: the
+    // first channel created picks it (the fastest its own divider allows, e.g.
+    // 80MHz for a 1MHz channel), and a later channel fails when its own divider
+    // would exceed 256 (a 100kHz channel after a 1MHz one). Hence RX runs at
+    // 320kHz (a divider of 250 from 80MHz, 100 from 32MHz; ~102ms idle limit)
+    // and TX at 1MHz, so channels can be created in any order.
+    constexpr uint32_t kRxResolutionHz = 320000;
+    constexpr uint32_t kTxModulatedResolutionHz = kRmtResolutionHzFine;
+
+    // Hardware duration (at kRxResolutionHz) -> library ticks, rounded; a
+    // non-zero duration stays non-zero.
+    uint16_t rxDurationToTicks(uint32_t duration)
+    {
+      if (duration == 0)
+        return 0;
+      uint64_t ticks = (static_cast<uint64_t>(duration) * kRmtResolutionHz + kRxResolutionHz / 2) / kRxResolutionHz;
+      if (ticks == 0)
+        ticks = 1;
+      return ticks > 0xFFFF ? 0xFFFF : static_cast<uint16_t>(ticks);
+    }
     constexpr uint32_t kDefaultCarrierFrequencyHz = 38000;
     constexpr size_t kMaxRxSymbols = 256;
     constexpr size_t kMaxQueuedFrames = 4;
@@ -37,34 +62,62 @@ namespace esp32irpk::hal
 
     rmt_clock_source_t selectRmtClkSrc()
     {
-#if defined(SOC_RMT_SUPPORT_REF_TICK) && SOC_RMT_SUPPORT_REF_TICK
-      ESP_LOGV(kTag, "selectRmtClkSrc : RMT_CLK_SRC_REF_TICK");
-      return RMT_CLK_SRC_REF_TICK;
-#else
-      ESP_LOGV(kTag, "selectRmtClkSrc : RMT_CLK_SRC_DEFAULT");
       return RMT_CLK_SRC_DEFAULT;
-#endif
     }
 
+    constexpr uint32_t kMaxSymbolDuration = 0x7FFF; // RMT duration field limit
+
+    // Append a single-level run of `dur` channel ticks, packing two halves per
+    // symbol and never emitting a zero duration mid-stream (which the RMT HW
+    // treats as an end marker).
+    void appendRun(std::vector<rmt_symbol_word_t> &syms, uint8_t level, uint32_t dur)
+    {
+      while (dur > 0)
+      {
+        uint32_t d0 = std::min<uint32_t>(dur, kMaxSymbolDuration);
+        dur -= d0;
+        uint32_t d1 = std::min<uint32_t>(dur, kMaxSymbolDuration);
+        dur -= d1;
+        if (d1 == 0 && d0 > 1)
+        {
+          d1 = d0 / 2;
+          d0 -= d1;
+        }
+        rmt_symbol_word_t s{};
+        s.level0 = level;
+        s.duration0 = static_cast<uint16_t>(d0);
+        s.level1 = level;
+        s.duration1 = static_cast<uint16_t>(d1 ? d1 : d0);
+        syms.push_back(s);
+      }
+    }
+
+    // Modulated path (HW carrier): one symbol per mark/space pair at
+    // kTxModulatedResolutionHz. A duration longer than the symbol field is
+    // split into level runs.
     std::vector<rmt_symbol_word_t> toSymbols(const esp32irpk::IRRawTickView &raw, bool mark_high)
     {
-      constexpr uint16_t kMaxDuration = 0x7FFF; // RMT duration field limit
+      constexpr uint32_t kScale = kTxModulatedResolutionHz / kRmtResolutionHz; // 1 or 10
+      const uint8_t mark_lvl = mark_high ? 1 : 0;
+      const uint8_t space_lvl = mark_high ? 0 : 1;
       std::vector<rmt_symbol_word_t> syms;
       syms.reserve((raw.len + 1) / 2);
       for (size_t i = 0; i < raw.len; i += 2)
       {
-        rmt_symbol_word_t s{};
-        uint32_t mark_ticks = raw.ticks[i];
-        uint32_t space_ticks = (i + 1 < raw.len) ? static_cast<uint32_t>(raw.ticks[i + 1]) : 0;
-        if (mark_ticks > kMaxDuration)
-          mark_ticks = kMaxDuration;
-        if (space_ticks > kMaxDuration)
-          space_ticks = kMaxDuration;
-        s.level0 = mark_high ? 1 : 0;
-        s.duration0 = static_cast<uint16_t>(mark_ticks);
-        s.level1 = mark_high ? 0 : 1;
-        s.duration1 = static_cast<uint16_t>(space_ticks);
-        syms.push_back(s);
+        uint32_t mark = static_cast<uint32_t>(raw.ticks[i]) * kScale;
+        uint32_t space = (i + 1 < raw.len) ? static_cast<uint32_t>(raw.ticks[i + 1]) * kScale : 0;
+        if (mark <= kMaxSymbolDuration && space <= kMaxSymbolDuration)
+        {
+          rmt_symbol_word_t s{};
+          s.level0 = mark_lvl;
+          s.duration0 = static_cast<uint16_t>(mark);
+          s.level1 = space_lvl;
+          s.duration1 = static_cast<uint16_t>(space);
+          syms.push_back(s);
+          continue;
+        }
+        appendRun(syms, mark_lvl, mark);
+        appendRun(syms, space_lvl, space);
       }
       return syms;
     }
@@ -78,7 +131,6 @@ namespace esp32irpk::hal
                                                     uint32_t carrier_hz, float duty,
                                                     bool mark_high)
     {
-      constexpr uint32_t kMaxDur = 0x7FFF; // RMT duration field limit (1us units)
       std::vector<rmt_symbol_word_t> syms;
       const uint8_t mark_lvl = mark_high ? 1 : 0;
       const uint8_t space_lvl = mark_high ? 0 : 1;
@@ -88,8 +140,8 @@ namespace esp32irpk::hal
       uint16_t hi = 0, lo = 0;
       if (period > 0)
       {
-        if (period > 2 * kMaxDur)
-          period = 2 * kMaxDur;
+        if (period > 2 * kMaxSymbolDuration)
+          period = 2 * kMaxSymbolDuration;
         uint32_t high = static_cast<uint32_t>(period * duty + 0.5f);
         if (high < 1)
           high = 1;
@@ -98,31 +150,6 @@ namespace esp32irpk::hal
         hi = static_cast<uint16_t>(high);
         lo = static_cast<uint16_t>(period - high);
       }
-
-      // Emit a single-level run of `us` microseconds, packing two halves per
-      // symbol and never emitting a zero duration mid-stream (which the RMT HW
-      // treats as an end marker).
-      auto pushRun = [&](uint8_t level, uint32_t us)
-      {
-        while (us > 0)
-        {
-          uint32_t d0 = std::min<uint32_t>(us, kMaxDur);
-          us -= d0;
-          uint32_t d1 = std::min<uint32_t>(us, kMaxDur);
-          us -= d1;
-          if (d1 == 0 && d0 > 1)
-          {
-            d1 = d0 / 2;
-            d0 -= d1;
-          }
-          rmt_symbol_word_t s{};
-          s.level0 = level;
-          s.duration0 = static_cast<uint16_t>(d0);
-          s.level1 = level;
-          s.duration1 = static_cast<uint16_t>(d1 ? d1 : d0);
-          syms.push_back(s);
-        }
-      };
 
       for (size_t i = 0; i < raw.len; i += 2)
       {
@@ -144,13 +171,13 @@ namespace esp32irpk::hal
         }
         else
         {
-          pushRun(mark_lvl, mark_us);
+          appendRun(syms, mark_lvl, mark_us);
         }
         if (i + 1 < raw.len)
         {
           uint32_t space_us = static_cast<uint32_t>(raw.ticks[i + 1]) * kRmtTickUs;
           if (space_us > 0)
-            pushRun(space_lvl, space_us);
+            appendRun(syms, space_lvl, space_us);
         }
       }
       return syms;
@@ -199,7 +226,7 @@ namespace esp32irpk::hal
     cfg.clk_src = selectRmtClkSrc();
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
     cfg.mem_block_symbols = mem_words;
-    cfg.resolution_hz = phase_aligned ? kRmtResolutionHzFine : kRmtResolutionHz;
+    cfg.resolution_hz = phase_aligned ? kRmtResolutionHzFine : kTxModulatedResolutionHz;
     cfg.trans_queue_depth = 2;
     cfg.flags.invert_out = inverted_;
 
@@ -345,18 +372,20 @@ namespace esp32irpk::hal
     gpio_ = gpio;
     inverted_ = inverted;
     // A single space/idle is a 15-bit duration field at the RX resolution
-    // (1 tick = kRmtTickUs). Clamp so signal_range_max_ns stays representable.
-    constexpr uint32_t kMaxIdleUs = 0x7FFFu * kRmtTickUs;
+    // (~327ms at 100kHz, ~102ms at 320kHz). Clamp so signal_range_max_ns stays
+    // representable.
+    constexpr uint32_t kMaxIdleUs =
+        static_cast<uint32_t>(static_cast<uint64_t>(kMaxSymbolDuration) * 1000000u / kRxResolutionHz);
     idle_threshold_us_ = idle_threshold_us > kMaxIdleUs ? kMaxIdleUs : idle_threshold_us;
     const bool explicit_capacity = max_rx_symbols != 0;
     max_rx_symbols_ = explicit_capacity ? max_rx_symbols : kMaxRxSymbols;
-    ESP_LOGV(kTag, "RMT RX begin: gpio=%d inverted=%d idle_threshold_us=%u tick_us=%u max_rx_symbols=%u",
-             gpio_, inverted_ ? 1 : 0, idle_threshold_us_, kRmtTickUs, (unsigned)max_rx_symbols_);
+    ESP_LOGV(kTag, "RMT RX begin: gpio=%d inverted=%d idle_threshold_us=%u resolution_hz=%u max_rx_symbols=%u",
+             gpio_, inverted_ ? 1 : 0, idle_threshold_us_, (unsigned)kRxResolutionHz, (unsigned)max_rx_symbols_);
 
     rmt_rx_channel_config_t cfg = {};
     cfg.clk_src = selectRmtClkSrc();
     cfg.gpio_num = static_cast<gpio_num_t>(gpio_);
-    cfg.resolution_hz = kRmtResolutionHz;
+    cfg.resolution_hz = kRxResolutionHz;
     cfg.flags.invert_in = inverted_;
     cfg.flags.with_dma = false;
 
@@ -506,17 +535,9 @@ namespace esp32irpk::hal
       for (size_t i = 0; i < sym_count_; ++i)
       {
         const auto &s = sym[i];
-        uint32_t t0 = static_cast<uint32_t>(s.duration0);
-        if (t0 > 0xFFFF)
-          t0 = 0xFFFF;
-        frame.ticks.push_back(static_cast<uint16_t>(t0));
+        frame.ticks.push_back(rxDurationToTicks(s.duration0));
         if (s.duration1 > 0)
-        {
-          uint32_t t1 = static_cast<uint32_t>(s.duration1);
-          if (t1 > 0xFFFF)
-            t1 = 0xFFFF;
-          frame.ticks.push_back(static_cast<uint16_t>(t1));
-        }
+          frame.ticks.push_back(rxDurationToTicks(s.duration1));
       }
       sym_count_ = 0;
 

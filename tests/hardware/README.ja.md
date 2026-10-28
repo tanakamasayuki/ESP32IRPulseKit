@@ -12,6 +12,7 @@ ESP32実機を使う自動テストをここに追加します。
 | `protocol_matrix/` | 自前TX -> 自前RXで複数protocolを実機確認するmatrix | 必須寄り |
 | `protocol_matrix_ac/` | エアコンの自己往復matrix（`ac::` レイヤー、TX -> RX、各ベンダ1状態） | 必須寄り |
 | `rx_capacity/` | RXキャプチャ容量: `setMaxRxSymbols()` 以内のフレームは欠けずに届き、超えるフレームは `RAW_TRUNCATED` 付きで切り詰め | 必須寄り |
+| `rmt_coexist/` | 1ボード: RX・TX・他のRMT利用者（WS2812相当）を1つのチップでどの順番でも `begin()` できる | 必須寄り |
 
 これらは合否が明確で、`pytest hardware` で自動収集されます。観測ログを取るだけの実機調査（jitter、timing sweep、外部ライブラリ互換）は `tests/studies/` に置き、自動収集されません。
 

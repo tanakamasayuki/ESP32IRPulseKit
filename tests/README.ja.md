@@ -44,7 +44,7 @@ uv run --env-file .env pytest -v --clean --profiles all --peer-profiles all     
 uv run --env-file .env pytest studies/compat_matrix*/ -o python_files="study_*.py" -v --clean  # 実装間の互換（汎用＋エアコン）
 ```
 
-- 1つ目は `pc/`（host のコーデック/フレームロジック・例＋スケッチのコンパイル・fixtures）**と** `hardware/`（`link_smoke`・`protocol_matrix`・`protocol_matrix_ac`・`rx_capacity`）を収集します。`studies/` は収集しません（`test_*.py` ではなく `study_*.py` のため）。`protocol_matrix` は汎用プロトコル（NEC/Sony/Samsung/JVC/AEHA/RC5/RC6）、`protocol_matrix_ac` はエアコン層の PulseKit 自己往復（TX -> RX、各ベンダ1状態）を検証します — どちらもゲートされた合否です。
+- 1つ目は `pc/`（host のコーデック/フレームロジック・例＋スケッチのコンパイル・fixtures）**と** `hardware/`（`link_smoke`・`protocol_matrix`・`protocol_matrix_ac`・`rx_capacity`・`rmt_coexist`）を収集します。`studies/` は収集しません（`test_*.py` ではなく `study_*.py` のため）。`protocol_matrix` は汎用プロトコル（NEC/Sony/Samsung/JVC/AEHA/RC5/RC6）、`protocol_matrix_ac` はエアコン層の PulseKit 自己往復（TX -> RX、各ベンダ1状態）を検証します — どちらもゲートされた合否です。
 - `--profiles all --peer-profiles all` で、`hardware/` を RX/TX の全組み合わせ（S3→S3、ESP32→ESP32、と S3/ESP32 のクロス2通り）で回し、`pc/codec_smoke` を host と ESP32無印 実機の両方で回します。IR は空間で届くので、どの組み合わせも成立します。ESP32無印 は RMT RX ping-pong がなく、RXキャプチャがRMTハードウェアメモリに収まる必要があるなど S3 と別の経路を通り、異なるチップ間の送受信はユーザーの実際の使い方でもあるため、リリース前に全組み合わせを確認します。実機は1台ずつ逐次実行されます。
 - 2つ目は compat-matrix studies を外部ライブラリ（IRremoteESP8266・HeatpumpIR・Arduino-IRremote）に対して実行します — 各エアコンベンダの「対応」を裏付ける**実装間**相互運用テストです。`compat_matrix*` は `compat_matrix/`（汎用プロトコル）と `compat_matrix_ac/`（エアコン）の両方に一致します。チップに依存しないので既定プロファイル（ESP32-S3）で足ります。
 

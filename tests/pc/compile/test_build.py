@@ -80,3 +80,18 @@ def test_protocol_matrix_ac_hardware_sketches_build(tmp_path):
     matrix = repo / "tests" / "hardware" / "protocol_matrix_ac"
     compile_sketch(matrix, tmp_path, "rx_esp32s3")
     compile_sketch(matrix / "peer_tx", tmp_path, "tx_esp32s3")
+
+
+def test_rx_capacity_hardware_sketches_build(tmp_path):
+    repo = Path(__file__).resolve().parents[3]
+    sketch = repo / "tests" / "hardware" / "rx_capacity"
+    compile_sketch(sketch, tmp_path, "rx_esp32s3")
+    compile_sketch(sketch, tmp_path, "rx_esp32")
+    compile_sketch(sketch / "peer_tx", tmp_path, "tx_esp32s3")
+
+
+def test_rmt_coexist_hardware_sketch_builds(tmp_path):
+    repo = Path(__file__).resolve().parents[3]
+    sketch = repo / "tests" / "hardware" / "rmt_coexist"
+    compile_sketch(sketch, tmp_path, "rx_esp32s3")
+    compile_sketch(sketch, tmp_path, "rx_esp32")

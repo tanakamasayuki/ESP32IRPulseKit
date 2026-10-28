@@ -20,7 +20,7 @@ IRは物理環境の影響を受けやすいため、`pc/codec_smoke` でArduino
 
 | 環境 | 実行するテスト |
 | --- | --- |
-| ローカル開発 | pc、hardware/link_smoke、hardware/protocol_matrix、hardware/protocol_matrix_ac、hardware/rx_capacity |
+| ローカル開発 | pc、hardware/link_smoke、hardware/protocol_matrix、hardware/protocol_matrix_ac、hardware/rx_capacity、hardware/rmt_coexist |
 | GitHub Actions | pc（fixtures、codec_smoke、compile） |
 | 必要時 | studies |
 
@@ -47,7 +47,8 @@ IRは物理環境の影響を受けやすいため、`pc/codec_smoke` でArduino
 | examples build | | ✅ | | buildテスト追加済み |
 | RMT TX RAW送信 | | ✅ sketch build | ✅ NEC smoke | TX peerスケッチ + 2台smoke |
 | RMT RX RAW受信 | | ✅ sketch build | ✅ NEC smoke | RX dutスケッチ + 2台smoke |
-| RXキャプチャ容量 / RAW_TRUNCATED | ✅ 計算規則 | ✅ ESP32 build | ✅ rx_capacity（ESP32-S3） | ブロック数とtruncate判定はhostで検証。ESP32/S2の複数ブロック経路はESP32無印のRX実機が用意できるまでビルドのみ |
+| RXキャプチャ容量 / RAW_TRUNCATED | ✅ 計算規則 | ✅ ESP32 build | ✅ rx_capacity（ESP32-S3、ESP32） | ブロック数とtruncate判定はhostで検証。ESP32の複数ブロック経路はESP32無印RXのプロファイルで実機確認（ESP32-S2はビルドのみ） |
+| RMTチャンネルの共存 | | | ✅ rmt_coexist（ESP32-S3、ESP32） | 1ボードでRX・TX・WS2812相当のチャンネルをどの順番でも `begin()` |
 | TX->RX loop | | | ✅ NEC smoke | TX/RX 2台構成のpytest追加済み |
 | protocol matrix | | ✅ sketch build | ✅ | ESP32IRPulseKit TX -> ESP32IRPulseKit RXでNEC/SONY12/SAMSUNG32/JVCを確認 |
 | エアコン protocol matrix | ✅ codec_smoke | ✅ sketch build | ✅ | 自前TX -> 自前RXの自己往復、各ベンダ1状態（Panasonic/Gree/Mitsubishi/Fujitsu/Daikin/Toshiba/Samsung/Sharp） |

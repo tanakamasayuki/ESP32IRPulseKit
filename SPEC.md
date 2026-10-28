@@ -330,6 +330,8 @@ Specs added with `addProtocol()` keep their relative registration order; built-i
 
 The default `setIdleThresholdUs()` value is `30000us`. When decode is enabled, the receiver uses the larger of the receiver setting and the maximum non-zero `idle_threshold_us` among registered protocols.
 
+The RMT RX channel runs at 320kHz, so the idle threshold is limited to about `102000us` (a 15-bit RMT duration); a larger value is clamped.
+
 ### 4.5 RX Capture Capacity
 
 `setMaxRxSymbols(symbols)` sets the maximum number of RMT symbols a single capture can hold. It is valid only before `begin()`.
@@ -338,6 +340,10 @@ The default `setIdleThresholdUs()` value is `30000us`. When decode is enabled, t
 - A long waveform such as an air-conditioner frame (section 11) needs a larger value. Raise it together with `setIdleThresholdUs()` so the whole burst lands in one capture.
 - A larger capacity costs RAM per receiver, so it is opt-in rather than a global default.
 - On ESP32 and ESP32-S2 (no RMT RX ping-pong) a whole frame must fit in the RX channel's RMT hardware memory. The receiver takes enough RMT memory blocks for the capacity. With the default capacity it takes at most half of the RMT memory (256 symbols on ESP32, 128 on ESP32-S2), leaving room for other RMT users (IR TX, WS2812 LEDs). A capacity set explicitly with `setMaxRxSymbols()` may take all but one block (448 symbols on ESP32, 192 on ESP32-S2), so one TX channel can still coexist; begin the receiver after other RMT users if they need more than that. If other RMT channels hold that memory, `begin()` still succeeds with fewer blocks; frames that do not fit are truncated with `RAW_TRUNCATED`. Other SoCs stream the capture and are limited only by the capacity.
+
+### 4.6 RMT Clock and Other RMT Users
+
+The receiver and sender channels use the SoC's default RMT clock source, the same one as other RMT users such as the Arduino RMT API behind `rgbLedWrite()` and WS2812 drivers; the clock source is shared by every RMT channel on the chip. On SoCs that also share the clock divider (all but ESP32 / ESP32-S2), the first channel created picks it, so the RX channel runs at 320kHz and the TX channel at 1MHz, which coexist with each other and with faster channels. `IRReceiver`, `IRSender`, and other RMT users can therefore `begin()` in any order on one chip.
 
 ## 5. IRReceiver
 
