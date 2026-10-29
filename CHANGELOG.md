@@ -1,6 +1,8 @@
 # Changelog / 変更履歴
 
 ## Unreleased
+
+## 1.0.7
 - (EN) RMT channels now coexist in any order. On SoCs whose RMT channels share one clock divider (ESP32-S3/C3/C6/H2/P4), the first channel created picks it, so `IRReceiver::begin()` failed ("channel prescale out of the range") after an `IRSender` (1MHz phase-aligned carrier) or another fast RMT user had begun on the same chip. On ESP32 / ESP32-S2, the library used the REF_TICK clock source, so it could not share the chip with RMT users on the default clock (`rgbLedWrite()`, WS2812 drivers: "group clock conflict"). All channels now use the default clock source; RX runs at 320kHz and the modulated TX at 1MHz on every SoC. The RX idle threshold is now limited to ~102ms (was ~327ms). New single-board hardware test `hardware/rmt_coexist`.
 - (JA) RMTチャンネルをどの順番でも共存できるように。分周器を全チャンネルで共有するSoC（ESP32-S3/C3/C6/H2/P4）では最初に作ったチャンネルが分周を決めるため、同じチップで `IRSender`（1MHzの位相同期キャリア）や他の高速なRMT利用者が先に始まっていると `IRReceiver::begin()` が失敗していた（"channel prescale out of the range"）。ESP32 / ESP32-S2ではREF_TICKクロック源を使っていたため、既定クロックのRMT利用者（`rgbLedWrite()`、WS2812ドライバ）と同じチップで使えなかった（"group clock conflict"）。全チャンネルを既定クロック源にし、全SoCでRXを320kHz、変調TXを1MHzに。RXのidle閾値の上限は約102ms（従来は約327ms）。1ボード実機テスト `hardware/rmt_coexist` を追加。
 
